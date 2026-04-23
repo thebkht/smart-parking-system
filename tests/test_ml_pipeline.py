@@ -273,6 +273,67 @@ def test_prepare_stage2_inherits_scene_holdout(tmp_path):
     assert report["scene_holdout"]["leakage_checks"]["scene_leakage_detected"] is False
 
 
+def test_prepare_stage2_accepts_roi_annotations_dataset(tmp_path):
+    root = tmp_path / "parking_rois"
+    images = root / "images"
+    make_image(images / "frame_a.jpg", 90)
+    make_image(images / "frame_b.jpg", 140)
+    make_image(images / "frame_c.jpg", 180)
+    annotations = {
+        "train": {
+            "file_names": ["frame_a.jpg"],
+            "rois_list": [[
+                [[0.10, 0.10], [0.30, 0.10], [0.30, 0.40], [0.10, 0.40]],
+                [[0.50, 0.20], [0.80, 0.20], [0.80, 0.60], [0.50, 0.60]],
+            ]],
+            "occupancy_list": [[False, True]],
+        },
+        "valid": {
+            "file_names": ["frame_b.jpg"],
+            "rois_list": [[
+                [[0.15, 0.15], [0.35, 0.15], [0.35, 0.45], [0.15, 0.45]],
+                [[0.55, 0.25], [0.85, 0.25], [0.85, 0.65], [0.55, 0.65]],
+            ]],
+            "occupancy_list": [[False, True]],
+        },
+        "test": {
+            "file_names": ["frame_c.jpg"],
+            "rois_list": [[
+                [[0.20, 0.20], [0.40, 0.20], [0.40, 0.50], [0.20, 0.50]],
+                [[0.60, 0.30], [0.90, 0.30], [0.90, 0.70], [0.60, 0.70]],
+            ]],
+            "occupancy_list": [[False, True]],
+        },
+    }
+    (root / "annotations.json").write_text(json.dumps(annotations), encoding="utf-8")
+
+    args = SimpleNamespace(
+        pklot_dir=str(root),
+        cnrpark_dir=None,
+        patch_cache=str(tmp_path / "patches"),
+        stage2_output=str(tmp_path / "stage2_data"),
+        pklot_test_output=str(tmp_path / "pklot_test"),
+        cnrpark_test_output=str(tmp_path / "cnrpark_test"),
+        val_ratio=0.2,
+        test_ratio=0.2,
+        seed=7,
+    )
+    prepare_dataset.prepare_stage2(args)
+
+    assert len(list((tmp_path / "stage2_data" / "train" / "free").glob("*.jpg"))) == 1
+    assert len(list((tmp_path / "stage2_data" / "train" / "occupied").glob("*.jpg"))) == 1
+    assert len(list((tmp_path / "stage2_data" / "val" / "free").glob("*.jpg"))) == 1
+    assert len(list((tmp_path / "stage2_data" / "val" / "occupied").glob("*.jpg"))) == 1
+    assert len(list((tmp_path / "stage2_data" / "test" / "free").glob("*.jpg"))) == 1
+    assert len(list((tmp_path / "stage2_data" / "test" / "occupied").glob("*.jpg"))) == 1
+
+    report = json.loads((tmp_path / "stage2_data" / prepare_dataset.SANITY_REPORT).read_text(encoding="utf-8"))
+    assert report["split_strategy"] == "source_presplit"
+    assert report["annotation_source"] == "annotations.json"
+    assert report["invalid_polygons_skipped"] == 0
+    assert report["splits"]["val"] == {"free": 1, "occupied": 1}
+
+
 def test_collect_cnrpark_patches_reads_official_labels_layout(tmp_path):
     root = tmp_path / "cnr"
     sunny_free = root / "PATCHES" / "SUNNY" / "2015-11-22" / "camera6" / "S_2015-11-22_09.47_C06_205.jpg"

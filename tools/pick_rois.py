@@ -78,6 +78,16 @@ class PickerState:
     def to_yaml_dict(self) -> dict:
         return {name: [x1, y1, x2, y2] for name, x1, y1, x2, y2 in self.rois}
 
+    def load_yaml_dict(self, rois: dict) -> None:
+        loaded: List[Tuple[str, int, int, int, int]] = []
+        for name, coords in rois.items():
+            if not isinstance(coords, list) or len(coords) != 4:
+                continue
+            x1, y1, x2, y2 = (int(v) for v in coords)
+            loaded.append((str(name), x1, y1, x2, y2))
+        self.rois = loaded
+        self.pending = None
+
 
 # ── drawing ─────────────────────────────────────────────────────────────────
 def draw_crosshair(canvas: np.ndarray, x: int, y: int) -> None:
@@ -154,17 +164,57 @@ def render(base: np.ndarray, state: PickerState, scale: float) -> np.ndarray:
     return canvas
 
 
-# ── save ────────────────────────────────────────────────────────────────────
-def save_config(state: PickerState, config_path: Path) -> None:
+# ── save/load ───────────────────────────────────────────────────────────────
+def make_source_key(source_path: Path, source_kind: str) -> str:
+    try:
+        normalized = source_path.resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        normalized = source_path.resolve().as_posix()
+    return f"{source_kind}:{normalized}"
+
+
+def load_source_rois(config_path: Path, source_path: Path, source_kind: str) -> dict:
+    if not config_path.exists():
+        return {}
+    with open(config_path, encoding="utf-8") as f:
+        existing = yaml.safe_load(f) or {}
+
+    source_key = make_source_key(source_path, source_kind)
+    source_entry = (existing.get("roi_sources") or {}).get(source_key) or {}
+    rois = source_entry.get("rois")
+    if isinstance(rois, dict):
+        return rois
+
+    # Backward compatibility with older single-source configs.
+    legacy_rois = existing.get("rois")
+    if isinstance(legacy_rois, dict):
+        return legacy_rois
+    return {}
+
+
+def save_config(state: PickerState, config_path: Path, source_path: Path, source_kind: str) -> None:
     existing: dict = {}
     if config_path.exists():
         with open(config_path, encoding="utf-8") as f:
             existing = yaml.safe_load(f) or {}
+
+    source_key = make_source_key(source_path, source_kind)
+    roi_sources = existing.get("roi_sources") or {}
+    roi_sources[source_key] = {
+        "kind": source_kind,
+        "path": str(source_path.resolve()),
+        "rois": state.to_yaml_dict(),
+    }
+
+    existing["roi_sources"] = roi_sources
+    # Keep the top-level field as the active source for compatibility with the rest of the app.
     existing["rois"] = state.to_yaml_dict()
+
     config_path.parent.mkdir(parents=True, exist_ok=True)
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(existing, f, default_flow_style=False, sort_keys=False)
     print(f"\n✓ Saved {len(state.rois)} ROIs to {config_path}")
+    print(f"  source: {source_key}")
     for name, x1, y1, x2, y2 in state.rois:
         print(f"  {name}: [{x1}, {y1}, {x2}, {y2}]")
 
@@ -246,6 +296,9 @@ def main() -> None:
 
     state = PickerState()
     config_path = Path(args.config)
+    existing_rois = load_source_rois(config_path, source_path, source_kind)
+    if existing_rois:
+        state.load_yaml_dict(existing_rois)
     WIN = "ROI Picker — Smart Parking"
     cv2.namedWindow(WIN, cv2.WINDOW_NORMAL)
 
@@ -267,6 +320,8 @@ def main() -> None:
             print(f"Selected video timestamp: {args.time_sec:.3f}s")
         else:
             print(f"Selected video frame: {args.frame_number}")
+    if state.rois:
+        print(f"Loaded {len(state.rois)} existing ROIs for this source from {config_path}")
     print("Click TOP-LEFT then BOTTOM-RIGHT of each parking spot.")
     print("Keys: U=undo  R=reset  S=save+quit  Q=quit\n")
 
@@ -282,7 +337,7 @@ def main() -> None:
             if not state.rois:
                 print("No ROIs defined yet — nothing to save.")
             else:
-                save_config(state, config_path)
+                save_config(state, config_path, source_path, source_kind)
                 break
         elif key in (ord("u"), ord("U")):
             state.undo()

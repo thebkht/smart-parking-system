@@ -49,11 +49,15 @@ DEFAULT_CAMERA_PROBE_LIMIT = 10
 DEFAULT_STAGE2_LOCAL_CHECKPOINT = "runs/stage2_cls/yolov8n_stage2/weights/best.pt"
 DEFAULT_STAGE1_MIN_BOX_AREA = 1500
 DEFAULT_STAGE1_FILTER_MODE = "bounds"
+DEFAULT_STAGE1_CONFIDENCE = 0.4
+DEFAULT_STAGE1_POSTPROCESS_TYPE = "nmm"
+DEFAULT_STAGE1_MATCH_THRESHOLD = 0.3
 DEFAULT_CAMERA_READ_RETRY_LIMIT = 30        # was 10 — give ~6s before giving up
 DEFAULT_CAMERA_REOPEN_LIMIT = 5             # was 3 — more reopen attempts before fallback
 DEFAULT_BUILTIN_CAMERA_LABEL = "built-in"
 DEFAULT_IPHONE_CAMERA_LABEL = "iphone"
 DEFAULT_CAMERA_PROBE_MISS_STREAK_LIMIT = 2
+STAGE1_OCCUPY_THRESHOLD = 0.45
 
 DEFAULT_ROIS: Dict[str, Tuple[int, int, int, int]] = {
     "spot_1": (50, 100, 200, 250),
@@ -104,6 +108,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Use the Stage 1 parking-space detector instead of fixed ROIs.",
     )
+    parser.add_argument(
+        "--stage1-only",
+        action="store_true",
+        help=(
+            "Skip Stage 2 classifier entirely. A Stage 1 detection box is "
+            "treated as occupied; undetected spots are free. "
+            "Useful when Stage 2 domain-shifts badly (e.g. steep overhead angle)."
+        ),
+    )
     parser.add_argument("--device", default=None, help="Inference device. Default from config.")
     parser.add_argument("--backend-url", default=DEFAULT_BACKEND_URL)
     parser.add_argument(
@@ -132,7 +145,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--save-annotated",
-        help="Path to save an annotated output image in image mode.",
+        help=(
+            "Path to save annotated output. In image mode this saves an image; "
+            "in video/camera mode this saves an annotated video."
+        ),
     )
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
     parser.add_argument(
@@ -299,6 +315,12 @@ def resolve_settings(args: argparse.Namespace, cfg: dict) -> argparse.Namespace:
         args.stage1_min_box_area = stage1_cfg.get("min_box_area", DEFAULT_STAGE1_MIN_BOX_AREA)
     if args.stage1_filter_mode is None:
         args.stage1_filter_mode = stage1_cfg.get("filter_mode", DEFAULT_STAGE1_FILTER_MODE)
+    args.stage1_postprocess_type = str(
+        stage1_cfg.get("postprocess_type", DEFAULT_STAGE1_POSTPROCESS_TYPE)
+    ).strip().lower()
+    args.stage1_match_threshold = float(
+        stage1_cfg.get("match_threshold", DEFAULT_STAGE1_MATCH_THRESHOLD)
+    )
 
     configured_stage2_path = Path(str(args.stage2_model))
     if not configured_stage2_path.exists():
@@ -510,6 +532,8 @@ def get_spot_boxes(
     overlap: float = 0.2,
     min_box_area: int = DEFAULT_STAGE1_MIN_BOX_AREA,
     filter_mode: str = DEFAULT_STAGE1_FILTER_MODE,
+    postprocess_type: str = DEFAULT_STAGE1_POSTPROCESS_TYPE,
+    match_threshold: float = DEFAULT_STAGE1_MATCH_THRESHOLD,
 ) -> Dict[str, Tuple[int, int, int, int]]:
     if not use_stage1_detector:
         return fixed_rois
@@ -517,10 +541,9 @@ def get_spot_boxes(
         raise ValueError("Stage 1 parking-space detector requested but no model was loaded.")
 
     # Stage 1 is always a YOLO .pt — Core ML only applies to stage 2
-    yolo_device = device if device != "coreml" else "cpu"
-    lot_mask = roi_bounds(fixed_rois)
-
-    roi_boxes = list(fixed_rois.values())
+    yolo_device = device if device != "mps" else "cpu"
+    lot_mask = roi_bounds(fixed_rois) if fixed_rois and fixed_rois != DEFAULT_ROIS else None
+    roi_boxes = list(fixed_rois.values()) if fixed_rois else []
 
     if use_sahi:
         try:
@@ -531,7 +554,7 @@ def get_spot_boxes(
             sahi_model = AutoDetectionModel.from_pretrained(
                 model_type="ultralytics",
                 model_path=stage1_model.ckpt_path,
-                confidence_threshold=0.3,
+                confidence_threshold=DEFAULT_STAGE1_CONFIDENCE,
                 device=yolo_device,
             )
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
@@ -547,8 +570,7 @@ def get_spot_boxes(
                 verbose=0,
             )
             os.unlink(tmp_path)
-            boxes: Dict[str, Tuple[int, int, int, int]] = {}
-            next_index = 1
+            candidates: list[Tuple[Tuple[int, int, int, int], float]] = []
             for pred in result.object_prediction_list:
                 b = pred.bbox
                 kept = filter_stage1_box(
@@ -561,16 +583,27 @@ def get_spot_boxes(
                 )
                 if kept is None:
                     continue
-                boxes[f"spot_{next_index}"] = kept
-                next_index += 1
-            return boxes
+                score = float(getattr(pred.score, "value", 1.0))
+                candidates.append((kept, score))
+            return consolidate_stage1_boxes(
+                candidates,
+                postprocess_type=postprocess_type,
+                match_threshold=match_threshold,
+            )
         except ImportError:
             print("SAHI not installed; falling back to standard inference.")
 
-    results = stage1_model(frame, device=yolo_device, verbose=False, imgsz=stage1_imgsz)[0]
-    boxes = {}
-    next_index = 1
-    for box in results.boxes.xyxy.cpu().numpy():
+    results = stage1_model(
+        frame,
+        device=yolo_device,
+        verbose=False,
+        imgsz=stage1_imgsz,
+        conf=DEFAULT_STAGE1_CONFIDENCE,
+    )[0]
+    candidates: list[Tuple[Tuple[int, int, int, int], float]] = []
+    raw_boxes = results.boxes.xyxy.cpu().numpy()
+    raw_scores = results.boxes.conf.cpu().numpy() if results.boxes.conf is not None else None
+    for index, box in enumerate(raw_boxes):
         kept = filter_stage1_box(
             frame.shape,
             tuple(box.astype(int)),
@@ -581,9 +614,13 @@ def get_spot_boxes(
         )
         if kept is None:
             continue
-        boxes[f"spot_{next_index}"] = kept
-        next_index += 1
-    return boxes
+        score = float(raw_scores[index]) if raw_scores is not None else 1.0
+        candidates.append((kept, score))
+    return consolidate_stage1_boxes(
+        candidates,
+        postprocess_type=postprocess_type,
+        match_threshold=match_threshold,
+    )
 
 
 def clip_box(
@@ -615,6 +652,142 @@ def roi_bounds(rois: Dict[str, Tuple[int, int, int, int]]) -> Optional[Tuple[int
 def box_area(box: Tuple[int, int, int, int]) -> int:
     x1, y1, x2, y2 = box
     return max(0, x2 - x1) * max(0, y2 - y1)
+
+
+def box_iou(box_a: Tuple[int, int, int, int], box_b: Tuple[int, int, int, int]) -> float:
+    ax1, ay1, ax2, ay2 = box_a
+    bx1, by1, bx2, by2 = box_b
+    inter_x1 = max(ax1, bx1)
+    inter_y1 = max(ay1, by1)
+    inter_x2 = min(ax2, bx2)
+    inter_y2 = min(ay2, by2)
+    inter_w = max(0, inter_x2 - inter_x1)
+    inter_h = max(0, inter_y2 - inter_y1)
+    inter_area = inter_w * inter_h
+    if inter_area <= 0:
+        return 0.0
+    union = box_area(box_a) + box_area(box_b) - inter_area
+    if union <= 0:
+        return 0.0
+    return inter_area / union
+
+
+def _axis_overlap_ratio(start_a: int, end_a: int, start_b: int, end_b: int) -> float:
+    intersection = max(0, min(end_a, end_b) - max(start_a, start_b))
+    span = min(max(1, end_a - start_a), max(1, end_b - start_b))
+    return intersection / span
+
+
+def _box_center(box: Tuple[int, int, int, int]) -> Tuple[float, float]:
+    x1, y1, x2, y2 = box
+    return ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+
+
+def _merge_boxes(boxes: Iterable[Tuple[int, int, int, int]]) -> Tuple[int, int, int, int]:
+    box_list = list(boxes)
+    return (
+        min(box[0] for box in box_list),
+        min(box[1] for box in box_list),
+        max(box[2] for box in box_list),
+        max(box[3] for box in box_list),
+    )
+
+
+def _should_merge_stage1_boxes(
+    box_a: Tuple[int, int, int, int],
+    box_b: Tuple[int, int, int, int],
+    *,
+    match_threshold: float,
+    median_width: float,
+    median_height: float,
+) -> bool:
+    iou = box_iou(box_a, box_b)
+    if iou >= match_threshold:
+        return True
+
+    ax1, ay1, ax2, ay2 = box_a
+    bx1, by1, bx2, by2 = box_b
+    horizontal_overlap = _axis_overlap_ratio(ax1, ax2, bx1, bx2)
+    vertical_overlap = _axis_overlap_ratio(ay1, ay2, by1, by2)
+
+    inter_x1 = max(ax1, bx1)
+    inter_y1 = max(ay1, by1)
+    inter_x2 = min(ax2, bx2)
+    inter_y2 = min(ay2, by2)
+    inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+    smaller_area = min(box_area(box_a), box_area(box_b))
+    inter_smaller = (inter_area / smaller_area) if smaller_area > 0 else 0.0
+    if inter_smaller >= max(0.5, match_threshold):
+        return True
+
+    acx, acy = _box_center(box_a)
+    bcx, bcy = _box_center(box_b)
+    center_dx = abs(acx - bcx)
+    center_dy = abs(acy - bcy)
+    width_gate = max(8.0, median_width * 0.35)
+    height_gate = max(8.0, median_height * 0.35)
+    if horizontal_overlap >= 0.55 and center_dx <= width_gate and center_dy <= height_gate:
+        return True
+    if vertical_overlap >= 0.8 and center_dx <= width_gate * 0.6:
+        return True
+    return False
+
+
+def consolidate_stage1_boxes(
+    candidates: Iterable[Tuple[Tuple[int, int, int, int], float]],
+    *,
+    postprocess_type: str,
+    match_threshold: float,
+) -> Dict[str, Tuple[int, int, int, int]]:
+    candidate_list = list(candidates)
+    if not candidate_list:
+        return {}
+
+    if postprocess_type == "none":
+        return {
+            f"spot_{index}": box
+            for index, (box, _score) in enumerate(candidate_list, start=1)
+        }
+
+    widths = [max(1, box[2] - box[0]) for box, _score in candidate_list]
+    heights = [max(1, box[3] - box[1]) for box, _score in candidate_list]
+    median_width = float(np.median(widths))
+    median_height = float(np.median(heights))
+
+    ordered = sorted(candidate_list, key=lambda item: item[1], reverse=True)
+    merged_groups: list[list[Tuple[Tuple[int, int, int, int], float]]] = []
+    for box, score in ordered:
+        assigned = False
+        for group in merged_groups:
+            merged_box = _merge_boxes(group_box for group_box, _group_score in group)
+            if _should_merge_stage1_boxes(
+                box,
+                merged_box,
+                match_threshold=match_threshold,
+                median_width=median_width,
+                median_height=median_height,
+            ):
+                group.append((box, score))
+                assigned = True
+                break
+        if not assigned:
+            merged_groups.append([(box, score)])
+
+    merged_candidates: list[Tuple[Tuple[int, int, int, int], float]] = []
+    for group in merged_groups:
+        if postprocess_type == "nms":
+            best_box, best_score = max(group, key=lambda item: item[1])
+            merged_candidates.append((best_box, best_score))
+            continue
+        merged_box = _merge_boxes(box for box, _score in group)
+        merged_score = max(score for _box, score in group)
+        merged_candidates.append((merged_box, merged_score))
+
+    merged_candidates.sort(key=lambda item: (item[0][1], item[0][0]))
+    return {
+        f"spot_{index}": box
+        for index, (box, _score) in enumerate(merged_candidates, start=1)
+    }
 
 
 def filter_stage1_box(
@@ -792,10 +965,178 @@ def write_latest_frame(
     return True
 
 
+def _resolve_video_output_path(save_annotated: Optional[str], default_name: str) -> Optional[Path]:
+    if not save_annotated:
+        return None
+    output_path = Path(save_annotated)
+    if output_path.suffix:
+        return output_path
+    output_path.mkdir(parents=True, exist_ok=True)
+    return output_path / default_name
+
+
+def _make_partial_video_path(output_path: Path) -> Path:
+    return output_path.with_name(f"{output_path.stem}.partial{output_path.suffix}")
+
+
+def _video_writer_candidates(output_path: Path) -> Tuple[Tuple[str, Path], ...]:
+    suffix = output_path.suffix.lower()
+    mp4_candidates = (
+        ("avc1", output_path.with_suffix(".mp4")),
+        ("mp4v", output_path.with_suffix(".mp4")),
+    )
+    avi_candidates = (
+        ("MJPG", output_path.with_suffix(".avi")),
+        ("XVID", output_path.with_suffix(".avi")),
+    )
+    if suffix == ".avi":
+        return avi_candidates + mp4_candidates
+    if suffix in {".mp4", ".m4v", ".mov"}:
+        return mp4_candidates + avi_candidates
+    return mp4_candidates + avi_candidates
+
+
+def create_video_writer(
+    output_path: Path,
+    frame_size: Tuple[int, int],
+    fps: float,
+) -> Tuple[cv2.VideoWriter, Path, Path, str]:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    normalized_fps = fps if fps and fps > 0 else 1.0
+    writer: Optional[cv2.VideoWriter] = None
+    opened_path: Optional[Path] = None
+    partial_path: Optional[Path] = None
+    selected_fourcc: Optional[str] = None
+    for fourcc_name, candidate_output_path in _video_writer_candidates(output_path):
+        candidate_partial_path = _make_partial_video_path(candidate_output_path)
+        candidate = cv2.VideoWriter(
+            str(candidate_partial_path),
+            cv2.VideoWriter_fourcc(*fourcc_name),
+            normalized_fps,
+            frame_size,
+        )
+        if candidate.isOpened():
+            writer = candidate
+            opened_path = candidate_output_path
+            partial_path = candidate_partial_path
+            selected_fourcc = fourcc_name
+            break
+        candidate.release()
+    if writer is None:
+        raise RuntimeError(f"Could not create video writer for: {output_path}")
+    if opened_path is None or partial_path is None or selected_fourcc is None:
+        raise RuntimeError(f"Could not determine output path for: {output_path}")
+    return writer, opened_path, partial_path, selected_fourcc
+
+
+def finalize_video_output(partial_path: Optional[Path], final_path: Optional[Path]) -> None:
+    if partial_path is None or final_path is None or not partial_path.exists():
+        return
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    partial_path.replace(final_path)
+
+
 def post_payload(payload: Dict[str, Any], backend_url: str, timeout: float) -> None:
     response = requests.post(backend_url, json=payload, timeout=timeout)
     response.raise_for_status()
 
+
+
+def get_spot_boxes_with_scores(
+    frame: np.ndarray,
+    stage1_model: "YOLO",
+    device: str,
+    use_sahi: bool = False,
+    stage1_imgsz: int = 1280,
+    slice_size: int = 640,
+    overlap: float = 0.2,
+    min_box_area: int = DEFAULT_STAGE1_MIN_BOX_AREA,
+    filter_mode: str = DEFAULT_STAGE1_FILTER_MODE,
+    postprocess_type: str = DEFAULT_STAGE1_POSTPROCESS_TYPE,
+    match_threshold: float = DEFAULT_STAGE1_MATCH_THRESHOLD,
+    fixed_rois: Optional[Dict[str, Tuple[int, int, int, int]]] = None,
+) -> Tuple[Dict[str, Tuple[int, int, int, int]], Dict[str, float]]:
+    """Run stage1 and return (spot_boxes, confidences_per_spot).
+
+    Confidence per spot is the max stage1 score of detections consolidated
+    into that spot.  Used by --stage1-only mode to infer occupancy directly.
+    """
+    yolo_device = device if device != "coreml" else "cpu"
+    lot_mask = roi_bounds(fixed_rois) if fixed_rois else None
+    roi_boxes_list = list(fixed_rois.values()) if fixed_rois else []
+
+    raw_candidates: list[Tuple[Tuple[int, int, int, int], float]] = []
+
+    if use_sahi:
+        try:
+            from sahi import AutoDetectionModel
+            from sahi.predict import get_sliced_prediction
+            import tempfile, os as _os
+
+            sahi_model = AutoDetectionModel.from_pretrained(
+                model_type="ultralytics",
+                model_path=stage1_model.ckpt_path,
+                confidence_threshold=DEFAULT_STAGE1_CONFIDENCE,
+                device=yolo_device,
+            )
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                tmp_path = tmp.name
+            import cv2 as _cv2
+            _cv2.imwrite(tmp_path, frame)
+            result = get_sliced_prediction(
+                tmp_path, sahi_model,
+                slice_height=slice_size, slice_width=slice_size,
+                overlap_height_ratio=overlap, overlap_width_ratio=overlap,
+                verbose=0,
+            )
+            _os.unlink(tmp_path)
+            for pred in result.object_prediction_list:
+                b = pred.bbox
+                kept = filter_stage1_box(
+                    frame.shape,
+                    (int(b.minx), int(b.miny), int(b.maxx), int(b.maxy)),
+                    lot_mask=lot_mask, roi_boxes=roi_boxes_list,
+                    min_box_area=min_box_area, filter_mode=filter_mode,
+                )
+                if kept is not None:
+                    raw_candidates.append((kept, float(getattr(pred.score, "value", 1.0))))
+        except ImportError:
+            print("SAHI not installed; falling back to standard inference.")
+            use_sahi = False
+
+    if not use_sahi:
+        results = stage1_model(
+            frame, device=yolo_device, verbose=False,
+            imgsz=stage1_imgsz, conf=DEFAULT_STAGE1_CONFIDENCE,
+        )[0]
+        raw_boxes  = results.boxes.xyxy.cpu().numpy()
+        raw_scores = results.boxes.conf.cpu().numpy() if results.boxes.conf is not None else None
+        for idx, box in enumerate(raw_boxes):
+            kept = filter_stage1_box(
+                frame.shape, tuple(box.astype(int)),
+                lot_mask=lot_mask, roi_boxes=roi_boxes_list,
+                min_box_area=min_box_area, filter_mode=filter_mode,
+            )
+            if kept is not None:
+                score = float(raw_scores[idx]) if raw_scores is not None else 1.0
+                raw_candidates.append((kept, score))
+
+    spot_boxes = consolidate_stage1_boxes(
+        raw_candidates,
+        postprocess_type=postprocess_type,
+        match_threshold=match_threshold,
+    )
+
+    # Build per-spot confidence: max raw score whose box overlaps the consolidated box
+    spot_scores: Dict[str, float] = {}
+    for spot_id, sbox in spot_boxes.items():
+        best = 0.0
+        for raw_box, raw_score in raw_candidates:
+            if box_iou(sbox, raw_box) > 0.05:
+                best = max(best, raw_score)
+        spot_scores[spot_id] = round(best, 3)
+
+    return spot_boxes, spot_scores
 
 def run_pipeline(
     frame: np.ndarray,
@@ -806,32 +1147,58 @@ def run_pipeline(
     args: argparse.Namespace,
     last_confidences: Optional[Dict[str, float]] = None,  # ← add this
 ) -> Tuple[Dict[str, Any], Dict[str, Tuple[int, int, int, int]]]:
-    spot_boxes = get_spot_boxes(
-        frame=frame,
-        fixed_rois=fixed_rois,
-        stage1_model=stage1_model,
-        device=args.device,
-        use_stage1_detector=args.stage1_detector,
-        use_sahi=args.stage1_sahi,
-        stage1_imgsz=args.stage1_imgsz,
-        slice_size=args.stage1_slice_size,
-        overlap=args.stage1_overlap,
-        min_box_area=args.stage1_min_box_area,
-        filter_mode=args.stage1_filter_mode,
-    )
+    stage1_only = getattr(args, "stage1_only", False)
 
-    raw_statuses: Dict[str, str] = {}
-    confidences: Dict[str, float] = {}
-    for spot_id, box in sorted(spot_boxes.items()):
-        status, confidence = classify_patch(
+    if stage1_only and args.stage1_detector and stage1_model is not None:
+        # Skip stage2: treat every stage1 detection as "occupied"
+        spot_boxes, spot_scores = get_spot_boxes_with_scores(
             frame=frame,
-            box=box,
-            model=stage2_model,
+            stage1_model=stage1_model,
             device=args.device,
-            threshold=args.stage2_threshold,
+            use_sahi=args.stage1_sahi,
+            stage1_imgsz=args.stage1_imgsz,
+            slice_size=args.stage1_slice_size,
+            overlap=args.stage1_overlap,
+            min_box_area=args.stage1_min_box_area,
+            filter_mode=args.stage1_filter_mode,
+            postprocess_type=args.stage1_postprocess_type,
+            match_threshold=args.stage1_match_threshold,
+            fixed_rois=fixed_rois,
         )
-        raw_statuses[spot_id] = status
-        confidences[spot_id] = confidence
+        raw_statuses: Dict[str, str] = {
+    sid: ("occupied" if spot_scores.get(sid, 0) >= STAGE1_OCCUPY_THRESHOLD else "free")
+    for sid in spot_boxes
+}
+        confidences: Dict[str, float] = spot_scores
+    else:
+        spot_boxes = get_spot_boxes(
+            frame=frame,
+            fixed_rois=fixed_rois,
+            stage1_model=stage1_model,
+            device=args.device,
+            use_stage1_detector=args.stage1_detector,
+            use_sahi=args.stage1_sahi,
+            stage1_imgsz=args.stage1_imgsz,
+            slice_size=args.stage1_slice_size,
+            overlap=args.stage1_overlap,
+            min_box_area=args.stage1_min_box_area,
+            filter_mode=args.stage1_filter_mode,
+            postprocess_type=args.stage1_postprocess_type,
+            match_threshold=args.stage1_match_threshold,
+        )
+
+        raw_statuses: Dict[str, str] = {}
+        confidences: Dict[str, float] = {}
+        for spot_id, box in sorted(spot_boxes.items()):
+            status, confidence = classify_patch(
+                frame=frame,
+                box=box,
+                model=stage2_model,
+                device=args.device,
+                threshold=args.stage2_threshold,
+            )
+            raw_statuses[spot_id] = status
+            confidences[spot_id] = confidence
 
     smooth_buf.update(raw_statuses)
     if last_confidences is not None:
@@ -1062,6 +1429,10 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
     stage1_model, stage2_model = create_models(args)
     smooth_buf = SmoothingBuffer(window=args.smooth_n)
     latest_frame_path = Path(args.latest_frame_path)
+    video_writer: Optional[cv2.VideoWriter] = None
+    output_video_path = _resolve_video_output_path(args.save_annotated, "annotated_camera.mp4")
+    video_partial_path: Optional[Path] = None
+    video_final_path: Optional[Path] = None
 
     # Must open on the main thread for AVFoundation / Continuity Camera
     cap = open_camera_capture(args.camera, getattr(args, "camera_backend", None))
@@ -1095,6 +1466,20 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
                 frame, fixed_rois, stage1_model, stage2_model, smooth_buf, args, last_confidences
             )
             annotated = annotate_frame(frame, payload["spots"], spot_boxes, payload["confidence"])
+            if output_video_path is not None:
+                if video_writer is None:
+                    frame_height, frame_width = annotated.shape[:2]
+                    fps = 1000.0 / max(1, int(args.frame_interval))
+                    video_writer, video_final_path, video_partial_path, selected_fourcc = create_video_writer(
+                        output_video_path,
+                        (frame_width, frame_height),
+                        fps,
+                    )
+                    print(
+                        f"Annotated video will be saved to: {video_final_path} "
+                        f"(codec={selected_fourcc})"
+                    )
+                video_writer.write(annotated)
             write_latest_frame(
                 annotated,
                 latest_frame_path,
@@ -1124,6 +1509,9 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
         print("\nStopped by user.")
     finally:
         cap.release()
+        if video_writer is not None:
+            video_writer.release()
+            finalize_video_output(video_partial_path, video_final_path)
         if getattr(args, "requested_camera", None) == DEFAULT_IPHONE_CAMERA_LABEL:
             handoff_to_builtin_camera(
                 getattr(args, "fallback_camera", None),
@@ -1140,10 +1528,18 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
     stage1_model, stage2_model = create_models(args)
     smooth_buf = SmoothingBuffer(window=args.smooth_n)
     latest_frame_path = Path(args.latest_frame_path)
+    output_video_path = _resolve_video_output_path(
+        args.save_annotated,
+        f"{video_path.stem}_annotated.mp4",
+    )
+    video_writer: Optional[cv2.VideoWriter] = None
+    video_partial_path: Optional[Path] = None
+    video_final_path: Optional[Path] = None
 
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video file: {video_path}")
+    source_fps = cap.get(cv2.CAP_PROP_FPS)
 
     last_post = time.perf_counter() - args.post_interval
     backend_retry_after = 0.0
@@ -1167,6 +1563,19 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
                 frame, fixed_rois, stage1_model, stage2_model, smooth_buf, args, last_confidences
             )
             annotated = annotate_frame(frame, payload["spots"], spot_boxes, payload["confidence"])
+            if output_video_path is not None:
+                if video_writer is None:
+                    frame_height, frame_width = annotated.shape[:2]
+                    video_writer, video_final_path, video_partial_path, selected_fourcc = create_video_writer(
+                        output_video_path,
+                        (frame_width, frame_height),
+                        source_fps,
+                    )
+                    print(
+                        f"Annotated video will be saved to: {video_final_path} "
+                        f"(codec={selected_fourcc})"
+                    )
+                video_writer.write(annotated)
             write_latest_frame(
                 annotated,
                 latest_frame_path,
@@ -1196,6 +1605,9 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
         print("\nStopped by user.")
     finally:
         cap.release()
+        if video_writer is not None:
+            video_writer.release()
+            finalize_video_output(video_partial_path, video_final_path)
     return 0
 
 def main() -> None:

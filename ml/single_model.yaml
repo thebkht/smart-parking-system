@@ -1,8 +1,8 @@
-path: /Users/thebkht/Projects/smart-parking-system/datasets/single_model_data_boxes
+path: datasets/Parking_ROIs_GoPro/detection_dataset.yaml
 train: train/images
 val: valid/images
 test: test/images
 nc: 2
 names:
-- free
-- occupied
+  - free
+  - occupied

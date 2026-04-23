@@ -3,10 +3,10 @@
   "track": "stage2",
   "variant": "n",
   "model": "yolov8n-cls.pt",
-  "data": "datasets\\stage2_data",
-  "epochs": 60,
+  "data": "datasets/Parking_ROIs_GoPro/stage2_data",
+  "epochs": 50,
   "imgsz": 64,
-  "batch": 64,
+  "batch": 8,
   "lr0": 0.001,
   "patience": 20,
   "augmentation": {
@@ -19,10 +19,12 @@
     "dropout": 0.1,
     "cos_lr": true
   },
-  "train_time_s": 526.99,
-  "best_ckpt": "runs\\stage2_cls\\yolov8n_stage2\\weights\\best.pt",
-  "last_ckpt": "runs\\stage2_cls\\yolov8n_stage2\\weights\\last.pt",
-  "selected_ckpt": "runs\\stage2_cls\\yolov8n_stage2\\weights\\best.pt",
-  "top1_accuracy": 0.9954589605331421,
+  "train_time_s": 1411.2,
+  "best_ckpt": "runs/stage2_cls/yolov8n_stage2/weights/best.pt",
+  "last_ckpt": "runs/stage2_cls/yolov8n_stage2/weights/last.pt",
+  "actual_run_dir": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/stage2_cls/yolov8n_stage2-2",
+  "expected_run_dir": "runs/stage2_cls/yolov8n_stage2",
+  "selected_ckpt": "runs/stage2_cls/yolov8n_stage2/weights/best.pt",
+  "top1_accuracy": 0.9627100825309753,
   "top5_accuracy": 1.0
 }

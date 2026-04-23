@@ -35,6 +35,7 @@ _SPLIT_ALIASES = {"train": "train", "valid": "val", "val": "val", "test": "test"
 _TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{2}_\d{2}_\d{2}_jpg$")
 _PARKING_LOT_RE = re.compile(r"^(parking_lot_\d+)_mp4-(\d+)_jpg$")
 _TINY_BOX_AREA = 0.0025
+_ROI_SPLIT_ALIASES = {"train": "train", "valid": "val", "val": "val", "test": "test"}
 
 STAGE1_DATA_DIR = "datasets/stage1_data"
 STAGE1_YAML = "ml/stage1.yaml"
@@ -849,6 +850,142 @@ def _crop_patch(
         img.crop((x1, y1, x2, y2)).save(target)
 
 
+def _polygon_points_to_box_line(
+    polygon: list[list[float]],
+    *,
+    class_id: int,
+) -> str | None:
+    coords: list[float] = []
+    for point in polygon:
+        if len(point) != 2:
+            return None
+        x, y = point
+        try:
+            coords.extend((float(x), float(y)))
+        except (TypeError, ValueError):
+            return None
+    box = _label_geometry_to_box(coords)
+    if box is None:
+        return None
+    return format_detection_box(class_id, box)
+
+
+def _is_roi_annotations_dataset(root: Path) -> bool:
+    return (root / "annotations.json").exists() and (root / "images").exists()
+
+
+def prepare_stage2_from_roi_annotations(args: argparse.Namespace) -> None:
+    source_root = Path(args.pklot_dir)
+    annotations_path = source_root / "annotations.json"
+    images_dir = source_root / "images"
+    stage2_output = Path(args.stage2_output)
+
+    if not annotations_path.exists():
+        raise SystemExit(f"ROI annotations file not found: {annotations_path}")
+    if not images_dir.exists():
+        raise SystemExit(f"ROI images directory not found: {images_dir}")
+
+    data = json.loads(annotations_path.read_text(encoding="utf-8"))
+    combined: dict[str, dict[str, list[Path]]] = {
+        "train": {"free": [], "occupied": []},
+        "val": {"free": [], "occupied": []},
+        "test": {"free": [], "occupied": []},
+    }
+    all_images: dict[str, list[Path]] = {"free": [], "occupied": []}
+    invalid_polygons = 0
+    missing_images: list[str] = []
+
+    patch_cache = Path(args.patch_cache) if args.patch_cache else source_root / "stage2_patch_cache"
+    patch_cache.mkdir(parents=True, exist_ok=True)
+    print(f"\n[Stage 2] Cropping ROI patches from annotations.json -> {patch_cache}/")
+
+    for source_split, payload in data.items():
+        split_name = _ROI_SPLIT_ALIASES.get(source_split.lower())
+        if split_name is None:
+            continue
+        file_names = payload.get("file_names", [])
+        rois_list = payload.get("rois_list", [])
+        occupancy_list = payload.get("occupancy_list", [])
+        if not (len(file_names) == len(rois_list) == len(occupancy_list)):
+            raise SystemExit(
+                f"ROI annotation split {source_split!r} has mismatched lengths: "
+                f"files={len(file_names)} rois={len(rois_list)} occupancy={len(occupancy_list)}"
+            )
+
+        split_counts = {"free": 0, "occupied": 0}
+        for file_name, polygons, occupancies in zip(file_names, rois_list, occupancy_list):
+            image_path = images_dir / str(file_name)
+            if not image_path.exists():
+                missing_images.append(str(file_name))
+                continue
+            if len(polygons) != len(occupancies):
+                raise SystemExit(
+                    f"ROI annotation image {file_name!r} has mismatched polygon/occupancy lengths: "
+                    f"{len(polygons)} vs {len(occupancies)}"
+                )
+            normalized_stem = normalize_source_stem(str(file_name))
+            for index, (polygon, occupied) in enumerate(zip(polygons, occupancies)):
+                class_name = "occupied" if bool(occupied) else "free"
+                class_id = 1 if class_name == "occupied" else 0
+                box_line = _polygon_points_to_box_line(polygon, class_id=class_id)
+                if box_line is None:
+                    invalid_polygons += 1
+                    continue
+                target = patch_cache / split_name / class_name / f"{normalized_stem}__{index:04d}.jpg"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                _crop_patch(image_path, box_line, target)
+                if target.exists():
+                    combined[split_name][class_name].append(target)
+                    all_images[class_name].append(target)
+                    split_counts[class_name] += 1
+        print(
+            f"  {split_name:5s}: {split_counts['free']:7d} free  "
+            f"{split_counts['occupied']:7d} occupied"
+        )
+
+    print(f"\n[Stage 2] Writing ROI classification dataset -> {stage2_output}/")
+    collisions = copy_images(combined, stage2_output, source_root=patch_cache)
+    pklot_collisions = copy_test_flat(
+        combined["test"],
+        Path(args.pklot_test_output),
+        source_root=patch_cache,
+    )
+    sanity_check_stage2(
+        combined,
+        all_images=all_images,
+        collisions={
+            **collisions,
+            **{f"pklot_test/{k}": v for k, v in pklot_collisions.items()},
+        },
+        report_path=stage2_output / SANITY_REPORT,
+        scene_split_summary={
+            "source": "roi_annotations_presplit",
+            "scene_counts": {split: 0 for split in ("train", "val", "test")},
+            "leakage_checks": {
+                "scene_leakage_detected": False,
+                "shared_scene_ids": [],
+                "shared_normalized_stems": [],
+            },
+        },
+    )
+
+    report_path = stage2_output / SANITY_REPORT
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["source"] = str(source_root.resolve())
+    report["split_strategy"] = "source_presplit"
+    report["annotation_source"] = "annotations.json"
+    report["invalid_polygons_skipped"] = invalid_polygons
+    report["missing_images"] = missing_images
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    print("\n[Stage 2] Split summary")
+    for split_name in ("train", "val", "test"):
+        counts = {cls: len(paths) for cls, paths in combined[split_name].items()}
+        print(f"  {split_name:5s}: {counts}")
+    print(f"  pklot_test : {{'free': {len(combined['test']['free'])}, 'occupied': {len(combined['test']['occupied'])}}}")
+    print(f"  report     : {report_path}")
+
+
 def collect_roboflow_patches(root: Path, patch_output: Path) -> dict[str, list[Path]]:
     patches: dict[str, list[Path]] = {"free": [], "occupied": []}
     print(f"\n[Stage 2] Cropping PKLot patches -> {patch_output}/")
@@ -993,6 +1130,10 @@ def copy_weather_flat(
 
 
 def prepare_stage2(args: argparse.Namespace) -> None:
+    if _is_roi_annotations_dataset(Path(args.pklot_dir)):
+        prepare_stage2_from_roi_annotations(args)
+        return
+
     validate_split_ratios(args.val_ratio, args.test_ratio)
     pklot_dir = Path(args.pklot_dir)
     patch_cache = Path(args.patch_cache) if args.patch_cache else pklot_dir.parent / f"{pklot_dir.name}_patches"
@@ -1137,7 +1278,7 @@ def main() -> None:
     pklot_dir = Path(args.pklot_dir)
     if not pklot_dir.exists():
         raise SystemExit(f"PKLot directory not found: {pklot_dir}")
-    if not _roboflow_splits(pklot_dir):
+    if not _roboflow_splits(pklot_dir) and not _is_roi_annotations_dataset(pklot_dir):
         raise SystemExit(f"No Roboflow train/valid/test splits found in {pklot_dir}")
     parking_space_dir = Path(args.parking_space_dir) if args.parking_space_dir else None
     if parking_space_dir is not None and not parking_space_dir.exists():
