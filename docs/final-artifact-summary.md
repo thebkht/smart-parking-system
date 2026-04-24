@@ -6,9 +6,9 @@
 
 | Split | Images | Boxes | Scenes |
 | --- | ---: | ---: | ---: |
-| train | 1953 | 72607 | 123 |
-| val | 337 | 13433 | 27 |
-| test | 396 | 13733 | 27 |
+| train | 1834 | 68685 | 144 |
+| val | 560 | 20591 | 31 |
+| test | 322 | 11397 | 32 |
 
 ### Stage 2
 
@@ -53,8 +53,8 @@
 
 ## Latest Metrics Snapshot
 
-- Stage 1 evaluation: `{"mAP50": "0.9949", "mAP50_95": "0.8864", "model": "yolov8n_stage1", "precision": "0.9948", "recall": "0.9911", "scene_count": "27", "scene_leakage": "False", "split": "val"}`
-- Stage 2 evaluation: `{"confusion_matrix": "[[10282, 101], [2392, 11146]]", "dataset": "stage2_data/val", "f1": "0.8994", "model": "yolov8m_stage2", "precision": "0.991", "recall": "0.8233", "sample_count": "23921", "support_free": "10383", "support_occupied": "13538", "threshold": "0.5", "top1_accuracy": "0.8958"}`
+- Stage 1 evaluation: `{"mAP50": "0.7791", "mAP50_95": "0.523", "model": "yolov8s_stage1", "precision": "0.8231", "recall": "0.678", "scene_count": "0", "scene_leakage": "False", "split": "val"}`
+- Stage 2 evaluation: `{"confusion_matrix": "[[2076, 70], [72, 1590]]", "dataset": "stage2_data/val", "f1": "0.9573", "model": "yolov8n_stage2-2", "precision": "0.9578", "recall": "0.9567", "sample_count": "3808", "support_free": "2146", "support_occupied": "1662", "threshold": "0.5", "top1_accuracy": "0.9627"}`
 - Stage 2 model comparison: `{"confusion_matrix": "[[10249, 134], [2054, 11484]]", "dataset": "stage2_data/val", "f1": "0.913", "model": "yolov8m_stage2", "precision": "0.9885", "recall": "0.8483", "sample_count": "23921", "size_mb": "30.22", "support_free": "10383", "support_occupied": "13538", "threshold": "0.3", "top1_accuracy": "0.9085"}`
 - Stage 2 threshold sweep: `{"confusion_matrix": "[[10120, 263], [1682, 11856]]", "dataset": "stage2_data/val", "f1": "0.9242", "model": "yolov8m_stage2", "precision": "0.9783", "recall": "0.8758", "sample_count": "23921", "support_free": "10383", "support_occupied": "13538", "threshold": "0.1", "top1_accuracy": "0.9187"}`
 - Stage 2 cross-dataset: `{"confusion_matrix": "[[9798, 51], [2358, 9539]]", "dataset": "cnrpark_test", "f1": "0.8879", "model": "yolov8m_stage2", "precision": "0.9947", "recall": "0.8018", "sample_count": "21746", "support_free": "9849", "support_occupied": "11897", "threshold": "0.5", "top1_accuracy": "0.8892"}`
