@@ -48,7 +48,7 @@ ACPDS provides full parking lot images annotated with quadrilateral polygons per
 
 # **3\. Quadrilateral pooling — the patch extraction method**
 
-The ACPDS paper (Section 4.3, Figure 4\) proposes two pooling methods. This project uses method (a): quadrilateral pooling. This section documents the method, its advantage over square pooling, and the corner-ordering fix required for correct implementation.
+The ACPDS paper (Section 4.3, Figure 4\) discusses two ways to pool features for each annotated parking space. That comparison is useful background for this project, but our implementation is not the paper's R-CNN-based model family. This project uses YOLOv8-cls for Stage 2 and adopts method (a): quadrilateral pooling. This section documents the paper's two methods, explains why method (a) is the right fit for this YOLO pipeline, and records the corner-ordering fix required for correct implementation.
 
 ## **3.1 The two methods (ACPDS paper Figure 4\)**
 
@@ -66,7 +66,9 @@ The ACPDS paper (Section 4.3, Figure 4\) proposes two pooling methods. This proj
 | Each spot appears as a trapezoid or parallelogram in the image, not a rectangle. |
 | A bounding-square crop (method b) always includes pixels from neighboring spots — visible in the paper's Figure 4b as colored overlaps. |
 | The perspective warp (method a) maps the exact 4 corners to a 128×128 square, removing distortion and excluding neighboring spots entirely. |
+| Square pooling can add surrounding context, which may sometimes help when a spot is heavily occluded or near an image edge, but it also mixes in irrelevant neighboring pixels. |
 | This is especially important for crowded ACPDS scenes with heavy occlusions between adjacent cars. |
+| For this project's YOLOv8 patch classifier, cleaner per-spot inputs are preferred over extra context, so method (a) remains the chosen approach. |
 
 ## **3.2 The corner-ordering problem**
 
