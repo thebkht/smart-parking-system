@@ -32,7 +32,7 @@ Key points:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
+pip install -r requirements.txt
 ```
 
 Windows PowerShell:
@@ -41,13 +41,13 @@ Windows PowerShell:
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
+pip install -r requirements.txt
 ```
 
 Cross-platform with `make`:
 
 ```bash
-make install-dev
+make install
 ```
 
 Quick environment check:

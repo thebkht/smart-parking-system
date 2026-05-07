@@ -16,7 +16,7 @@ cd "$SCRIPT_DIR"
 if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
 else
-    echo "ERROR: .venv not found. Run: make install-dev"
+    echo "ERROR: .venv not found. Run: make install"
     exit 1
 fi
 

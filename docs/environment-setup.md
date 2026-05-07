@@ -21,7 +21,7 @@ From the project root:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
+pip install -r requirements.txt
 ```
 
 On Windows PowerShell:
@@ -30,26 +30,22 @@ On Windows PowerShell:
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
+pip install -r requirements.txt
 ```
 
 Or with `make`:
 
 ```bash
-make install-dev
+make install
 ```
 
 The `Makefile` calls the virtual environment's Python directly, so the same `make` targets work on Windows without a manual `activate` step.
 
-## Dependency Groups
+## Dependency File
 
 `requirements.txt`
 
-- runtime packages for dataset prep, training, inference, FastAPI logging, plotting, and local logging
-
-`requirements-dev.txt`
-
-- runtime packages plus notebook, test, and formatting tools
+- the single source of truth for runtime, test, and formatting dependencies used by this repo
 
 ## Project Conventions
 

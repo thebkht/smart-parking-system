@@ -1,7 +1,8 @@
-# Core ML + edge stack
+# Runtime + local development
 numpy>=1.24,<3.0
 opencv-python>=4.9,<5.0
 ultralytics>=8.2,<9.0
+torch>=2.0,<3.0
 PyYAML>=6.0,<7.0
 requests>=2.31,<3.0
 pandas>=2.0,<3.0
@@ -12,9 +13,6 @@ fastapi>=0.115,<1.0
 uvicorn>=0.30,<1.0
 sahi>=0.11.36
 
-# Dataset conversion helpers
-lxml>=5.1,<6.0
-
 # Optional local inference/export support
 onnx>=1.16,<2.0
 onnxruntime>=1.17,<2.0
@@ -23,3 +21,8 @@ onnxslim>=0.1.71
 # Apple Silicon export + benchmark
 coremltools>=8.0,<9.0
 Pillow>=10.0,<12.0
+
+# Test and formatting tools
+pytest>=8.1,<9.0
+black>=24.3,<25.0
+ruff>=0.3,<1.0

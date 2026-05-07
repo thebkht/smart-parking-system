@@ -57,9 +57,7 @@ install: venv
 	$(VENV_PYTHON) -m pip install --upgrade pip
 	$(VENV_PYTHON) -m pip install -r requirements.txt
 
-install-dev: venv
-	$(VENV_PYTHON) -m pip install --upgrade pip
-	$(VENV_PYTHON) -m pip install -r requirements-dev.txt
+install-dev: install
 
 prepare-stage1:
 	$(VENV_PYTHON) ml/prepare_dataset.py --stage1 --pklot-dir $(PKLOT_DIR) $(PREP_STAGE1_ARGS)
