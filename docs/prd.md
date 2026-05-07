@@ -92,127 +92,144 @@ getPerspectiveTransform requires the 4 source points in a consistent order. If A
 
 Add order\_corners() as the first step in every patch extraction call. It enforces clockwise TL → TR → BR → BL ordering regardless of how the ACPDS JSON stores the corners.
 
-| import numpy as np |
-| :---- |
-| import cv2 |
-|   |
-| def order\_corners(corners): |
-|     """ |
-|     Reorder 4 corner points to clockwise: TL, TR, BR, BL. |
-|     Works regardless of the original storage order in ACPDS JSON. |
-|     """ |
-|     pts \= np.array(corners, dtype=np.float32) |
-|   |
-|     \# Split into top 2 (smallest y) and bottom 2 (largest y) |
-|     sorted\_by\_y \= pts\[np.argsort(pts\[:, 1\])\] |
-|     top    \= sorted\_by\_y\[:2\]   \# smaller y \= higher in image |
-|     bottom \= sorted\_by\_y\[2:\]   \# larger y  \= lower in image |
-|   |
-|     \# Within each pair, sort by x to get left/right |
-|     tl, tr \= top\[np.argsort(top\[:, 0\])\]       \# left \= smaller x |
-|     bl, br \= bottom\[np.argsort(bottom\[:, 0\])\] \# left \= smaller x |
-|   |
-|     return np.array(\[tl, tr, br, bl\], dtype=np.float32) |
-|     \# Result: \[top-left, top-right, bottom-right, bottom-left\] |
-|   |
-|   |
-| def warp\_spot(img, corners, size=128): |
-|     """ |
-|     Quadrilateral pooling (ACPDS paper method a, Figure 4). |
-|     Warps the perspective quadrilateral to a flat size x size square. |
-|     Pixels come only from inside the spot boundary \-- no bleed from neighbors. |
-|     """ |
-|     src \= order\_corners(corners)   \# enforce TL, TR, BR, BL |
-|     dst \= np.array(\[               \# destination: flat square |
-|         \[0,    0   \], |
-|         \[size, 0   \], |
-|         \[size, size\], |
-|         \[0,    size\], |
-|     \], dtype=np.float32) |
-|   |
-|     M \= cv2.getPerspectiveTransform(src, dst) |
-|     return cv2.warpPerspective(img, M, (size, size)) |
-|   |
-|   |
-| \# ── Validation: run this before any training ───────────────── |
-| def validate\_patches(data, n=20): |
-|     """ |
-|     Visualize n random patches to confirm corner ordering is correct. |
-|     Each patch should show exactly one parking spot, flat and upright. |
-|     Run this before starting a training run. |
-|     """ |
-|     import random |
-|     samples \= random.sample(data, min(n, len(data))) |
-|     for entry in samples: |
-|         img \= cv2.imread(entry\['image\_path'\]) |
-|         for spot in entry\['spots'\]\[:3\]:  \# first 3 spots per image |
-|             patch \= warp\_spot(img, spot\['corners'\]) |
-|             label \= 'occ' if spot\['occupied'\] else 'free' |
-|             cv2.imshow(f"{entry\['id'\]}\_{spot\['id'\]}\_{label}", patch) |
-|             cv2.waitKey(300) |
-|     cv2.destroyAllWindows() |
+```python
+import numpy as np
+import cv2
+
+
+def order_corners(corners):
+    """
+    Reorder 4 corner points to clockwise: TL, TR, BR, BL.
+    Works regardless of the original storage order in ACPDS JSON.
+    """
+    pts = np.array(corners, dtype=np.float32)
+
+    # Split into top 2 (smallest y) and bottom 2 (largest y)
+    sorted_by_y = pts[np.argsort(pts[:, 1])]
+    top = sorted_by_y[:2]       # smaller y = higher in image
+    bottom = sorted_by_y[2:]    # larger y = lower in image
+
+    # Within each pair, sort by x to get left/right
+    tl, tr = top[np.argsort(top[:, 0])]         # left = smaller x
+    bl, br = bottom[np.argsort(bottom[:, 0])]   # left = smaller x
+
+    return np.array([tl, tr, br, bl], dtype=np.float32)
+    # Result: [top-left, top-right, bottom-right, bottom-left]
+
+
+def warp_spot(img, corners, size=128):
+    """
+    Quadrilateral pooling (ACPDS paper method a, Figure 4).
+    Warps the perspective quadrilateral to a flat size x size square.
+    Pixels come only from inside the spot boundary -- no bleed from neighbors.
+    """
+    src = order_corners(corners)    # enforce TL, TR, BR, BL
+    dst = np.array([                # destination: flat square
+        [0, 0],
+        [size, 0],
+        [size, size],
+        [0, size],
+    ], dtype=np.float32)
+
+    M = cv2.getPerspectiveTransform(src, dst)
+    return cv2.warpPerspective(img, M, (size, size))
+
+
+# Validation: run this before any training
+def validate_patches(data, n=20):
+    """
+    Visualize n random patches to confirm corner ordering is correct.
+    Each patch should show exactly one parking spot, flat and upright.
+    Run this before starting a training run.
+    """
+    import random
+
+    samples = random.sample(data, min(n, len(data)))
+    for entry in samples:
+        img = cv2.imread(entry["image_path"])
+        for spot in entry["spots"][:3]:  # first 3 spots per image
+            patch = warp_spot(img, spot["corners"])
+            label = "occ" if spot["occupied"] else "free"
+            cv2.imshow(f"{entry['id']}_{spot['id']}_{label}", patch)
+            cv2.waitKey(300)
+    cv2.destroyAllWindows()
+```
 
 ## **3.4 Full patch extraction pipeline**
 
 Complete script to extract all ACPDS patches into the stage2 folder structure. Uses order\_corners() on every spot before warping.
 
-| import cv2, json, numpy as np, os |
-| :---- |
-|   |
-| def order\_corners(corners): |
-|     pts \= np.array(corners, dtype=np.float32) |
-|     sorted\_by\_y \= pts\[np.argsort(pts\[:, 1\])\] |
-|     top, bottom \= sorted\_by\_y\[:2\], sorted\_by\_y\[2:\] |
-|     tl, tr \= top\[np.argsort(top\[:, 0\])\] |
-|     bl, br \= bottom\[np.argsort(bottom\[:, 0\])\] |
-|     return np.array(\[tl, tr, br, bl\], dtype=np.float32) |
-|   |
-| def warp\_spot(img, corners, size=128): |
-|     src \= order\_corners(corners) |
-|     dst \= np.array(\[\[0,0\],\[size,0\],\[size,size\],\[0,size\]\], dtype=np.float32) |
-|     M   \= cv2.getPerspectiveTransform(src, dst) |
-|     return cv2.warpPerspective(img, M, (size, size)) |
-|   |
-| with open('acpds/annotations.json') as f: |
-|     data \= json.load(f) |
-|   |
-| counts \= {'train':{'occupied':0,'free':0}, 'val':{'occupied':0,'free':0}, 'test':{'occupied':0,'free':0}} |
-|   |
-| for entry in data: |
-|     img   \= cv2.imread(entry\['image\_path'\]) |
-|     split \= entry\['split'\]          \# 'train', 'val', or 'test' |
-|     for spot in entry\['spots'\]: |
-|         patch \= warp\_spot(img, spot\['corners'\])   \# quad pooling, method (a) |
-|         label \= 'occupied' if spot\['occupied'\] else 'free' |
-|         out\_dir \= f'acpds\_stage2/{split}/{label}' |
-|         os.makedirs(out\_dir, exist\_ok=True) |
-|         path \= f'{out\_dir}/{entry\["id"\]}\_{spot\["id"\]}.jpg' |
-|         cv2.imwrite(path, patch) |
-|         counts\[split\]\[label\] \+= 1 |
-|   |
-| \# Print dataset statistics |
-| for split, c in counts.items(): |
-|     total \= c\['occupied'\] \+ c\['free'\] |
-|     print(f"{split:6s}: {total:5d} patches  "{ |
-|           f"occupied={c\['occupied'\]} ({100\*c\['occupied'\]//total}%)  " |
-|           f"free={c\['free'\]} ({100\*c\['free'\]//total}%)") |
+```python
+import cv2
+import json
+import numpy as np
+import os
+
+
+def order_corners(corners):
+    pts = np.array(corners, dtype=np.float32)
+    sorted_by_y = pts[np.argsort(pts[:, 1])]
+    top, bottom = sorted_by_y[:2], sorted_by_y[2:]
+    tl, tr = top[np.argsort(top[:, 0])]
+    bl, br = bottom[np.argsort(bottom[:, 0])]
+    return np.array([tl, tr, br, bl], dtype=np.float32)
+
+
+def warp_spot(img, corners, size=128):
+    src = order_corners(corners)
+    dst = np.array([[0, 0], [size, 0], [size, size], [0, size]], dtype=np.float32)
+    M = cv2.getPerspectiveTransform(src, dst)
+    return cv2.warpPerspective(img, M, (size, size))
+
+
+with open("acpds/annotations.json") as f:
+    data = json.load(f)
+
+counts = {
+    "train": {"occupied": 0, "free": 0},
+    "val": {"occupied": 0, "free": 0},
+    "test": {"occupied": 0, "free": 0},
+}
+
+for entry in data:
+    img = cv2.imread(entry["image_path"])
+    split = entry["split"]  # train, val, or test
+    for spot in entry["spots"]:
+        patch = warp_spot(img, spot["corners"])   # quad pooling, method (a)
+        label = "occupied" if spot["occupied"] else "free"
+        out_dir = f"acpds_stage2/{split}/{label}"
+        os.makedirs(out_dir, exist_ok=True)
+        path = f"{out_dir}/{entry['id']}_{spot['id']}.jpg"
+        cv2.imwrite(path, patch)
+        counts[split][label] += 1
+
+# Print dataset statistics
+for split, c in counts.items():
+    total = c["occupied"] + c["free"]
+    print(
+        f"{split:6s}: {total:5d} patches  "
+        f"occupied={c['occupied']} ({100 * c['occupied'] // total}%)  "
+        f"free={c['free']} ({100 * c['free'] // total}%)"
+    )
+```
 
 ## **3.5 Expected folder structure after extraction**
 
-| acpds\_stage2/ |
-| :---- |
-| ├── train/ |
-| │   ├── occupied/   (\~2,580 patches, 128×128, perspective-corrected) |
-| │   └── free/        (\~2,796 patches, 128×128, perspective-corrected) |
-| ├── val/ |
-| │   ├── occupied/   (\~700 patches, different lots from train) |
-| │   └── free/        (\~720 patches) |
-| └── test/ |
-|     ├── occupied/   (\~700 patches, never-seen lots — the key evaluation set) |
-|     └── free/        (\~740 patches) |
-|   |
-| \# Total: \~11,236 patches across all splits |
-| \# Class balance: \~48% occupied / 52% free (near-balanced, no weighting needed) |
+```text
+acpds_stage2/
+├── train/
+│   ├── occupied/   (~2,580 patches, 128x128, perspective-corrected)
+│   └── free/       (~2,796 patches, 128x128, perspective-corrected)
+├── val/
+│   ├── occupied/   (~700 patches, different lots from train)
+│   └── free/       (~720 patches)
+└── test/
+    ├── occupied/   (~700 patches, never-seen lots - the key evaluation set)
+    └── free/       (~740 patches)
+
+Total: ~11,236 patches across all splits
+Class balance: ~48% occupied / 52% free (near-balanced, no weighting needed)
+```
 
 # **4\. Primary dataset — ACPDS**
 
@@ -277,17 +294,19 @@ Three parallel data flows share one FastAPI backend and one SQLite database.
 
 ## **6.2 Training command**
 
-| yolo classify train \\ |
-| :---- |
-|   model=yolov8n-cls.pt \\ |
-|   data=acpds\_stage2/ \\ |
-|   epochs=30 \\ |
-|   imgsz=128 \\ |
-|   device=mps \\ |
-|   batch=32 |
-|   |
-| \# imgsz=128 matches ACPDS quadrilateral warp output size |
-| \# Validate: yolo classify val model=acpds\_cls/weights/best.pt data=acpds\_stage2/ |
+```bash
+yolo classify train \
+  model=yolov8n-cls.pt \
+  data=acpds_stage2/ \
+  epochs=30 \
+  imgsz=128 \
+  device=mps \
+  batch=32
+
+# imgsz=128 matches ACPDS quadrilateral warp output size
+# Validate:
+yolo classify val model=acpds_cls/weights/best.pt data=acpds_stage2/
+```
 
 ## **6.3 Model comparison plan**
 
@@ -320,68 +339,83 @@ Three parallel data flows share one FastAPI backend and one SQLite database.
 
 The complete edge inference pipeline. Key change from v3: rectangular crop replaced by quadrilateral warp using order\_corners() \+ getPerspectiveTransform. Polygon ROIs loaded from GET /map at startup.
 
-| import cv2, requests, time, numpy as np |
-| :---- |
-| from ultralytics import YOLO |
-| from collections import deque |
-|   |
-| STAGE2\_MODEL \= 'acpds\_cls/weights/best.pt' |
-| API\_URL      \= 'http://localhost:8000/update' |
-| INTERVAL     \= 2       \# seconds between inference cycles |
-| SMOOTH\_N     \= 5       \# temporal smoothing window |
-|   |
-| \# ── Load spot polygons from backend ───────────────────────── |
-| map\_data      \= requests.get('http://localhost:8000/map').json() |
-| SPOT\_POLYGONS \= {s\['spot\_id'\]: s\['corners'\] for s in map\_data\['spots'\]} |
-|   |
-| stage2  \= YOLO(STAGE2\_MODEL) |
-| history \= {} |
-|   |
-| \# ── Quadrilateral pooling (ACPDS paper method a) ──────────── |
-| def order\_corners(corners): |
-|     pts        \= np.array(corners, dtype=np.float32) |
-|     sorted\_y   \= pts\[np.argsort(pts\[:, 1\])\] |
-|     top, bot   \= sorted\_y\[:2\], sorted\_y\[2:\] |
-|     tl, tr     \= top\[np.argsort(top\[:, 0\])\] |
-|     bl, br     \= bot\[np.argsort(bot\[:, 0\])\] |
-|     return np.array(\[tl, tr, br, bl\], dtype=np.float32) |
-|   |
-| def warp\_spot(frame, corners, size=128): |
-|     src \= order\_corners(corners) |
-|     dst \= np.array(\[\[0,0\],\[size,0\],\[size,size\],\[0,size\]\], dtype=np.float32) |
-|     M   \= cv2.getPerspectiveTransform(src, dst) |
-|     return cv2.warpPerspective(frame, M, (size, size)) |
-|   |
-| \# ── Classification ─────────────────────────────────────────── |
-| def classify\_patch(frame, corners): |
-|     patch  \= warp\_spot(frame, corners) |
-|     result \= stage2(patch, device='mps', verbose=False)\[0\] |
-|     return result.names\[result.probs.top1\], float(result.probs.top1conf) |
-|   |
-| \# ── Temporal smoothing ─────────────────────────────────────── |
-| def smooth(spot\_id, occupied): |
-|     if spot\_id not in history: |
-|         history\[spot\_id\] \= deque(maxlen=SMOOTH\_N) |
-|     history\[spot\_id\].append(occupied) |
-|     return sum(history\[spot\_id\]) \> len(history\[spot\_id\]) / 2 |
-|   |
-| \# ── Main loop ──────────────────────────────────────────────── |
-| cap \= cv2.VideoCapture(0) |
-| while True: |
-|     ret, frame \= cap.read() |
-|     if not ret: break |
-|     status, confidences \= {}, {} |
-|     for spot\_id, corners in SPOT\_POLYGONS.items(): |
-|         label, conf \= classify\_patch(frame, corners) |
-|         smoothed    \= smooth(spot\_id, label \== 'occupied') |
-|         status\[spot\_id\]      \= 'occupied' if smoothed else 'free' |
-|         confidences\[spot\_id\] \= round(conf, 3\) |
-|     payload \= {\*\*status, 'confidence': confidences, |
-|                'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} |
-|     print(payload) |
-|     try: requests.post(API\_URL, json=payload, timeout=2) |
-|     except: pass |
-|     time.sleep(INTERVAL) |
+```python
+import cv2
+import requests
+import time
+import numpy as np
+from ultralytics import YOLO
+from collections import deque
+
+STAGE2_MODEL = "acpds_cls/weights/best.pt"
+API_URL = "http://localhost:8000/update"
+INTERVAL = 2      # seconds between inference cycles
+SMOOTH_N = 5      # temporal smoothing window
+
+# Load spot polygons from backend
+map_data = requests.get("http://localhost:8000/map").json()
+SPOT_POLYGONS = {s["spot_id"]: s["corners"] for s in map_data["spots"]}
+
+stage2 = YOLO(STAGE2_MODEL)
+history = {}
+
+
+# Quadrilateral pooling (ACPDS paper method a)
+def order_corners(corners):
+    pts = np.array(corners, dtype=np.float32)
+    sorted_y = pts[np.argsort(pts[:, 1])]
+    top, bot = sorted_y[:2], sorted_y[2:]
+    tl, tr = top[np.argsort(top[:, 0])]
+    bl, br = bot[np.argsort(bot[:, 0])]
+    return np.array([tl, tr, br, bl], dtype=np.float32)
+
+
+def warp_spot(frame, corners, size=128):
+    src = order_corners(corners)
+    dst = np.array([[0, 0], [size, 0], [size, size], [0, size]], dtype=np.float32)
+    M = cv2.getPerspectiveTransform(src, dst)
+    return cv2.warpPerspective(frame, M, (size, size))
+
+
+# Classification
+def classify_patch(frame, corners):
+    patch = warp_spot(frame, corners)
+    result = stage2(patch, device="mps", verbose=False)[0]
+    return result.names[result.probs.top1], float(result.probs.top1conf)
+
+
+# Temporal smoothing
+def smooth(spot_id, occupied):
+    if spot_id not in history:
+        history[spot_id] = deque(maxlen=SMOOTH_N)
+    history[spot_id].append(occupied)
+    return sum(history[spot_id]) > len(history[spot_id]) / 2
+
+
+# Main loop
+cap = cv2.VideoCapture(0)
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    status, confidences = {}, {}
+    for spot_id, corners in SPOT_POLYGONS.items():
+        label, conf = classify_patch(frame, corners)
+        smoothed = smooth(spot_id, label == "occupied")
+        status[spot_id] = "occupied" if smoothed else "free"
+        confidences[spot_id] = round(conf, 3)
+    payload = {
+        **status,
+        "confidence": confidences,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    print(payload)
+    try:
+        requests.post(API_URL, json=payload, timeout=2)
+    except Exception:
+        pass
+    time.sleep(INTERVAL)
+```
 
 # **8\. Backend API**
 
@@ -591,41 +625,44 @@ If time allows in Week 7, run a direct comparison of the two ACPDS pooling metho
 
 ## **16.1 Python / ML**
 
-| pip install ultralytics opencv-python requests fastapi uvicorn |
-| :---- |
-| pip install torch torchvision   \# for MobileNetV3 localization (optional) |
-| pip install open3d pycolmap     \# for SfM layout AI |
-|   |
-| git clone https://github.com/martin-marek/parking-space-occupancy |
-| cd parking-space-occupancy |
-| \# Follow README to download ACPDS dataset (\~26 MB) |
+```bash
+pip install ultralytics opencv-python requests fastapi uvicorn
+pip install torch torchvision   # for MobileNetV3 localization (optional)
+pip install open3d pycolmap     # for SfM layout AI
+
+git clone https://github.com/martin-marek/parking-space-occupancy
+cd parking-space-occupancy
+# Follow README to download ACPDS dataset (~26 MB)
+```
 
 ## **16.2 Web / Mobile app**
 
-| npm create vite@latest parking-app \-- \--template react |
-| :---- |
-| cd parking-app && npm install axios leaflet react-leaflet |
-|   |
-| npx create-expo-app parking-mobile |
-| cd parking-mobile && npx expo install expo-camera axios |
+```bash
+npm create vite@latest parking-app -- --template react
+cd parking-app && npm install axios leaflet react-leaflet
+
+npx create-expo-app parking-mobile
+cd parking-mobile && npx expo install expo-camera axios
+```
 
 ## **16.3 Verify GPU and patch extraction**
 
-| \# Verify MPS backend |
-| :---- |
-| python \-c "import torch; print(torch.backends.mps.is\_available())" |
-|   |
-| \# Run patch extraction |
-| python extract\_patches.py |
-| \# Expected output: |
-| \# train:  5376 patches  occupied=2580 (48%)  free=2796 (52%) |
-| \# val:    \~1420 patches  ... |
-| \# test:   \~1440 patches  ...  (unseen lots) |
-|   |
-| \# Validate patches visually before training |
-| python \-c "from extract\_patches import validate\_patches; validate\_patches(data)" |
-|   |
-| \# Train |
-| yolo classify train model=yolov8n-cls.pt data=acpds\_stage2/ imgsz=128 epochs=30 device=mps |
+```bash
+# Verify MPS backend
+python -c "import torch; print(torch.backends.mps.is_available())"
+
+# Run patch extraction
+python extract_patches.py
+# Expected output:
+# train:  5376 patches  occupied=2580 (48%)  free=2796 (52%)
+# val:    ~1420 patches  ...
+# test:   ~1440 patches  ...  (unseen lots)
+
+# Validate patches visually before training
+python -c "from extract_patches import validate_patches; validate_patches(data)"
+
+# Train
+yolo classify train model=yolov8n-cls.pt data=acpds_stage2/ imgsz=128 epochs=30 device=mps
+```
 
 Smart Parking System — PRD v6  ·  ACPDS \+ Quadrilateral Pooling \+ Find My Car \+ App  ·  Weeks 3–8
