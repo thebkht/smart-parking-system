@@ -144,6 +144,12 @@ def parse_args() -> argparse.Namespace:
         help="Disable backend POSTs and run detect in local-only mode.",
     )
     parser.add_argument(
+        "--display",
+        action="store_true",
+        default=False,
+        help="Open an OpenCV window showing the annotated frame (demo mode). Press q or close the window to quit.",
+    )
+    parser.add_argument(
         "--save-annotated",
         help=(
             "Path to save annotated output. In image mode this saves an image; "
@@ -484,12 +490,16 @@ def _classify_coreml(
     """Run a single patch through a Core ML classifier. Returns (status, confidence)."""
     import PIL.Image
 
-    resized = cv2.resize(patch, (imgsz, imgsz))
-    pil_img = PIL.Image.fromarray(cv2.cvtColor(resized, cv2.COLOR_BGR2RGB))
-
-    # Cache input name on the model object to avoid repeated spec parsing
+    # Cache input metadata once to avoid repeated spec parsing
     if not hasattr(model, "_cached_input_name"):
-        model._cached_input_name = model.get_spec().description.input[0].name
+        _inp = model.get_spec().description.input[0]
+        model._cached_input_name = _inp.name
+        _img = _inp.type.imageType
+        model._cached_input_w = _img.width or imgsz
+        model._cached_input_h = _img.height or imgsz
+
+    resized = cv2.resize(patch, (model._cached_input_w, model._cached_input_h))
+    pil_img = PIL.Image.fromarray(cv2.cvtColor(resized, cv2.COLOR_BGR2RGB))
     output = model.predict({model._cached_input_name: pil_img})
 
     # Output shape: classLabel (str), classLabel_probs (dict), var_NNN (ndarray)
@@ -866,11 +876,10 @@ def classify_patch(
 
     # Core ML path — model is a ct.models.MLModel, not a YOLO instance
     if device == "coreml":
-        return _classify_coreml(model, patch, imgsz=64, threshold=threshold, class_names={})
+        return _classify_coreml(model, patch, imgsz=640, threshold=threshold, class_names={})
 
-    # PyTorch / ONNX path via ultralytics
-    resized = cv2.resize(patch, (64, 64))
-    result = model(resized, device=device, verbose=False)[0]
+    # PyTorch / ONNX path via ultralytics — let YOLO handle resizing internally
+    result = model(patch, device=device, verbose=False)[0]
     label, confidence = _result_label_confidence(result)
     status = "occupied" if label == "occupied" and confidence >= threshold else "free"
     return status, confidence
@@ -1444,6 +1453,9 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
     last_confidences: Dict[str, float] = {}
     consecutive_failures = 0
 
+    if getattr(args, "display", False):
+        cv2.namedWindow("Smart Parking — live", cv2.WINDOW_NORMAL)
+
     try:
         while True:
             # Grab without decoding to flush stale buffered frames
@@ -1466,6 +1478,10 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
                 frame, fixed_rois, stage1_model, stage2_model, smooth_buf, args, last_confidences
             )
             annotated = annotate_frame(frame, payload["spots"], spot_boxes, payload["confidence"])
+            if getattr(args, "display", False):
+                cv2.imshow("Smart Parking — live", annotated)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
             if output_video_path is not None:
                 if video_writer is None:
                     frame_height, frame_width = annotated.shape[:2]
@@ -1512,6 +1528,8 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
         if video_writer is not None:
             video_writer.release()
             finalize_video_output(video_partial_path, video_final_path)
+        if getattr(args, "display", False):
+            cv2.destroyAllWindows()
         if getattr(args, "requested_camera", None) == DEFAULT_IPHONE_CAMERA_LABEL:
             handoff_to_builtin_camera(
                 getattr(args, "fallback_camera", None),
@@ -1545,6 +1563,9 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
     backend_retry_after = 0.0
     last_confidences: Dict[str, float] = {}
 
+    if getattr(args, "display", False):
+        cv2.namedWindow("Smart Parking — live", cv2.WINDOW_NORMAL)
+
     try:
         while True:
             ok, frame = cap.read()
@@ -1563,6 +1584,10 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
                 frame, fixed_rois, stage1_model, stage2_model, smooth_buf, args, last_confidences
             )
             annotated = annotate_frame(frame, payload["spots"], spot_boxes, payload["confidence"])
+            if getattr(args, "display", False):
+                cv2.imshow("Smart Parking — live", annotated)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
             if output_video_path is not None:
                 if video_writer is None:
                     frame_height, frame_width = annotated.shape[:2]
@@ -1608,6 +1633,8 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
         if video_writer is not None:
             video_writer.release()
             finalize_video_output(video_partial_path, video_final_path)
+        if getattr(args, "display", False):
+            cv2.destroyAllWindows()
     return 0
 
 def main() -> None:
