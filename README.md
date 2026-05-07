@@ -1,55 +1,98 @@
 # Smart Parking System
 
-This repo implements the v3 smart parking pipeline:
+Edge-based smart parking system using ACPDS quadrilateral pooling, `YOLOv8-cls`, FastAPI, and `Find My Car` product flows.
 
-`static camera -> fixed ROIs -> per-spot crop -> YOLOv8*-cls -> temporal smoothing -> JSON -> FastAPI`
+The canonical project definition is [docs/prd.md](docs/prd.md). This README summarizes the current `v6` direction.
 
-The deployed demo still supports fixed ROIs for a static camera, but the recommended ML workflow is now:
+## Architecture
 
-`full-frame parking-space detector -> per-slot crop -> occupancy classifier`
+Current pipeline:
 
-Stage 1 full-frame parking-space detection is the primary generalization track. Stage 2 patch classification remains the occupancy model. The single-model full-frame occupancy detector remains only as an ML comparison baseline.
+`parking-space quadrilaterals -> perspective warp -> YOLOv8-cls -> temporal smoothing -> JSON -> FastAPI`
 
-The final-project default is now:
+Key points:
 
-`trained Stage 1 detector -> per-slot crop -> trained Stage 2 classifier -> smoothing -> JSON -> FastAPI`
+- Stage 1 uses parking-space quadrilaterals from `ACPDS` annotations or future `SfM` layout generation
+- Stage 2 classifies each perspective-corrected `128 x 128` patch as `occupied` or `free`
+- only compact occupancy JSON is sent to the backend; raw video stays on the edge device
+- the broader product scope includes owner setup, occupancy map views, and `Find My Car`
 
-## Repo Focus
+## Repo Layout
 
-- `edge/` runs the two-stage edge pipeline and emits the v3 payload contract
-- `ml/` prepares Stage 2 datasets, trains YOLOv8 classification models, and evaluates classification metrics
-- `backend/` stores payloads from the edge pipeline and returns latest/history views
-- `docs/` contains the canonical PRD and aligned milestone notes
+- [docs/prd.md](docs/prd.md): canonical PRD
+- [docs/prd-diagrams.md](docs/prd-diagrams.md): architecture and comparison diagrams
+- [edge/detect.py](edge/detect.py): edge inference pipeline
+- [backend/main.py](backend/main.py): FastAPI backend
+- [ml/](ml): training, evaluation, export, and benchmarking scripts
+- [samples/](samples): sample images and videos
 
-## Public Release Policy
+## Setup
 
-This repo is intended to stay public-safe:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+```
 
-- code, configs, metrics, and reproducible commands stay in the repo
-- trained weights do not get committed into git history
-- dataset archives, extracted datasets, runtime databases, and generated logs stay out of git
+Quick environment check:
 
-Academic-use guidance:
+```bash
+python -c "import cv2, ultralytics, yaml; print('env ok')"
+```
 
-- this repo is shared publicly for academic review and demonstration
-- no claim is made that all upstream datasets permit public redistribution of derived checkpoints
-- before publishing model weights, verify that the exact training data license allows redistribution of trained artifacts
+## Common Commands
 
-Model publishing guidance is in [MODEL_LICENSE.md](/Users/thebkht/Projects/smart-parking-system/MODEL_LICENSE.md).
+Run the backend:
 
-Recommended release pattern:
+```bash
+uvicorn backend.main:app --reload
+```
 
-- publish final weights as GitHub Release assets or an external model registry
-- document the exact datasets used to train each released checkpoint
-- do not redistribute checkpoints trained on datasets whose licenses do not clearly allow model redistribution
+Run edge inference on an image:
 
-## Canonical Artifacts
+```bash
+python edge/detect.py --image samples/photo_2026-04-23\ 21.29.16.jpeg
+```
 
-- Stage 2 dataset: `stage2_data/`
-- Weather export for CNR evaluation: `datasets/stage2_weather/`
-- Cross-dataset exports: `datasets/pklot_test/`, `datasets/cnrpark_test/`
-- Stage 2 training handoff: `runs/stage2_cls/.../weights/best.pt`
-- Backend payload:
+Run live camera inference:
+
+```bash
+python edge/detect.py --camera 0
+```
+
+Train Stage 2 classifier variants:
+
+```bash
+python ml/train.py --stage2 --variant n
+python ml/train.py --stage2 --variant s
+python ml/train.py --stage2 --variant m
+```
+
+Evaluate a trained classifier:
+
+```bash
+python ml/evaluate.py --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --full
+```
+
+Run tests:
+
+```bash
+pytest
+```
+
+## Dataset Direction
+
+The current PRD centers the project on `ACPDS`:
+
+- 293 full parking-lot images
+- 11,236 parking-space annotations
+- quadrilateral spot geometry
+- unseen-lot validation and test splits
+
+This replaces the older repo story that emphasized PKLot/CNRPark and fixed ROI demos.
+
+## Payload Contract
 
 ```json
 {
@@ -65,206 +108,22 @@ Recommended release pattern:
 }
 ```
 
-## Setup
+## Public Release Policy
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
-```
+- code, configs, metrics, and reproducible commands stay in the repo
+- trained weights do not get committed into git history
+- dataset archives, extracted datasets, runtime databases, and generated logs stay out of git
 
-## ML Workflows
-
-Full-frame detection must be evaluated by scene holdout. Image-level random splits are not treated as evidence of generalization in this repo.
-
-Recommended Stage 1 full-frame parking-space detector:
-
-```bash
-python ml/prepare_dataset.py --stage1 --pklot-dir /path/to/pklot_roboflow
-python ml/train.py --stage1 --variant s --device mps
-python ml/train.py --stage1 --variant m --imgsz 960 --device mps
-python ml/evaluate.py --stage1 --weights runs/stage1_det/yolov8s_stage1/weights/best.pt --split val
-```
-
-Fine-tune an existing Stage 1 parking-space detector on a custom camera while keeping the repo's MPS patch path:
-
-```bash
-python ml/train.py --stage1 \
-  --data datasets/yolo_parking/dataset.yaml \
-  --weights runs/stage1_det/yolov8s_stage1/weights/best.pt \
-  --epochs 50 \
-  --imgsz 640 \
-  --freeze 10 \
-  --lr 0.001 \
-  --batch 8 \
-  --device mps \
-  --project runs/stage1_finetune \
-  --name my_camera \
-  --exist-ok \
-  --no-amp
-```
-
-Single-model occupancy detector baseline:
-
-```bash
-python ml/prepare_dataset.py --single-model \
-  --pklot-dir datasets/pklot_v4 \
-  --single-model-output single_model_data_boxes \
-  --single-model-yaml ml/single_model_boxes.yaml
-
-python ml/train.py --single-model --variant n --device mps
-python ml/evaluate.py --single-model --weights runs/single_model_det/yolov8n_single_model/weights/best.pt --split val
-```
-
-Stage 2 occupancy classifier with Stage 1-derived crops:
-
-Prepare the classification dataset:
-
-```bash
-python ml/prepare_dataset.py --stage2 --pklot-dir /path/to/pklot_roboflow
-python ml/prepare_dataset.py --stage2 --pklot-dir /path/to/pklot_roboflow --cnrpark-dir /path/to/cnrpark_ext
-```
-
-`--cnrpark-dir` now supports both:
-
-- pre-flattened patch folders with `free/` and `occupied/` subdirectories
-- the official `cnrpark.it` archive layout with `PATCHES/` and `LABELS/`
-
-When weather labels are available, dataset prep also exports `datasets/stage2_weather/{sunny,cloudy,rainy}/{free,occupied}` for per-weather evaluation.
-
-Train the main classifier comparison set:
-
-```bash
-python ml/train.py --stage2 --variant n --device mps
-python ml/train.py --stage2 --variant s --device mps
-python ml/train.py --stage2 --variant m --device mps
-```
-
-Current final artifact choice:
-
-- deployed Stage 1 detector path: `runs/stage1_det/yolov8s_stage1/weights/best.pt`
-- strongest Stage 2 classifier from the saved comparison logs: `runs/stage2_cls/yolov8m_stage2/weights/best.pt`
-- current exported inference artifacts: `artifacts/models/best.pt`, `artifacts/models/best.onnx`, `artifacts/models/best_int8.onnx`
-
-Generate a final artifact summary after training and evaluation:
-
-```bash
-python ml/finalize.py
-```
-
-Accuracy notes:
-
-- the saved `runs/stage2_cls/yolov8n_stage2/results.csv` shows an early accuracy collapse after epoch 4, so the repo now uses a lower Stage 2 learning rate, longer patience, cosine LR decay, and classifier dropout by default
-- Stage 1 and single-model prep now rebuild train/val/test by scene holdout after deduplicating `.rf.*` Roboflow variants
-- PKLot full-frame prep excludes zero-label frames and writes `detection_dataset_report.json` with split leakage checks and annotation-audit summaries
-- Roboflow PKLot exports may use per-slot polygons; `ml/prepare_dataset.py` converts those polygons into clipped YOLO detection boxes automatically for Stage 1, single-model detection, and Stage 2 patch cropping
-
-Evaluate Stage 2 classification:
-
-```bash
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --split val --device mps --batch 256
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --cross-dataset datasets/pklot_test --device mps --batch 256
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --cross-dataset datasets/cnrpark_test --device mps --batch 256
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --data datasets/stage2_weather --per-weather --device mps --batch 512
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --split val --device mps --batch 256 --sweep
-python ml/evaluate.py --stage2 --compare \
-  runs/stage2_cls/yolov8n_stage2/weights/best.pt \
-  runs/stage2_cls/yolov8s_stage2/weights/best.pt \
-  runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --split val --device mps --batch 256
-```
-
-The saved threshold sweep currently selects `0.1` as the best offline validation threshold for `yolov8m_stage2`.
-The deployed edge config still uses `0.3`, which matches the saved comparison run and is less aggressive for live demos.
-
-Run one-off prediction:
-
-```bash
-python ml/predict.py --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --source samples/demo.jpg
-python ml/predict.py --stage1 --weights runs/stage1_det/yolov8s_stage1/weights/best.pt --source samples/demo.jpg
-python ml/predict.py --single-model --weights runs/detect/train/weights/best.pt --source samples/demo.jpg
-```
-
-The deployed/default runtime remains two-stage. Fixed ROIs are still available for the static-camera demo, but they are deployment-specific rather than the repo’s generalizable ML recommendation.
-
-## Edge Demo
-
-Start the backend:
-
-```bash
-uvicorn backend.main:app --reload
-```
-
-Open the live MJPEG stream in a browser:
-
-```html
-<img src="http://127.0.0.1:8000/stream" alt="Parking stream" />
-```
-
-Run image inference with fixed ROIs:
-
-```bash
-python edge/detect.py \
-  --image samples/demo.jpg \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --save-annotated logs/demo-annotated.jpg
-```
-
-`detect.py` now posts to the backend by default, so `/status` and `/history` update automatically while the backend is running.
-Use `--no-post` for offline-only inference.
-For oblique camera views, configure `preprocess.perspective` in [edge/config.example.yaml](/Users/thebkht/Projects/smart-parking-system/edge/config.example.yaml) and redraw `rois` against the rectified output.
-
-Run the integrated final pipeline with the trained Stage 1 parking-space detector:
-
-```bash
-python edge/detect.py \
-  --image samples/demo.jpg \
-  --stage1-detector \
-  --stage1-model runs/stage1_det/yolov8s_stage1/weights/best.pt \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --save-annotated logs/final-demo-annotated.jpg
-```
-
-Benchmark the Stage 2 classifier on a representative ROI patch:
-
-```bash
-python edge/benchmark.py \
-  --task classify \
-  --image samples/demo.jpg \
-  --model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --imgsz 64 \
-  --roi 50 100 200 250
-```
-
-Run the short reproducible stability check that generated the current summary:
-
-```bash
-python edge/stability_test.py \
-  --image samples/demo.jpg \
-  --stage1-detector \
-  --stage1-model runs/stage1_det/yolov8s_stage1/weights/best.pt \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --device mps \
-  --duration 15 \
-  --frame-interval 500
-```
-
-For the longer Week 7 soak test, keep the same command and raise `--duration` to `1800`.
-
-Run live camera inference:
-
-```bash
-python edge/detect.py --camera 0 --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt
-python edge/detect.py --camera iphone --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt
-```
-
-`--camera iphone` is macOS-only and targets Continuity Camera / attached iPhone cameras.
-Camera mode updates `logs/latest_frame.jpg` continuously so `/stream` can render the latest annotated frame without waiting for POST intervals.
+Model publishing guidance is in [MODEL_LICENSE.md](MODEL_LICENSE.md).
 
 ## Docs
 
-- Canonical PRD: [docs/prd.md](/Users/thebkht/Projects/smart-parking-system/docs/prd.md)
-- Docs index: [docs/README.md](/Users/thebkht/Projects/smart-parking-system/docs/README.md)
-- Edge details: [edge/README.md](/Users/thebkht/Projects/smart-parking-system/edge/README.md)
-- Backend contract: [backend/README.md](/Users/thebkht/Projects/smart-parking-system/backend/README.md)
+- [docs/README.md](docs/README.md)
+- [docs/prd.md](docs/prd.md)
+- [docs/prd-diagrams.md](docs/prd-diagrams.md)
+- [edge/README.md](edge/README.md)
+- [backend/README.md](backend/README.md)
+
+## Note on Older Docs
+
+Some implementation docs and commands in the repo still reflect earlier `v3` assumptions such as fixed ROIs or PKLot/CNRPark-heavy workflows. When there is a mismatch, follow [docs/prd.md](docs/prd.md).

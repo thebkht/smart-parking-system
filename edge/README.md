@@ -21,7 +21,7 @@ The edge pipeline follows the v3 architecture:
 
 ## Config
 
-Copy [edge/config.example.yaml](/Users/thebkht/Projects/smart-parking-system/edge/config.example.yaml) to `edge/config.yaml` and adjust:
+Copy [edge/config.example.yaml](config.example.yaml) to `edge/config.yaml` and adjust:
 
 - `model.stage2_path` for the classifier checkpoint
 - `stage1.detector_path` for the parking-space detector checkpoint
@@ -43,7 +43,7 @@ When `--stage1-detector` is enabled, the parking-space detector output is filter
 - in `roi_center` mode, a box must also have its center inside one configured slot ROI
 
 For angled cameras, configure `preprocess.perspective.source_points` and either
-`destination_points` or `output_size` in [edge/config.example.yaml](/Users/thebkht/Projects/smart-parking-system/edge/config.example.yaml). The warp runs before Stage 1/Stage 2, so the configured `rois` should match the rectified image, not the raw camera frame.
+`destination_points` or `output_size` in [edge/config.example.yaml](config.example.yaml). The warp runs before Stage 1/Stage 2, so the configured `rois` should match the rectified image, not the raw camera frame.
 
 ## Commands
 

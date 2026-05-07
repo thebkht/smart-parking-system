@@ -4,7 +4,7 @@ This file provides repository-specific guidance for coding agents working in thi
 
 ## Canonical Source
 
-Use [docs/prd.md](/Users/thebkht/Projects/smart-parking-system/docs/prd.md) as the canonical project definition.
+Use [docs/prd.md](docs/prd.md) as the canonical project definition.
 
 Current product direction is `v6`, not the older `v3` summary:
 
@@ -20,8 +20,8 @@ If another doc conflicts with `docs/prd.md`, treat the PRD as authoritative.
 
 Some implementation docs still reflect the earlier `v3` architecture:
 
-- [edge/README.md](/Users/thebkht/Projects/smart-parking-system/edge/README.md)
-- [backend/README.md](/Users/thebkht/Projects/smart-parking-system/backend/README.md)
+- [edge/README.md](edge/README.md)
+- [backend/README.md](backend/README.md)
 
 When editing code or docs:
 
@@ -109,10 +109,10 @@ Note: command examples in the repo may still mention earlier PKLot/CNRPark or fi
 
 Key files:
 
-- [edge/detect.py](/Users/thebkht/Projects/smart-parking-system/edge/detect.py): edge inference pipeline
-- [backend/main.py](/Users/thebkht/Projects/smart-parking-system/backend/main.py): FastAPI backend
-- [docs/prd.md](/Users/thebkht/Projects/smart-parking-system/docs/prd.md): canonical requirements
-- [docs/prd-diagrams.md](/Users/thebkht/Projects/smart-parking-system/docs/prd-diagrams.md): architecture diagrams
+- [edge/detect.py](edge/detect.py): edge inference pipeline
+- [backend/main.py](backend/main.py): FastAPI backend
+- [docs/prd.md](docs/prd.md): canonical requirements
+- [docs/prd-diagrams.md](docs/prd-diagrams.md): architecture diagrams
 
 Preferred v6 architecture story:
 

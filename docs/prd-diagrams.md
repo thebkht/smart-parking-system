@@ -1,6 +1,6 @@
 # PRD Diagrams
 
-These diagrams are derived from the canonical PRD in [docs/prd.md](/Users/thebkht/Projects/smart-parking-system/docs/prd.md).
+These diagrams are derived from the canonical PRD in [docs/prd.md](prd.md).
 
 ## YOLO Two-Stage Spot Classification
 
