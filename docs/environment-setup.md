@@ -24,11 +24,22 @@ python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 ```
 
+On Windows PowerShell:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+```
+
 Or with `make`:
 
 ```bash
 make install-dev
 ```
+
+The `Makefile` calls the virtual environment's Python directly, so the same `make` targets work on Windows without a manual `activate` step.
 
 ## Dependency Groups
 
@@ -71,5 +82,5 @@ python -c "import cv2, ultralytics, yaml; print('env ok')"
 Use the standalone prediction CLI when you want a quick model output without running the full edge pipeline:
 
 ```bash
-python ml/predict.py --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --source samples/demo.jpg
+make predict STAGE2_VARIANT=n PREDICT_SOURCE=samples/demo.jpg
 ```

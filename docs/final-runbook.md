@@ -13,9 +13,8 @@ Current checked-in final artifact choices:
 ## 1. Prepare Datasets
 
 ```bash
-source .venv/bin/activate
-python ml/prepare_dataset.py --stage1 --pklot-dir datasets/pklot_raw
-python ml/prepare_dataset.py --stage2 --pklot-dir datasets/pklot_raw
+make prepare-stage1 PKLOT_DIR=datasets/pklot_raw
+make prepare-stage2 PKLOT_DIR=datasets/pklot_raw
 ```
 
 Add `--cnrpark-dir <path>` to the Stage 2 command when the CNRPark-EXT patch folders are available.
@@ -26,36 +25,27 @@ The Stage 2 prep command accepts either the official `cnrpark.it` `PATCHES/` + `
 Stage 1 detector:
 
 ```bash
-python ml/train.py --stage1 --variant s --device mps
+make train-stage1 STAGE1_VARIANT=s DEVICE=mps
 ```
 
 Stage 2 classifier comparison:
 
 ```bash
-python ml/train.py --stage2 --variant n --device mps
-python ml/train.py --stage2 --variant s --device mps
-python ml/train.py --stage2 --variant m --device mps
+make train-stage2 STAGE2_VARIANT=n DEVICE=mps
+make train-stage2 STAGE2_VARIANT=s DEVICE=mps
+make train-stage2 STAGE2_VARIANT=m DEVICE=mps
 ```
 
 ## 3. Evaluate
 
 ```bash
-python ml/evaluate.py --stage1 --weights runs/stage1_det/yolov8s_stage1/weights/best.pt --split val --device mps
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --split val --device mps --batch 256
-python ml/evaluate.py --stage2 --split val --device mps --batch 256 --compare \
-  runs/stage2_cls/yolov8n_stage2/weights/best.pt \
-  runs/stage2_cls/yolov8s_stage2/weights/best.pt \
-  runs/stage2_cls/yolov8m_stage2/weights/best.pt
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --split val --device mps --batch 256 --sweep
+make evaluate-stage1 STAGE1_VARIANT=s DEVICE=mps
+make evaluate-stage2 STAGE2_VARIANT=m DEVICE=mps EVALUATE_STAGE2_ARGS="--batch 256"
+make compare-stage2 DEVICE=mps COMPARE_STAGE2_ARGS="--batch 256"
+make sweep-stage2 STAGE2_VARIANT=m DEVICE=mps SWEEP_STAGE2_ARGS="--batch 256"
 ```
 
-Cross-dataset evaluation, when exports are available:
-
-```bash
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --cross-dataset datasets/pklot_test --device mps --batch 256
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --cross-dataset datasets/cnrpark_test --device mps --batch 256
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --data datasets/stage2_weather --per-weather --device mps --batch 512
-```
+For cross-dataset and per-weather evaluation, the current `Makefile` does not have dedicated targets yet. Use `make` for the standard validation path above, and run `ml/evaluate.py` directly only for these extra modes.
 
 The saved sweep artifact currently identifies `0.1` as the best validation threshold for `yolov8m_stage2`.
 The deployed edge config remains at `0.3`, which is the threshold used in the saved model-comparison and runtime demo path.
@@ -63,14 +53,9 @@ The deployed edge config remains at `0.3`, which is the threshold used in the sa
 ## 4. Export + Benchmark
 
 ```bash
-python ml/export.py --weights runs/stage2_cls/yolov8m_stage2/weights/best.pt --imgsz 64
-python edge/benchmark.py \
-  --task classify \
-  --image samples/demo.jpg \
-  --model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --imgsz 64 \
-  --roi 50 100 200 250
-python ml/bandwidth.py
+make export-stage2 STAGE2_VARIANT=m
+make benchmark-stage2 STAGE2_VARIANT=m BENCHMARK_IMAGE=samples/demo.jpg BENCHMARK_ROI="50 100 200 250"
+make bandwidth
 ```
 
 ## 5. End-to-End Validation
@@ -78,40 +63,27 @@ python ml/bandwidth.py
 Start backend:
 
 ```bash
-uvicorn backend.main:app --reload
+make backend
 ```
 
 Run integrated demo:
 
 ```bash
-python edge/detect.py \
-  --image samples/demo.jpg \
-  --stage1-detector \
-  --stage1-model runs/stage1_det/yolov8s_stage1/weights/best.pt \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --post \
-  --save-annotated logs/final-demo-annotated.jpg
+make edge EDGE_ARGS="--image samples/demo.jpg --stage1-detector --stage1-model runs/stage1_det/yolov8s_stage1/weights/best.pt --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt --post --save-annotated logs/final-demo-annotated.jpg"
 ```
 
 Run the short reproducible stability check used for the checked-in summary:
 
 ```bash
-python edge/stability_test.py \
-  --image samples/demo.jpg \
-  --stage1-detector \
-  --stage1-model runs/stage1_det/yolov8s_stage1/weights/best.pt \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --device mps \
-  --duration 15 \
-  --frame-interval 500
+make stability BENCHMARK_IMAGE=samples/demo.jpg STAGE1_VARIANT=s STAGE2_VARIANT=m STABILITY_DURATION=15 STABILITY_ARGS="--device mps --frame-interval 500"
 ```
 
-For the formal Week 7 soak test, rerun the same command with `--duration 1800` and add `--post` if backend verification is part of the test.
+For the formal Week 7 soak test, run `make stability STAGE1_VARIANT=s STAGE2_VARIANT=m STABILITY_ARGS="--device mps"` to use the default `1800` second duration.
 
 ## 6. Final Packaging
 
 ```bash
-python ml/finalize.py
+make finalize
 ```
 
 This generates:

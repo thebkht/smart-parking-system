@@ -14,19 +14,13 @@ The Week 4 demo should already reflect the v3 architecture, even if it uses a pl
 ## Start The Backend
 
 ```bash
-source .venv/bin/activate
-uvicorn backend.main:app --reload
+make backend
 ```
 
 ## Run The Static-Image Demo
 
 ```bash
-source .venv/bin/activate
-python edge/detect.py \
-  --image samples/demo.jpg \
-  --stage2-model yolov8n-cls.pt \
-  --post \
-  --save-annotated logs/week4-demo-annotated.jpg
+make edge EDGE_ARGS="--image samples/demo.jpg --stage2-model yolov8n-cls.pt --post --save-annotated logs/week4-demo-annotated.jpg"
 ```
 
 ## What To Show

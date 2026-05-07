@@ -19,19 +19,19 @@ PKLot full-frame detection should be treated carefully because Roboflow exports 
 ## Recommended Stage 1 Training Path
 
 ```bash
-python ml/prepare_dataset.py --stage1 --pklot-dir /path/to/pklot_roboflow
-python ml/train.py --stage1 --variant s --device mps
-python ml/train.py --stage1 --variant m --imgsz 960 --device mps
-python ml/evaluate.py --stage1 --weights runs/stage1_det/yolov8s_stage1/weights/best.pt --split val
+make prepare-stage1 PKLOT_DIR=/path/to/pklot_roboflow
+make train-stage1 STAGE1_VARIANT=s DEVICE=mps
+make train-stage1 STAGE1_VARIANT=m DEVICE=mps TRAIN_STAGE1_ARGS="--imgsz 960"
+make evaluate-stage1 STAGE1_VARIANT=s
 ```
 
 ## Stage 2 Training Path
 
 ```bash
-python ml/prepare_dataset.py --stage2 --pklot-dir /path/to/pklot_roboflow
-python ml/train.py --stage2 --variant n --device mps
-python ml/train.py --stage2 --variant s --device mps
-python ml/train.py --stage2 --variant m --device mps
+make prepare-stage2 PKLOT_DIR=/path/to/pklot_roboflow
+make train-stage2 STAGE2_VARIANT=n DEVICE=mps
+make train-stage2 STAGE2_VARIANT=s DEVICE=mps
+make train-stage2 STAGE2_VARIANT=m DEVICE=mps
 ```
 
 ## Other Supported ML Tracks
@@ -39,10 +39,10 @@ python ml/train.py --stage2 --variant m --device mps
 Single-model occupancy detector baseline:
 
 ```bash
-python ml/prepare_dataset.py --single-model --pklot-dir /path/to/pklot_roboflow
-python ml/train.py --single-model --variant n --device mps
-python ml/evaluate.py --single-model --weights runs/single_model_det/yolov8n_single_model/weights/best.pt --split val
+make prepare-single-model PKLOT_DIR=/path/to/pklot_roboflow
 ```
+
+Single-model training and evaluation do not currently have dedicated `make` targets. Keep using the direct `ml/train.py --single-model ...` and `ml/evaluate.py --single-model ...` commands for that older comparison path.
 
 ## Comparison Matrix
 
@@ -58,10 +58,11 @@ The main comparison is `yolov8n-cls` vs `yolov8s-cls` vs `yolov8m-cls` on:
 ## Evaluation Path
 
 ```bash
-python ml/evaluate.py --stage1 --weights runs/stage1_det/yolov8s_stage1/weights/best.pt --split val
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --split val
-python ml/evaluate.py --stage2 --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --cross-dataset pklot_test
+make evaluate-stage1 STAGE1_VARIANT=s
+make evaluate-stage2 STAGE2_VARIANT=n
 ```
+
+The cross-dataset evaluation example still requires running `ml/evaluate.py` directly because the `Makefile` only covers the standard validation path.
 
 Per-weather evaluation is only valid when the dataset is arranged as:
 

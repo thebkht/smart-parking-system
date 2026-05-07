@@ -50,18 +50,13 @@ For angled cameras, configure `preprocess.perspective.source_points` and either
 Static image:
 
 ```bash
-python edge/detect.py \
-  --image samples/demo.jpg \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --save-annotated logs/annotated.jpg
+make edge EDGE_ARGS="--image samples/demo.jpg --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt --save-annotated logs/annotated.jpg"
 ```
 
 Live camera:
 
 ```bash
-python edge/detect.py \
-  --camera 0 \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
+make edge EDGE_ARGS="--camera 0 --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt"
 ```
 
 The default camera profile is intentionally reduced now: `frame_interval_ms: 500`, `stream.max_width: 640`, `stream.jpeg_quality: 55`, `backend.timeout_s: 0.75`, and `backend.retry_delay_s: 10.0`.
@@ -69,28 +64,19 @@ The default camera profile is intentionally reduced now: `frame_interval_ms: 500
 Override the streamed frame target if needed:
 
 ```bash
-python edge/detect.py \
-  --camera 0 \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --latest-frame-path logs/latest_frame.jpg
+make edge EDGE_ARGS="--camera 0 --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt --latest-frame-path logs/latest_frame.jpg"
 ```
 
 If the live stream feels laggy, lower the stream cost without changing inference:
 
 ```bash
-python edge/detect.py \
-  --camera 0 \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --stream-max-width 640 \
-  --stream-jpeg-quality 55
+make edge EDGE_ARGS="--camera 0 --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt --stream-max-width 640 --stream-jpeg-quality 55"
 ```
 
 macOS iPhone camera:
 
 ```bash
-python edge/detect.py \
-  --camera iphone \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
+make edge EDGE_ARGS="--camera iphone --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt"
 ```
 
 `--camera iphone` is macOS-only and expects an available Continuity Camera / iPhone camera device.
@@ -98,11 +84,7 @@ python edge/detect.py \
 Stage 1 parking-space detector:
 
 ```bash
-python edge/detect.py \
-  --image samples/demo.jpg \
-  --stage1-detector \
-  --stage1-model runs/stage1_det/yolov8s_stage1/weights/best.pt \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt
+make edge EDGE_ARGS="--image samples/demo.jpg --stage1-detector --stage1-model runs/stage1_det/yolov8s_stage1/weights/best.pt --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt"
 ```
 
 ## Payload Contract
@@ -124,8 +106,5 @@ python edge/detect.py \
 Run without backend updates only when needed:
 
 ```bash
-python edge/detect.py \
-  --image samples/demo.jpg \
-  --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt \
-  --no-post
+make edge EDGE_ARGS="--image samples/demo.jpg --stage2-model runs/stage2_cls/yolov8m_stage2/weights/best.pt --no-post"
 ```

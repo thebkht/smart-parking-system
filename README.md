@@ -35,6 +35,21 @@ python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 ```
 
+Windows PowerShell:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+```
+
+Cross-platform with `make`:
+
+```bash
+make install-dev
+```
+
 Quick environment check:
 
 ```bash
@@ -46,39 +61,39 @@ python -c "import cv2, ultralytics, yaml; print('env ok')"
 Run the backend:
 
 ```bash
-uvicorn backend.main:app --reload
+make backend
 ```
 
 Run edge inference on an image:
 
 ```bash
-python edge/detect.py --image samples/photo_2026-04-23\ 21.29.16.jpeg
+make edge EDGE_ARGS="--image samples/photo_2026-04-23\ 21.29.16.jpeg"
 ```
 
 Run live camera inference:
 
 ```bash
-python edge/detect.py --camera 0
+make edge EDGE_ARGS="--camera 0"
 ```
 
 Train Stage 2 classifier variants:
 
 ```bash
-python ml/train.py --stage2 --variant n
-python ml/train.py --stage2 --variant s
-python ml/train.py --stage2 --variant m
+make train-stage2 STAGE2_VARIANT=n
+make train-stage2 STAGE2_VARIANT=s
+make train-stage2 STAGE2_VARIANT=m
 ```
 
 Evaluate a trained classifier:
 
 ```bash
-python ml/evaluate.py --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --full
+make evaluate-stage2 STAGE2_VARIANT=n
 ```
 
 Run tests:
 
 ```bash
-pytest
+make test
 ```
 
 ## Dataset Direction
