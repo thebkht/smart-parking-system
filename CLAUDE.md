@@ -1,101 +1,143 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides repository-specific guidance for coding agents working in this project.
+
+## Canonical Source
+
+Use [docs/prd.md](/Users/thebkht/Projects/smart-parking-system/docs/prd.md) as the canonical project definition.
+
+Current product direction is `v6`, not the older `v3` summary:
+
+- primary dataset: `ACPDS`
+- Stage 1 extraction path: quadrilateral parking-space polygons
+- Stage 2 classifier: `YOLOv8-cls`
+- pooling method: `order_corners()` + `getPerspectiveTransform()` + `warpPerspective()`
+- product scope: edge occupancy detection + backend + app + `Find My Car`
+
+If another doc conflicts with `docs/prd.md`, treat the PRD as authoritative.
+
+## Current Repo Reality
+
+Some implementation docs still reflect the earlier `v3` architecture:
+
+- [edge/README.md](/Users/thebkht/Projects/smart-parking-system/edge/README.md)
+- [backend/README.md](/Users/thebkht/Projects/smart-parking-system/backend/README.md)
+
+When editing code or docs:
+
+- prefer the current PRD direction over older ROI-first descriptions
+- do not assume fixed ROIs are the long-term architecture just because older docs mention them
+- preserve backward-compatible runtime behavior unless the task explicitly changes it
+- call out mismatches between implementation and PRD instead of silently rewriting scope
 
 ## Project Overview
 
-Two-stage edge inference system for smart parking. Stage 1 localizes parking spaces either through camera-specific fixed ROIs or a trained full-frame parking-space detector. Stage 2 classifies each cropped patch as occupied/free using YOLOv8-cls trained on PKLot + CNRPark-EXT. Only a JSON result (~1 KB) is sent to a minimal FastAPI backend — no raw video leaves the device.
+Smart Parking System is an edge-based parking occupancy project built around a two-stage pipeline:
+
+1. load or generate parking-space quadrilaterals
+2. perspective-warp each spot into a clean `128 x 128` patch
+3. classify each patch as `occupied` or `free` with `YOLOv8-cls`
+4. temporally smooth status outputs
+5. send compact JSON to the backend instead of raw video
+
+The broader v6 product also includes:
+
+- owner setup flow for lot layout creation
+- backend persistence and map/status APIs
+- web/mobile app flows
+- `Find My Car` based on photo-to-spot localization
 
 ## Environment
 
-Single shared `.venv` at the repo root (Python 3.9, arm64 Mac):
+Single shared `.venv` at the repo root:
 
 ```bash
-make install-dev          # create .venv and install all deps including dev tools
-source .venv/bin/activate # activate before running anything
+make install-dev
+source .venv/bin/activate
 ```
 
-Verify the environment:
+Quick verification:
+
 ```bash
 python -c "import cv2, ultralytics, yaml; print('env ok')"
 ```
 
 ## Common Commands
 
-**Run the backend:**
+Run the backend:
+
 ```bash
 uvicorn backend.main:app --reload
 ```
 
-**Run static-image inference demo (two-stage pipeline):**
+Run tests:
+
 ```bash
-python edge/detect.py --image /path/to/parking.jpg
-python edge/detect.py --image /path/to/parking.jpg --post                              # POST to backend
-python edge/detect.py --image /path/to/parking.jpg --save-annotated logs/out.jpg
-python edge/detect.py --image /path/to/parking.jpg --device cpu                        # if MPS unavailable
-python edge/detect.py --image /path/to/parking.jpg --stage2-model stage2_cls/weights/best.pt
-python edge/detect.py --image /path/to/parking.jpg --stage1-detector                  # use Stage 1 parking-space detector
-python edge/detect.py --camera 0                                                        # live camera mode
+pytest
 ```
 
-**ML pipeline (Stage 2 — PKLot + CNRPark-EXT classifier):**
-```bash
-python ml/prepare_dataset.py --pklot-dir datasets/pklot_patches                        # build stage2_data/
-python ml/prepare_dataset.py --pklot-dir datasets/pklot_patches --cnrpark-dir datasets/cnrpark
-python ml/train.py --stage2 --variant n                                                 # train YOLOv8n-cls
-python ml/train.py --stage2 --variant s                                                 # train YOLOv8s-cls
-python ml/train.py --stage2 --variant m                                                 # train YOLOv8m-cls
-python ml/export.py --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt
-python ml/evaluate.py --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --full
-python ml/evaluate.py --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --cross-dataset cnrpark_test
-python ml/evaluate.py --compare runs/stage2_cls/*/weights/best.pt
-python ml/bandwidth.py
-```
+Lint / format:
 
-**ML pipeline (clf-data workflow — SVM + YOLO comparison):**
-```bash
-python ml/prepare_dataset.py --clf-dir datasets/clf-data
-python ml/train.py --variant n
-```
-
-**Lint / format:**
 ```bash
 ruff check .
 black .
 ```
 
-**Run tests:**
+Representative edge commands:
+
 ```bash
-pytest
+python edge/detect.py --image /path/to/parking.jpg
+python edge/detect.py --image /path/to/parking.jpg --post
+python edge/detect.py --image /path/to/parking.jpg --save-annotated logs/out.jpg
+python edge/detect.py --image /path/to/parking.jpg --device cpu
+python edge/detect.py --camera 0
 ```
 
-## Architecture
+Representative ML commands:
 
-Two main components:
+```bash
+python ml/train.py --stage2 --variant n
+python ml/train.py --stage2 --variant s
+python ml/train.py --stage2 --variant m
+python ml/evaluate.py --weights runs/stage2_cls/yolov8n_stage2/weights/best.pt --full
+python ml/bandwidth.py
+```
 
-**`edge/detect.py`** — two-stage inference pipeline.
-- Stage 1: `get_spot_boxes()` returns `(x1,y1,x2,y2)` per parking space. Default: configured fixed ROIs for a static camera. With `--stage1-detector`: runs a YOLO parking-space detector.
-- Stage 2: `classify_patch()` crops each ROI to 64×64 and runs YOLOv8-cls. Default model path comes from config and falls back to the local trained checkpoint when present.
-- Output JSON: `{spot_1: "free", confidence: {spot_1: 0.97}, timestamp: "..."}`.
-- Device defaults to `mps` with CPU fallback via `--device cpu`.
+Note: command examples in the repo may still mention earlier PKLot/CNRPark or fixed-ROI workflows. Treat them as implementation history unless the current PRD or task says otherwise.
 
-**`backend/main.py`** — minimal FastAPI app. Persists every update to `parking.db` (SQLite):
-- `POST /update` — accepts any JSON payload (open schema via `extra="allow"`), stores to DB
-- `GET /status` — returns the latest stored update
-- `GET /history` — returns up to N recent updates (default 100)
-- `GET /health` — liveness check
+## Architecture Notes
 
-**`edge/config.example.yaml`** — template for local `edge/config.yaml` (gitignored). Covers model path, input mode (image or camera), postprocessing (smoothing window, overlap threshold), and logging output format.
+Key files:
 
-**`ml/`** — ML pipeline scripts: `prepare_dataset.py`, `train.py`, `export.py`, `evaluate.py`, `bandwidth.py`.
+- [edge/detect.py](/Users/thebkht/Projects/smart-parking-system/edge/detect.py): edge inference pipeline
+- [backend/main.py](/Users/thebkht/Projects/smart-parking-system/backend/main.py): FastAPI backend
+- [docs/prd.md](/Users/thebkht/Projects/smart-parking-system/docs/prd.md): canonical requirements
+- [docs/prd-diagrams.md](/Users/thebkht/Projects/smart-parking-system/docs/prd-diagrams.md): architecture diagrams
 
-**`artifacts/models/`** — where trained model checkpoints (`best.pt`, `best.onnx`, `best_int8.onnx`) are placed. Not committed.
+Preferred v6 architecture story:
 
-**`logs/`** — timestamped CSV/JSON inference logs. Not committed.
+`parking-space quadrilaterals -> perspective warp -> YOLOv8-cls -> temporal smoothing -> JSON -> FastAPI`
+
+Preferred payload contract:
+
+```json
+{
+  "spots": {
+    "spot_1": "free",
+    "spot_2": "occupied"
+  },
+  "confidence": {
+    "spot_1": 0.91,
+    "spot_2": 0.84
+  },
+  "timestamp": "2026-04-21T00:00:00Z"
+}
+```
 
 ## Conventions
 
-- Model artifacts go in `artifacts/models/`; logs go in `logs/`
-- Local edge config: copy `edge/config.example.yaml` → `edge/config.yaml`
-- `requirements.txt` = runtime stack; `requirements-dev.txt` adds pytest, black, ruff, jupyter
-- `opencv-python` (not `headless`) is used intentionally for webcam support
+- keep project-level agent guidance in this file tracked in git
+- do not put secrets, personal notes, or machine-specific private data here
+- prefer updating shared docs over creating parallel one-off guidance
+- model artifacts belong outside git-tracked source unless explicitly needed
+- logs and local runtime outputs should remain untracked
