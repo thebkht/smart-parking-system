@@ -379,6 +379,12 @@ Run SIFT localization against either a manifest JSON or a per-spot reference dir
 make localize-car LOCALIZE_ARGS="--query samples/query.jpg --references samples/localization_refs --output logs/localize_result.json"
 ```
 
+Evaluate multiple labeled localization queries:
+
+```bash
+python ml/evaluate_localization.py --queries samples/localization_refs/query_set.sample.json --references samples/localization_refs/labeled --output-json logs/localize_eval.json --output-csv logs/localize_eval.csv
+```
+
 Supported reference layouts:
 
 ```text
@@ -398,6 +404,8 @@ or:
   "spot_2": "refs/spot_2/a.jpg"
 }
 ```
+
+Starter sample references are available under [samples/localization_refs](/Users/thebkht/Projects/smart-parking-system/samples/localization_refs). The current starter set is meant for proof-of-function only. In a sample run using `photo_2026-04-23_21.29.43.jpeg` as the query, the SIFT matcher ranked `spot_2` first with 861 inliers, far ahead of the other tentative spot folders.
 
 ---
 

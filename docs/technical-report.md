@@ -287,7 +287,7 @@ First, the Stage 2 classifier did not achieve the original 98% target. Even the 
 
 ## 9. Conclusion
 
-This project demonstrates that a laptop-based edge parking system can combine full-frame parking-space localization and per-space occupancy classification into a practical two-stage inference pipeline. The checked-in final system uses a YOLO Stage 1 parking-space detector and a `yolov8m-cls` Stage 2 classifier, achieves strong in-domain classification performance, maintains useful cross-dataset generalization, runs at real-time speeds on Apple MPS, and reduces bandwidth by more than 99.9% compared with continuous video transmission.
+This project demonstrates that a laptop-based edge parking system can combine full-frame parking-space localization and per-space occupancy classification into a practical two-stage inference pipeline. The checked-in Week 6 state uses a YOLO Stage 1 parking-space detector, a promoted `yolov8n-cls` checkpoint for the handoff path, and comparison checkpoints for `s` and `m` variants. The system achieves strong Stage 1 localization performance, useful Stage 2 comparison coverage, compact export artifacts, and bandwidth reduction of more than 99.9% compared with continuous video transmission.
 
 The final repo state is suitable for class demonstration and technical submission because it includes:
 
