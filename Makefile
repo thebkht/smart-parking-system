@@ -17,10 +17,13 @@ endif
 
 PKLOT_DIR ?= datasets/pklot_raw
 CNRPARK_DIR ?=
+ACPDS_ROOT ?= datasets/acpds_raw
+ACPDS_MANIFEST ?=
+ACPDS_STAGE2_DIR ?= datasets/acpds_stage2
 STAGE1_VARIANT ?= s
 STAGE2_VARIANT ?= n
 STAGE1_WEIGHTS ?= runs/stage1_det/yolov8$(STAGE1_VARIANT)_stage1/weights/best.pt
-STAGE2_WEIGHTS ?= runs/stage2_cls/yolov8$(STAGE2_VARIANT)_stage2/weights/best.pt
+STAGE2_WEIGHTS ?= acpds_cls/weights/best.pt
 BENCHMARK_IMAGE ?= samples/demo.jpg
 BENCHMARK_ROI ?= 50 100 200 250
 BACKEND_HOST ?= 127.0.0.1
@@ -30,6 +33,7 @@ PREDICT_SOURCE ?= samples/demo.jpg
 PREP_STAGE1_ARGS ?=
 PREP_STAGE2_ARGS ?=
 PREP_SINGLE_MODEL_ARGS ?=
+VALIDATE_STAGE2_ARGS ?=
 TRAIN_STAGE1_ARGS ?=
 TRAIN_STAGE2_ARGS ?=
 EVALUATE_STAGE1_ARGS ?=
@@ -41,7 +45,7 @@ STABILITY_DURATION ?= 1800
 STABILITY_ARGS ?=
 
 .PHONY: venv install install-dev check-python \
-	prepare-stage1 prepare-stage2 prepare-single-model \
+	prepare-stage1 prepare-stage2 validate-stage2 prepare-single-model layout-sample \
 	train-stage1 train-stage2 train-stage2-all \
 	evaluate-stage1 evaluate-stage2 compare-stage2 sweep-stage2 \
 	export-stage2 benchmark-stage2 bandwidth stability test lint finalize \
@@ -63,7 +67,10 @@ prepare-stage1:
 	$(VENV_PYTHON) ml/prepare_dataset.py --stage1 --pklot-dir $(PKLOT_DIR) $(PREP_STAGE1_ARGS)
 
 prepare-stage2:
-	$(VENV_PYTHON) ml/prepare_dataset.py --stage2 --pklot-dir $(PKLOT_DIR) $(if $(CNRPARK_DIR),--cnrpark-dir $(CNRPARK_DIR),) $(PREP_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/extract_patches.py --dataset-root $(ACPDS_ROOT) --output $(ACPDS_STAGE2_DIR) $(if $(ACPDS_MANIFEST),--manifest $(ACPDS_MANIFEST),) $(PREP_STAGE2_ARGS)
+
+validate-stage2:
+	$(VENV_PYTHON) ml/extract_patches.py --dataset-root $(ACPDS_ROOT) --output $(ACPDS_STAGE2_DIR) $(if $(ACPDS_MANIFEST),--manifest $(ACPDS_MANIFEST),) --validate-only $(VALIDATE_STAGE2_ARGS)
 
 prepare-single-model:
 	$(VENV_PYTHON) ml/prepare_dataset.py --single-model --pklot-dir $(PKLOT_DIR) $(PREP_SINGLE_MODEL_ARGS)
@@ -96,7 +103,7 @@ sweep-stage2:
 	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights $(STAGE2_WEIGHTS) --split val --device $(DEVICE) --sweep $(SWEEP_STAGE2_ARGS)
 
 export-stage2:
-	$(VENV_PYTHON) ml/export.py --weights $(STAGE2_WEIGHTS) --imgsz 64 $(EXPORT_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/export.py --weights $(STAGE2_WEIGHTS) --imgsz 128 $(EXPORT_STAGE2_ARGS)
 
 benchmark-stage2:
 	$(VENV_PYTHON) edge/benchmark.py \
@@ -117,6 +124,9 @@ edge:
 
 predict:
 	$(VENV_PYTHON) ml/predict.py --weights $(STAGE2_WEIGHTS) --source $(PREDICT_SOURCE)
+
+layout-sample:
+	$(VENV_PYTHON) ml/sfm_layout.py --images samples --output artifacts/layout_sample
 
 stability:
 	$(VENV_PYTHON) edge/stability_test.py \

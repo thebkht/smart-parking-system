@@ -1,0 +1,553 @@
+{
+  "status": "passed",
+  "sample_count": 20,
+  "requested_sample_count": 20,
+  "seed": 42,
+  "generated_at": "2026-05-14T10:26:22Z",
+  "items": [
+    {
+      "source_image": "images/GOPR6536.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6536.JPG",
+      "spot_id": "GOPR6536_0060",
+      "split": "test",
+      "label": "free",
+      "ordered_corners": [
+        [
+          2251.4140625,
+          322.1820068359375
+        ],
+        [
+          2084.7470703125,
+          332.8479919433594
+        ],
+        [
+          2072.0810546875,
+          284.8489990234375
+        ],
+        [
+          2215.4140625,
+          272.1820068359375
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/01__GOPR6536__GOPR6536_0060.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6538.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6538.JPG",
+      "spot_id": "GOPR6538_0011",
+      "split": "test",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          958.8380126953125,
+          3000.0
+        ],
+        [
+          499.739990234375,
+          2896.39501953125
+        ],
+        [
+          911.406005859375,
+          2022.0570068359375
+        ],
+        [
+          1314.10498046875,
+          2239.18994140625
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/02__GOPR6538__GOPR6538_0011.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6665.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6665.JPG",
+      "spot_id": "GOPR6665_0000",
+      "split": "train",
+      "label": "free",
+      "ordered_corners": [
+        [
+          1878.0240478515625,
+          1984.9530029296875
+        ],
+        [
+          1439.469970703125,
+          2093.386962890625
+        ],
+        [
+          1400.9150390625,
+          1541.5789794921875
+        ],
+        [
+          1728.6259765625,
+          1469.2900390625
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/03__GOPR6665__GOPR6665_0000.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6586.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6586.JPG",
+      "spot_id": "GOPR6586_0001",
+      "split": "train",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          919.4840087890625,
+          2262.903076171875
+        ],
+        [
+          855.4840087890625,
+          1868.2359619140625
+        ],
+        [
+          1619.4840087890625,
+          1585.5699462890625
+        ],
+        [
+          1788.8170166015625,
+          1904.237060546875
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/04__GOPR6586__GOPR6586_0001.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6703.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6703.JPG",
+      "spot_id": "GOPR6703_0047",
+      "split": "val",
+      "label": "free",
+      "ordered_corners": [
+        [
+          1474.990966796875,
+          586.0830078125
+        ],
+        [
+          1226.990966796875,
+          654.0830078125
+        ],
+        [
+          1183.990966796875,
+          495.0830078125
+        ],
+        [
+          1394.990966796875,
+          438.0830078125
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/05__GOPR6703__GOPR6703_0047.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6597.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6597.JPG",
+      "spot_id": "GOPR6597_0088",
+      "split": "val",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          1992.2039794921875,
+          555.60400390625
+        ],
+        [
+          1886.2039794921875,
+          554.60400390625
+        ],
+        [
+          1930.5379638671875,
+          519.60400390625
+        ],
+        [
+          2020.8709716796875,
+          522.93701171875
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/06__GOPR6597__GOPR6597_0088.jpg",
+      "blank_like": true
+    },
+    {
+      "source_image": "images/GOPR6751.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6751.JPG",
+      "spot_id": "GOPR6751_0003",
+      "split": "train",
+      "label": "free",
+      "ordered_corners": [
+        [
+          1897.1259765625,
+          1488.2969970703125
+        ],
+        [
+          1293.1259765625,
+          1385.6300048828125
+        ],
+        [
+          1437.1259765625,
+          1173.6300048828125
+        ],
+        [
+          1998.458984375,
+          1248.2969970703125
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/07__GOPR6751__GOPR6751_0003.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6614.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6614.JPG",
+      "spot_id": "GOPR6614_0029",
+      "split": "train",
+      "label": "free",
+      "ordered_corners": [
+        [
+          1852.8399658203125,
+          651.1439819335938
+        ],
+        [
+          1532.8399658203125,
+          675.6439819335938
+        ],
+        [
+          1566.3399658203125,
+          625.1439819335938
+        ],
+        [
+          1866.8399658203125,
+          602.1439819335938
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/08__GOPR6614__GOPR6614_0029.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6735.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6735.JPG",
+      "spot_id": "GOPR6735_0005",
+      "split": "train",
+      "label": "free",
+      "ordered_corners": [
+        [
+          1914.7030029296875,
+          1233.4150390625
+        ],
+        [
+          1615.7030029296875,
+          1178.4150390625
+        ],
+        [
+          1852.7030029296875,
+          903.4149780273438
+        ],
+        [
+          2096.702880859375,
+          936.4149780273438
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/09__GOPR6735__GOPR6735_0005.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6771.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6771.JPG",
+      "spot_id": "GOPR6771_0008",
+      "split": "train",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          2920.212890625,
+          2016.43798828125
+        ],
+        [
+          2512.212890625,
+          1820.43798828125
+        ],
+        [
+          2728.212890625,
+          1358.43798828125
+        ],
+        [
+          3034.212890625,
+          1488.43798828125
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/10__GOPR6771__GOPR6771_0008.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6593.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6593.JPG",
+      "spot_id": "GOPR6593_0026",
+      "split": "val",
+      "label": "free",
+      "ordered_corners": [
+        [
+          3508.9169921875,
+          764.9089965820312
+        ],
+        [
+          3495.583984375,
+          788.9089965820312
+        ],
+        [
+          3259.583984375,
+          675.5750122070312
+        ],
+        [
+          3288.9169921875,
+          660.2420043945312
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/11__GOPR6593__GOPR6593_0026.jpg",
+      "blank_like": true
+    },
+    {
+      "source_image": "images/GOPR6712.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6712.JPG",
+      "spot_id": "GOPR6712_0013",
+      "split": "test",
+      "label": "free",
+      "ordered_corners": [
+        [
+          3419.27392578125,
+          894.072998046875
+        ],
+        [
+          3385.27392578125,
+          978.072998046875
+        ],
+        [
+          2915.27392578125,
+          772.072998046875
+        ],
+        [
+          2998.77392578125,
+          718.072998046875
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/12__GOPR6712__GOPR6712_0013.jpg",
+      "blank_like": true
+    },
+    {
+      "source_image": "images/GOPR6783.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6783.JPG",
+      "spot_id": "GOPR6783_0008",
+      "split": "train",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          1006.1019897460938,
+          1447.9630126953125
+        ],
+        [
+          727.4349975585938,
+          1542.6300048828125
+        ],
+        [
+          783.4349975585938,
+          1221.2969970703125
+        ],
+        [
+          1027.43505859375,
+          1137.2960205078125
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/13__GOPR6783__GOPR6783_0008.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6562.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6562.JPG",
+      "spot_id": "GOPR6562_0024",
+      "split": "train",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          2184.323974609375,
+          653.9219970703125
+        ],
+        [
+          1971.823974609375,
+          699.9219970703125
+        ],
+        [
+          2053.323974609375,
+          583.9219970703125
+        ],
+        [
+          2226.323974609375,
+          552.9219970703125
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/14__GOPR6562__GOPR6562_0024.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6663.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6663.JPG",
+      "spot_id": "GOPR6663_0015",
+      "split": "train",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          268.7460021972656,
+          1899.2120361328125
+        ],
+        [
+          233.74600219726562,
+          1696.2120361328125
+        ],
+        [
+          748.4130249023438,
+          1457.8790283203125
+        ],
+        [
+          843.7459716796875,
+          1605.8790283203125
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/15__GOPR6663__GOPR6663_0015.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6802.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6802.JPG",
+      "spot_id": "GOPR6802_0005",
+      "split": "train",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          377.4280090332031,
+          1526.6629638671875
+        ],
+        [
+          363.4280090332031,
+          1376.6629638671875
+        ],
+        [
+          845.427978515625,
+          1144.6629638671875
+        ],
+        [
+          909.427978515625,
+          1272.6629638671875
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/16__GOPR6802__GOPR6802_0005.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6672.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6672.JPG",
+      "spot_id": "GOPR6672_0014",
+      "split": "train",
+      "label": "occupied",
+      "ordered_corners": [
+        [
+          1263.0579833984375,
+          481.8269958496094
+        ],
+        [
+          1074.5579833984375,
+          531.3270263671875
+        ],
+        [
+          1057.0579833984375,
+          416.3269958496094
+        ],
+        [
+          1220.0579833984375,
+          375.8269958496094
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/17__GOPR6672__GOPR6672_0014.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6767.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6767.JPG",
+      "spot_id": "GOPR6767_0087",
+      "split": "train",
+      "label": "free",
+      "ordered_corners": [
+        [
+          3421.195068359375,
+          748.5570068359375
+        ],
+        [
+          3321.196044921875,
+          710.5570068359375
+        ],
+        [
+          3319.195068359375,
+          679.2239990234375
+        ],
+        [
+          3407.862060546875,
+          711.8900146484375
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/18__GOPR6767__GOPR6767_0087.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6766.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6766.JPG",
+      "spot_id": "GOPR6766_0011",
+      "split": "train",
+      "label": "free",
+      "ordered_corners": [
+        [
+          557.5020141601562,
+          2167.44189453125
+        ],
+        [
+          237.5019989013672,
+          2390.44189453125
+        ],
+        [
+          148.5019989013672,
+          1728.4420166015625
+        ],
+        [
+          403.50201416015625,
+          1554.4420166015625
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/19__GOPR6766__GOPR6766_0011.jpg",
+      "blank_like": false
+    },
+    {
+      "source_image": "images/GOPR6597.JPG",
+      "source_image_path": "datasets/acpds/images/GOPR6597.JPG",
+      "spot_id": "GOPR6597_0064",
+      "split": "val",
+      "label": "free",
+      "ordered_corners": [
+        [
+          2538.0380859375,
+          645.43701171875
+        ],
+        [
+          2422.0380859375,
+          631.93701171875
+        ],
+        [
+          2410.0380859375,
+          591.43701171875
+        ],
+        [
+          2516.0380859375,
+          602.60400390625
+        ]
+      ],
+      "output_patch_path": "datasets/acpds_stage2/validation_samples/20__GOPR6597__GOPR6597_0064.jpg",
+      "blank_like": false
+    }
+  ],
+  "human_gate": {
+    "pass_criteria": "no twisted or blank-looking perspective warps in reviewed samples",
+    "fail_criteria": "twisted corners, extreme clipping, or blank output in any reviewed sample"
+  }
+}

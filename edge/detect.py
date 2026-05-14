@@ -29,7 +29,7 @@ import requests
 import yaml
 from ultralytics import YOLO
 
-STAGE2_MODEL_DEFAULT = "yolov8n-cls.pt"
+STAGE2_MODEL_DEFAULT = "acpds_cls/weights/best.pt"
 DEFAULT_STAGE1_LOCAL_CHECKPOINT = "runs/stage1_det/yolov8s_stage1/weights/best.pt"
 STAGE1_MODEL_DEFAULT = "yolov8n.pt"
 DEFAULT_BACKEND_URL = "http://127.0.0.1:8000/update"
@@ -46,7 +46,7 @@ DEFAULT_STREAM_MAX_WIDTH = 640
 DEFAULT_STAGE2_THRESHOLD = 0.5
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.yaml"
 DEFAULT_CAMERA_PROBE_LIMIT = 10
-DEFAULT_STAGE2_LOCAL_CHECKPOINT = "runs/stage2_cls/yolov8n_stage2/weights/best.pt"
+DEFAULT_STAGE2_LOCAL_CHECKPOINT = "acpds_cls/weights/best.pt"
 DEFAULT_STAGE1_MIN_BOX_AREA = 1500
 DEFAULT_STAGE1_FILTER_MODE = "bounds"
 DEFAULT_STAGE1_CONFIDENCE = 0.4
@@ -612,7 +612,8 @@ def get_spot_boxes(
     )[0]
     candidates: list[Tuple[Tuple[int, int, int, int], float]] = []
     raw_boxes = results.boxes.xyxy.cpu().numpy()
-    raw_scores = results.boxes.conf.cpu().numpy() if results.boxes.conf is not None else None
+    box_conf = getattr(results.boxes, "conf", None)
+    raw_scores = box_conf.cpu().numpy() if box_conf is not None else None
     for index, box in enumerate(raw_boxes):
         kept = filter_stage1_box(
             frame.shape,
@@ -1157,6 +1158,8 @@ def run_pipeline(
     last_confidences: Optional[Dict[str, float]] = None,  # ← add this
 ) -> Tuple[Dict[str, Any], Dict[str, Tuple[int, int, int, int]]]:
     stage1_only = getattr(args, "stage1_only", False)
+    stage1_postprocess_type = getattr(args, "stage1_postprocess_type", DEFAULT_STAGE1_POSTPROCESS_TYPE)
+    stage1_match_threshold = getattr(args, "stage1_match_threshold", DEFAULT_STAGE1_MATCH_THRESHOLD)
 
     if stage1_only and args.stage1_detector and stage1_model is not None:
         # Skip stage2: treat every stage1 detection as "occupied"
@@ -1170,8 +1173,8 @@ def run_pipeline(
             overlap=args.stage1_overlap,
             min_box_area=args.stage1_min_box_area,
             filter_mode=args.stage1_filter_mode,
-            postprocess_type=args.stage1_postprocess_type,
-            match_threshold=args.stage1_match_threshold,
+            postprocess_type=stage1_postprocess_type,
+            match_threshold=stage1_match_threshold,
             fixed_rois=fixed_rois,
         )
         raw_statuses: Dict[str, str] = {
@@ -1192,8 +1195,8 @@ def run_pipeline(
             overlap=args.stage1_overlap,
             min_box_area=args.stage1_min_box_area,
             filter_mode=args.stage1_filter_mode,
-            postprocess_type=args.stage1_postprocess_type,
-            match_threshold=args.stage1_match_threshold,
+            postprocess_type=stage1_postprocess_type,
+            match_threshold=stage1_match_threshold,
         )
 
         raw_statuses: Dict[str, str] = {}

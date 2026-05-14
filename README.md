@@ -24,19 +24,19 @@ Key points:
 
 ## Team & Task Assignments
 
-### @thebkht — ML lead
+### [@thebkht](https://github.com/thebkht) — ML lead
 
 > Owns the critical path: dataset, patch extraction, training, and SfM layout AI.
 
 **Week 5**
 
-- [ ] Download ACPDS via `github.com/martin-marek/parking-space-occupancy`
-- [ ] Write `ml/extract_patches.py` — `order_corners()` + `warpPerspective` to `acpds_stage2/`
-- [ ] Run `validate_patches()` on 20 samples before training — confirm no twisted warps
-- [ ] Train `YOLOv8n-cls` on `acpds_stage2/` — target ≥98% accuracy on unseen test split
-- [ ] Implement SfM pipeline (COLMAP or OpenCV) → generate BEV map sample for owner setup
-- [ ] **Deliver** `acpds_cls/weights/best.pt` + validated sample patches to @abdusattormv
-- [ ] **Deliver** SfM script + BEV map image to @mirzayv
+- [x] Download ACPDS via `github.com/martin-marek/parking-space-occupancy`
+- [x] Write `ml/extract_patches.py` — `order_corners()` + `warpPerspective` to `datasets/acpds_stage2/`
+- [x] Run `validate_patches()` on 20 samples before training — save `validation_report.json` + `validation_samples/`
+- [x] Train `YOLOv8n-cls` on `datasets/acpds_stage2/` with validation gate + promoted checkpoint at `acpds_cls/weights/best.pt`
+- [x] Implement SfM pipeline (`ml/sfm_layout.py`) → generate `artifacts/layout_sample/bev_map.png` + `layout.json`
+- [x] **Deliver** `acpds_cls/weights/best.pt` + validated sample patches + `map_sample.json` to [@abdusattormv](https://github.com/abdusattormv)
+- [x] **Deliver** SfM script + BEV map image + layout JSON to [@mirzayv](https://github.com/mirzayv)
 
 **Week 6**
 
@@ -59,7 +59,7 @@ Key points:
 
 ---
 
-### @member-b — ML / research
+### [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) — ML / research
 
 > Owns evaluation depth, model comparison, and literature context.
 
@@ -89,7 +89,7 @@ Key points:
 
 ---
 
-### @abdusattormv — Edge / backend
+### [@abdusattormv](https://github.com/abdusattormv) — Edge / backend
 
 > Owns `detect.py`, FastAPI, all benchmarks, and the report's system sections.
 
@@ -102,7 +102,7 @@ Key points:
 
 **Week 6**
 
-- [ ] Integrate `acpds_cls/weights/best.pt` from @thebkht into `detect.py`
+- [ ] Integrate `acpds_cls/weights/best.pt` from [@thebkht](https://github.com/thebkht) into `detect.py`
 - [ ] Full pipeline end-to-end: camera → Stage 1 → warp → Stage 2 → JSON → API
 - [ ] FPS benchmark across all backends: MPS / CPU / ONNX FP32 / ONNX INT8
 - [ ] Bandwidth measurement and comparison vs H.264 streaming
@@ -123,7 +123,7 @@ Key points:
 
 ---
 
-### @mirzayv — App / frontend
+### [@mirzayv](https://github.com/mirzayv) — App / frontend
 
 > Owns all three app screens, React Native mobile, and final report submission.
 
@@ -136,7 +136,7 @@ Key points:
 
 - [ ] Owner setup screen: photo upload → `POST /layout` → spinner → display BEV map with polygon overlays
 - [ ] Live occupancy map screen: poll `GET /status` every 2–5 s → color spots green / red in real time
-- [ ] Integrate BEV map image from @thebkht into the owner setup flow
+- [ ] Integrate BEV map image from [@thebkht](https://github.com/thebkht) into the owner setup flow
 
 **Week 7**
 
@@ -154,12 +154,12 @@ Key points:
 
 ## Handoff Points
 
-| When          | From      | To            | Deliverable                                            |
-| ------------- | --------- | ------------- | ------------------------------------------------------ |
-| End of Week 5 | @thebkht  | @abdusattormv | `acpds_cls/weights/best.pt` + validated sample patches |
-| End of Week 5 | @thebkht  | @mirzayv      | SfM pipeline script + BEV map image                    |
-| End of Week 6 | @member-b | @thebkht      | Localization accuracy results (feeds Week 7 report)    |
-| End of Week 7 | All       | @mirzayv      | All report sections → compile + submit                 |
+| When          | From                                                       | To                                               | Deliverable                                            |
+| ------------- | ---------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@abdusattormv](https://github.com/abdusattormv) | `acpds_cls/weights/best.pt` + validated sample patches |
+| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@mirzayv](https://github.com/mirzayv)           | SfM pipeline script + BEV map image                    |
+| End of Week 6 | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | [@thebkht](https://github.com/thebkht)           | Localization accuracy results (feeds Week 7 report)    |
+| End of Week 7 | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                 |
 
 ---
 
@@ -226,18 +226,24 @@ Run live camera inference:
 make edge EDGE_ARGS="--camera 0"
 ```
 
-Train Stage 2 classifier variants:
+Prepare, validate, and train the Week 5 ACPDS classifier:
 
 ```bash
+make prepare-stage2 ACPDS_ROOT=/path/to/acpds PREP_STAGE2_ARGS="--run-validation --validation-status passed"
+make validate-stage2 ACPDS_ROOT=/path/to/acpds VALIDATE_STAGE2_ARGS="--validation-status passed"
 make train-stage2 STAGE2_VARIANT=n
-make train-stage2 STAGE2_VARIANT=s
-make train-stage2 STAGE2_VARIANT=m
 ```
 
 Evaluate a trained classifier:
 
 ```bash
-make evaluate-stage2 STAGE2_VARIANT=n
+make evaluate-stage2
+```
+
+Generate a Week 5 BEV layout sample for App handoff:
+
+```bash
+make layout-sample
 ```
 
 Run tests:
@@ -245,6 +251,60 @@ Run tests:
 ```bash
 make test
 ```
+
+---
+
+## Week 5 Process
+
+Use this sequence for `[@thebkht](https://github.com/thebkht)`'s ACPDS milestone.
+
+1. Extract ACPDS patches into `datasets/acpds_stage2/`.
+2. Review 20 validation samples and mark the validation report as `passed`.
+3. Train `YOLOv8n-cls` and promote the selected checkpoint to `acpds_cls/weights/best.pt`.
+4. Evaluate the promoted checkpoint on the ACPDS split.
+5. Generate the BEV sample package for App.
+
+Recommended commands:
+
+```bash
+make prepare-stage2 ACPDS_ROOT=/path/to/acpds PREP_STAGE2_ARGS="--run-validation"
+make validate-stage2 ACPDS_ROOT=/path/to/acpds VALIDATE_STAGE2_ARGS="--validation-status passed"
+make train-stage2 STAGE2_VARIANT=n
+make evaluate-stage2
+make layout-sample
+```
+
+Direct CLI equivalents:
+
+```bash
+python ml/extract_patches.py --dataset-root /path/to/acpds --output datasets/acpds_stage2 --run-validation
+python ml/extract_patches.py --dataset-root /path/to/acpds --output datasets/acpds_stage2 --validate-only --validation-status passed
+python ml/train.py --stage2 --variant n --data datasets/acpds_stage2 --device mps
+python ml/evaluate.py --stage2 --weights acpds_cls/weights/best.pt --data datasets/acpds_stage2 --split test --device mps
+python ml/sfm_layout.py --images samples --output artifacts/layout_sample
+```
+
+Expected outputs:
+
+- `datasets/acpds_stage2/dataset_report.json`
+- `datasets/acpds_stage2/patch_index.json`
+- `datasets/acpds_stage2/validation_report.json`
+- `datasets/acpds_stage2/validation_samples/`
+- `datasets/acpds_stage2/map_sample.json`
+- `acpds_cls/weights/best.pt`
+- `artifacts/layout_sample/bev_map.png`
+- `artifacts/layout_sample/layout.json`
+
+Week 5 handoff package:
+
+- Edge: `acpds_cls/weights/best.pt`, `datasets/acpds_stage2/validation_samples/`, `datasets/acpds_stage2/validation_report.json`, `datasets/acpds_stage2/map_sample.json`
+- App: `ml/sfm_layout.py`, `artifacts/layout_sample/bev_map.png`, `artifacts/layout_sample/layout.json`
+
+Notes:
+
+- Stage 2 training is gated by `datasets/acpds_stage2/validation_report.json` with `status: "passed"`.
+- `acpds_cls/weights/best.pt` is promoted automatically after successful Stage 2 training.
+- The ACPDS split from the manifest is authoritative; this workflow does not rebuild train/val/test randomly.
 
 ---
 
