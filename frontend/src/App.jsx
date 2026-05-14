@@ -193,25 +193,16 @@ function BEVMap({
     <svg
       viewBox={`0 0 ${VW} ${VH}`}
       width="100%"
-      style={{
-        display: "block",
-        borderRadius: 8,
-        border: "1px solid var(--color-border-tertiary)",
-      }}
+      style={{ display: "block", borderRadius: 8, border: "1px solid #e7e5e4" }}
       aria-label="Parking lot BEV map"
     >
-      <rect
-        width={VW}
-        height={VH}
-        fill="var(--color-background-secondary)"
-        rx="8"
-      />
+      <rect width={VW} height={VH} fill="#f5f5f4" rx="8" />
       <rect
         x={VW * 0.06}
         y={VH * 0.1}
         width={VW * 0.88}
         height={VH * 0.8}
-        fill="var(--color-background-tertiary)"
+        fill="#e7e5e4"
         rx="4"
         opacity="0.5"
       />
@@ -220,7 +211,7 @@ function BEVMap({
         y={VH / 2}
         textAnchor="middle"
         dominantBaseline="middle"
-        fill="var(--color-border-secondary)"
+        fill="#a8a29e"
         fontSize="11"
         fontFamily="monospace"
       >
@@ -236,9 +227,9 @@ function BEVMap({
         const isHighlit = highlightSpot === spot.spot_id;
         const isDimmed = dimUnhighlighted && highlightSpot && !isHighlit;
 
-        let fill = "var(--color-background-secondary)";
-        let stroke = "var(--color-border-tertiary)";
-        let textFill = "var(--color-text-secondary)";
+        let fill = "#e7e5e4";
+        let stroke = "#d4d0cb";
+        let textFill = "#78716c";
 
         if (occ === "free") {
           fill = "#1a7a4a22";
@@ -313,7 +304,7 @@ function StatusDot({ status }) {
         alignItems: "center",
         gap: 5,
         fontSize: 12,
-        color: "var(--color-text-secondary)",
+        color: "#78716c",
       }}
     >
       <span
@@ -381,7 +372,7 @@ function OwnerSetup({ layout, setLayout }) {
         <p
           style={{
             fontSize: 13,
-            color: "var(--color-text-secondary)",
+            color: "#78716c",
             margin: "0 0 16px",
             lineHeight: 1.6,
           }}
@@ -393,11 +384,11 @@ function OwnerSetup({ layout, setLayout }) {
 
         <div
           style={{
-            border: "1.5px dashed var(--color-border-secondary)",
+            border: "1.5px dashed #d4d0cb",
             borderRadius: 10,
             padding: "32px 24px",
             textAlign: "center",
-            background: "var(--color-background-secondary)",
+            background: "#f5f5f4",
             cursor: "pointer",
           }}
           onClick={() => fileRef.current?.click()}
@@ -407,7 +398,7 @@ function OwnerSetup({ layout, setLayout }) {
             style={{
               margin: 0,
               fontSize: 14,
-              color: "var(--color-text-primary)",
+              color: "#1c1917",
               fontWeight: 500,
             }}
           >
@@ -415,13 +406,7 @@ function OwnerSetup({ layout, setLayout }) {
               ? `${files.length} photo${files.length > 1 ? "s" : ""} selected`
               : "Click to select photos"}
           </p>
-          <p
-            style={{
-              margin: "4px 0 0",
-              fontSize: 12,
-              color: "var(--color-text-secondary)",
-            }}
-          >
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#78716c" }}>
             JPG or PNG · minimum 4 images · 60%+ overlap recommended
           </p>
           <input
@@ -443,8 +428,8 @@ function OwnerSetup({ layout, setLayout }) {
                 key={i}
                 style={{
                   fontSize: 11,
-                  background: "var(--color-background-info)",
-                  color: "var(--color-text-info)",
+                  background: "#eff6ff",
+                  color: "#1d4ed8",
                   padding: "3px 8px",
                   borderRadius: 4,
                   fontFamily: "monospace",
@@ -457,13 +442,7 @@ function OwnerSetup({ layout, setLayout }) {
         )}
 
         {error && (
-          <p
-            style={{
-              fontSize: 12,
-              color: "var(--color-text-danger)",
-              marginTop: 8,
-            }}
-          >
+          <p style={{ fontSize: 12, color: "#dc2626", marginTop: 8 }}>
             {error}
           </p>
         )}
@@ -477,8 +456,8 @@ function OwnerSetup({ layout, setLayout }) {
             style={{
               padding: "8px 20px",
               borderRadius: 6,
-              border: "1px solid var(--color-border-primary)",
-              background: "var(--color-background-primary)",
+              border: "1px solid #a8a29e",
+              background: "#ffffff",
               cursor: files.length ? "pointer" : "not-allowed",
               fontSize: 13,
               fontWeight: 500,
@@ -495,11 +474,11 @@ function OwnerSetup({ layout, setLayout }) {
             style={{
               padding: "8px 16px",
               borderRadius: 6,
-              border: "1px solid var(--color-border-tertiary)",
+              border: "1px solid #e7e5e4",
               background: "transparent",
               cursor: "pointer",
               fontSize: 12,
-              color: "var(--color-text-secondary)",
+              color: "#78716c",
             }}
           >
             Load sample handoff
@@ -518,13 +497,13 @@ function OwnerSetup({ layout, setLayout }) {
             style={{
               width: 18,
               height: 18,
-              border: "2px solid var(--color-border-secondary)",
-              borderTopColor: "var(--color-text-primary)",
+              border: "2px solid #d4d0cb",
+              borderTopColor: "#1c1917",
               borderRadius: "50%",
               animation: "spin 0.8s linear infinite",
             }}
           />
-          <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+          <span style={{ fontSize: 13, color: "#78716c" }}>
             Running SfM pipeline…
           </span>
         </div>
@@ -547,8 +526,8 @@ function OwnerSetup({ layout, setLayout }) {
               style={{
                 fontSize: 11,
                 fontFamily: "monospace",
-                color: "var(--color-text-secondary)",
-                background: "var(--color-background-secondary)",
+                color: "#78716c",
+                background: "#f5f5f4",
                 padding: "2px 8px",
                 borderRadius: 4,
               }}
@@ -564,20 +543,16 @@ function OwnerSetup({ layout, setLayout }) {
                 fontSize: 12,
                 padding: "6px 14px",
                 borderRadius: 6,
-                border: "1px solid var(--color-border-tertiary)",
+                border: "1px solid #e7e5e4",
                 background: "transparent",
                 cursor: "pointer",
-                color: "var(--color-text-secondary)",
+                color: "#78716c",
               }}
             >
               Re-upload
             </button>
             <span
-              style={{
-                fontSize: 12,
-                color: "var(--color-text-secondary)",
-                alignSelf: "center",
-              }}
+              style={{ fontSize: 12, color: "#78716c", alignSelf: "center" }}
             >
               Canvas {layout.canvas.width}×{layout.canvas.height} ·{" "}
               {layout.source_images.length} source images
@@ -645,7 +620,7 @@ function OccupancyMap({ layout }) {
         style={{
           textAlign: "center",
           padding: "60px 0",
-          color: "var(--color-text-secondary)",
+          color: "#78716c",
           fontSize: 13,
         }}
       >
@@ -671,13 +646,13 @@ function OccupancyMap({ layout }) {
           {
             label: "Total spots",
             value: layout.spots.length,
-            accent: "var(--color-text-secondary)",
+            accent: "#78716c",
           },
         ].map(({ label, value, accent }) => (
           <div
             key={label}
             style={{
-              background: "var(--color-background-secondary)",
+              background: "#f5f5f4",
               borderRadius: 8,
               padding: "12px 14px",
             }}
@@ -686,7 +661,7 @@ function OccupancyMap({ layout }) {
               style={{
                 margin: 0,
                 fontSize: 11,
-                color: "var(--color-text-secondary)",
+                color: "#78716c",
                 textTransform: "uppercase",
                 letterSpacing: "0.06em",
               }}
@@ -724,7 +699,7 @@ function OccupancyMap({ layout }) {
               fontSize: 12,
               padding: "6px 14px",
               borderRadius: 6,
-              border: "1px solid var(--color-border-secondary)",
+              border: "1px solid #d4d0cb",
               background: "transparent",
               cursor: pollState === "idle" ? "pointer" : "not-allowed",
               opacity: pollState === "idle" ? 1 : 0.5,
@@ -739,11 +714,11 @@ function OccupancyMap({ layout }) {
               fontSize: 12,
               padding: "6px 14px",
               borderRadius: 6,
-              border: "1px solid var(--color-border-tertiary)",
+              border: "1px solid #e7e5e4",
               background: "transparent",
               cursor: pollState !== "idle" ? "pointer" : "not-allowed",
               opacity: pollState !== "idle" ? 1 : 0.5,
-              color: "var(--color-text-secondary)",
+              color: "#78716c",
             }}
           >
             ■ Stop
@@ -754,7 +729,7 @@ function OccupancyMap({ layout }) {
             <span
               style={{
                 fontSize: 11,
-                color: "var(--color-text-secondary)",
+                color: "#78716c",
                 fontFamily: "monospace",
               }}
             >
@@ -773,13 +748,13 @@ function OccupancyMap({ layout }) {
           display: "flex",
           gap: 16,
           fontSize: 11,
-          color: "var(--color-text-secondary)",
+          color: "#78716c",
         }}
       >
         {[
           ["#1a7a4a", "Free"],
           ["#c0392b", "Occupied"],
-          ["var(--color-border-tertiary)", "Unknown"],
+          ["#e7e5e4", "Unknown"],
         ].map(([c, l]) => (
           <span
             key={l}
@@ -806,8 +781,8 @@ function OccupancyMap({ layout }) {
             marginTop: 12,
             padding: "10px 14px",
             borderRadius: 8,
-            border: "1px solid var(--color-border-secondary)",
-            background: "var(--color-background-secondary)",
+            border: "1px solid #d4d0cb",
+            background: "#f5f5f4",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -832,7 +807,7 @@ function OccupancyMap({ layout }) {
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              color: "var(--color-text-secondary)",
+              color: "#78716c",
             }}
           >
             ✕
@@ -913,7 +888,7 @@ function FindMyCar({ layout }) {
         style={{
           textAlign: "center",
           padding: "60px 0",
-          color: "var(--color-text-secondary)",
+          color: "#78716c",
           fontSize: 13,
         }}
       >
@@ -929,7 +904,7 @@ function FindMyCar({ layout }) {
           <p
             style={{
               fontSize: 13,
-              color: "var(--color-text-secondary)",
+              color: "#78716c",
               margin: "0 0 14px",
               lineHeight: 1.6,
             }}
@@ -940,13 +915,13 @@ function FindMyCar({ layout }) {
 
           <div
             style={{
-              border: "1.5px dashed var(--color-border-secondary)",
+              border: "1.5px dashed #d4d0cb",
               borderRadius: 10,
               overflow: "hidden",
               cursor: "pointer",
               minHeight: 150,
               position: "relative",
-              background: "var(--color-background-secondary)",
+              background: "#f5f5f4",
             }}
             onClick={() => !foundSpot && fileRef.current?.click()}
           >
@@ -974,9 +949,7 @@ function FindMyCar({ layout }) {
                 }}
               >
                 <span style={{ fontSize: 28 }}>🚗</span>
-                <span
-                  style={{ fontSize: 12, color: "var(--color-text-secondary)" }}
-                >
+                <span style={{ fontSize: 12, color: "#78716c" }}>
                   Tap to take / upload photo
                 </span>
               </div>
@@ -1006,8 +979,8 @@ function FindMyCar({ layout }) {
                 style={{
                   padding: "9px 0",
                   borderRadius: 6,
-                  border: "1px solid var(--color-border-primary)",
-                  background: "var(--color-background-primary)",
+                  border: "1px solid #a8a29e",
+                  background: "#ffffff",
                   cursor: file ? "pointer" : "not-allowed",
                   fontSize: 13,
                   fontWeight: 500,
@@ -1030,16 +1003,14 @@ function FindMyCar({ layout }) {
                   style={{
                     width: 16,
                     height: 16,
-                    border: "2px solid var(--color-border-secondary)",
-                    borderTopColor: "var(--color-text-primary)",
+                    border: "2px solid #d4d0cb",
+                    borderTopColor: "#1c1917",
                     borderRadius: "50%",
                     animation: "spin 0.8s linear infinite",
                     flexShrink: 0,
                   }}
                 />
-                <span
-                  style={{ fontSize: 12, color: "var(--color-text-secondary)" }}
-                >
+                <span style={{ fontSize: 12, color: "#78716c" }}>
                   Running SIFT localization…
                 </span>
               </div>
@@ -1050,7 +1021,7 @@ function FindMyCar({ layout }) {
                   style={{
                     padding: "8px 12px",
                     borderRadius: 6,
-                    background: "var(--color-background-secondary)",
+                    background: "#f5f5f4",
                     fontSize: 12,
                     fontFamily: "monospace",
                   }}
@@ -1062,7 +1033,7 @@ function FindMyCar({ layout }) {
                   style={{
                     padding: "9px 0",
                     borderRadius: 6,
-                    border: "1px solid var(--color-border-secondary)",
+                    border: "1px solid #d4d0cb",
                     background: "transparent",
                     cursor: "pointer",
                     fontSize: 13,
@@ -1085,16 +1056,14 @@ function FindMyCar({ layout }) {
                   style={{
                     width: 16,
                     height: 16,
-                    border: "2px solid var(--color-border-secondary)",
-                    borderTopColor: "var(--color-text-primary)",
+                    border: "2px solid #d4d0cb",
+                    borderTopColor: "#1c1917",
                     borderRadius: "50%",
                     animation: "spin 0.8s linear infinite",
                     flexShrink: 0,
                   }}
                 />
-                <span
-                  style={{ fontSize: 12, color: "var(--color-text-secondary)" }}
-                >
+                <span style={{ fontSize: 12, color: "#78716c" }}>
                   Querying backend…
                 </span>
               </div>
@@ -1131,10 +1100,10 @@ function FindMyCar({ layout }) {
                   fontSize: 12,
                   padding: "6px 0",
                   borderRadius: 6,
-                  border: "1px solid var(--color-border-tertiary)",
+                  border: "1px solid #e7e5e4",
                   background: "transparent",
                   cursor: "pointer",
-                  color: "var(--color-text-secondary)",
+                  color: "#78716c",
                 }}
               >
                 New session
@@ -1144,13 +1113,7 @@ function FindMyCar({ layout }) {
         </div>
 
         <div>
-          <p
-            style={{
-              fontSize: 12,
-              color: "var(--color-text-secondary)",
-              margin: "0 0 8px",
-            }}
-          >
+          <p style={{ fontSize: 12, color: "#78716c", margin: "0 0 8px" }}>
             {step === "found"
               ? "Your spot is highlighted below ↓"
               : "Map will highlight your spot after matching"}
@@ -1167,7 +1130,7 @@ function FindMyCar({ layout }) {
             <p
               style={{
                 fontSize: 11,
-                color: "var(--color-text-secondary)",
+                color: "#78716c",
                 marginTop: 6,
                 fontFamily: "monospace",
               }}
@@ -1198,7 +1161,7 @@ export default function App() {
   return (
     <div
       style={{
-        fontFamily: "var(--font-sans, system-ui)",
+        fontFamily: "system-ui, sans-serif",
         maxWidth: 700,
         margin: "0 auto",
         padding: "0 0 40px",
@@ -1208,7 +1171,7 @@ export default function App() {
 
       <div
         style={{
-          borderBottom: "1px solid var(--color-border-tertiary)",
+          borderBottom: "1px solid #e7e5e4",
           marginBottom: 24,
           paddingBottom: 0,
         }}
@@ -1226,17 +1189,13 @@ export default function App() {
               fontSize: 13,
               fontFamily: "monospace",
               fontWeight: 500,
-              color: "var(--color-text-primary)",
+              color: "#1c1917",
             }}
           >
             SmartParking
           </span>
           <span
-            style={{
-              fontSize: 11,
-              color: "var(--color-text-secondary)",
-              fontFamily: "monospace",
-            }}
+            style={{ fontSize: 11, color: "#78716c", fontFamily: "monospace" }}
           >
             v6 · edge inference
           </span>
@@ -1246,7 +1205,7 @@ export default function App() {
                 marginLeft: "auto",
                 fontSize: 11,
                 fontFamily: "monospace",
-                color: "var(--color-text-secondary)",
+                color: "#78716c",
               }}
             >
               layout: {layout.spots.length} spots · {layout.spot_source}
@@ -1266,13 +1225,8 @@ export default function App() {
                 background: "transparent",
                 cursor: "pointer",
                 borderBottom:
-                  tab === t.id
-                    ? "2px solid var(--color-text-primary)"
-                    : "2px solid transparent",
-                color:
-                  tab === t.id
-                    ? "var(--color-text-primary)"
-                    : "var(--color-text-secondary)",
+                  tab === t.id ? "2px solid #1c1917" : "2px solid transparent",
+                color: tab === t.id ? "#1c1917" : "#78716c",
                 fontWeight: tab === t.id ? 500 : 400,
                 transition: "color 0.15s",
               }}
