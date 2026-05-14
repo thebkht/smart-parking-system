@@ -40,10 +40,10 @@ Key points:
 
 **Week 6**
 
-- [ ] Train `YOLOv8s-cls` and `YOLOv8m-cls` on ACPDS
-- [ ] Run INT8 quantization on `YOLOv8n-cls`
-- [ ] Implement SIFT car localization (`cv2.SIFT_create()` + FLANN matcher)
-- [ ] Write Dataset section of report
+- [x] Train `YOLOv8s-cls` and `YOLOv8m-cls` on ACPDS — best observed test accuracy was `0.8768` with `YOLOv8s-cls`, below the original `>=98%` target
+- [x] Run INT8 quantization on `YOLOv8n-cls` — generated `artifacts/models/best_int8.onnx` and `artifacts/models/best.mlpackage`
+- [x] Implement SIFT car localization (`cv2.SIFT_create()` + FLANN matcher)
+- [x] Write Dataset section of report
 
 **Week 7**
 
@@ -306,19 +306,72 @@ Notes:
 - `acpds_cls/weights/best.pt` is promoted automatically only for the Week 5 `YOLOv8n-cls` handoff path; `s` and `m` stay as comparison runs unless `--promote-stage2` is passed explicitly.
 - The ACPDS split from the manifest is authoritative; this workflow does not rebuild train/val/test randomly.
 
-## Week 6 Workflow
+## Week 6 Process
 
-Run the Week 6 Stage 2 comparison workflow:
+Use this sequence for the Week 6 Stage 2 comparison and export milestone.
+
+1. Run the `s` and `m` comparison workflow against the existing ACPDS Stage 2 dataset.
+2. Review `val` and `test` outputs for `n`, `s`, and `m`; do not overwrite `acpds_cls/weights/best.pt`.
+3. Export the promoted Week 5 `n` checkpoint into ONNX FP32, ONNX INT8, and Core ML INT8 artifacts.
+4. Evaluate the exported ONNX artifact on the ACPDS `val` and `test` splits.
+5. Use the combined results to update the report and decide whether the bottleneck is model capacity or patch quality.
+
+Recommended commands:
 
 ```bash
 make week6-stage2 DEVICE=mps
-```
-
-Run the Week 6 export workflow for the promoted `YOLOv8n-cls` checkpoint:
-
-```bash
 make week6-export
 ```
+
+Direct CLI equivalents:
+
+```bash
+python ml/train.py --stage2 --variant s --device mps
+python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8s_stage2/weights/best.pt --split val --device mps --output-json logs/week6/stage2_s_val.json
+python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8s_stage2/weights/best.pt --split test --device mps --output-json logs/week6/stage2_s_test.json
+python ml/train.py --stage2 --variant m --device mps
+python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8m_stage2/weights/best.pt --split val --device mps --output-json logs/week6/stage2_m_val.json
+python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8m_stage2/weights/best.pt --split test --device mps --output-json logs/week6/stage2_m_test.json
+python ml/evaluate.py --stage2 --split val --device mps --output-json logs/week6/stage2_compare_val.json --compare acpds_cls/weights/best.pt runs/acpds_cls/yolov8s_stage2/weights/best.pt runs/acpds_cls/yolov8m_stage2/weights/best.pt
+python ml/evaluate.py --stage2 --split test --device mps --output-json logs/week6/stage2_compare_test.json --compare acpds_cls/weights/best.pt runs/acpds_cls/yolov8s_stage2/weights/best.pt runs/acpds_cls/yolov8m_stage2/weights/best.pt
+python ml/export.py --weights acpds_cls/weights/best.pt --imgsz 128 --summary-json artifacts/models/export_summary.json
+python ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split val --device cpu --output-json logs/week6/stage2_export_onnx_val.json
+python ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split test --device cpu --output-json logs/week6/stage2_export_onnx_test.json
+```
+
+Expected outputs:
+
+- `runs/acpds_cls/yolov8s_stage2/weights/best.pt`
+- `runs/acpds_cls/yolov8m_stage2/weights/best.pt`
+- `models/stage2_s_report.json`
+- `models/stage2_m_report.json`
+- `logs/week6/stage2_s_val.json`
+- `logs/week6/stage2_s_test.json`
+- `logs/week6/stage2_m_val.json`
+- `logs/week6/stage2_m_test.json`
+- `logs/week6/stage2_compare_val.json`
+- `logs/week6/stage2_compare_test.json`
+- `artifacts/models/best.pt`
+- `artifacts/models/best.onnx`
+- `artifacts/models/best_int8.onnx`
+- `artifacts/models/best.mlpackage`
+- `artifacts/models/export_summary.json`
+- `logs/week6/stage2_export_onnx_val.json`
+- `logs/week6/stage2_export_onnx_test.json`
+
+Observed Week 6 comparison result:
+
+- `yolov8n-cls`: test accuracy `0.8678`, F1 `0.8110`, size `2.83 MB`
+- `yolov8s-cls`: test accuracy `0.8768`, F1 `0.8222`, size `9.78 MB`
+- `yolov8m-cls`: test accuracy `0.8742`, F1 `0.8225`, size `30.22 MB`
+
+This means Week 6 improved comparison coverage, but not the original `>=98%` accuracy target. The current evidence points more toward Stage 2 patch/data quality as the bottleneck than raw model size.
+
+Notes:
+
+- `acpds_cls/weights/best.pt` remains the Week 5 handoff checkpoint unless `--promote-stage2` is passed explicitly.
+- Exported classifier artifacts are evaluated with batch size `1` in `ml/evaluate.py`.
+- Exported ONNX weights must be loaded with `task="classify"` during evaluation to avoid detection-style NMS postprocessing.
 
 Run SIFT localization against either a manifest JSON or a per-spot reference directory:
 
