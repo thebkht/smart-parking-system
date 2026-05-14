@@ -59,7 +59,7 @@ Key points:
 
 ---
 
-### @member-b — ML / research
+### @OtabekSadriddinov — ML / research
 
 > Owns evaluation depth, model comparison, and literature context.
 
@@ -154,12 +154,12 @@ Key points:
 
 ## Handoff Points
 
-| When          | From      | To            | Deliverable                                            |
-| ------------- | --------- | ------------- | ------------------------------------------------------ |
-| End of Week 5 | @thebkht  | @abdusattormv | `acpds_cls/weights/best.pt` + validated sample patches |
-| End of Week 5 | @thebkht  | @mirzayv      | SfM pipeline script + BEV map image                    |
-| End of Week 6 | @member-b | @thebkht      | Localization accuracy results (feeds Week 7 report)    |
-| End of Week 7 | All       | @mirzayv      | All report sections → compile + submit                 |
+| When          | From               | To            | Deliverable                                            |
+| ------------- | ------------------ | ------------- | ------------------------------------------------------ |
+| End of Week 5 | @thebkht           | @abdusattormv | `acpds_cls/weights/best.pt` + validated sample patches |
+| End of Week 5 | @thebkht           | @mirzayv      | SfM pipeline script + BEV map image                    |
+| End of Week 6 | @OtabekSadriddinov | @thebkht      | Localization accuracy results (feeds Week 7 report)    |
+| End of Week 7 | All                | @mirzayv      | All report sections → compile + submit                 |
 
 ---
 
