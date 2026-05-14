@@ -39,7 +39,7 @@ downloads/
 
 datasets/
 
-# Week 5 handoff artifacts that may be shared with teammates
+# Exact Week 5 handoff artifacts that must stay trackable
 !acpds_cls/
 !acpds_cls/weights/
 !acpds_cls/weights/best.pt
@@ -48,7 +48,6 @@ datasets/
 !artifacts/layout_sample/bev_map.png
 !artifacts/layout_sample/layout.json
 
-!datasets/acpds_stage2/
 !datasets/acpds_stage2/validation_samples/
 !datasets/acpds_stage2/validation_samples/**
 !datasets/acpds_stage2/validation_report.json
