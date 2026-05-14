@@ -59,10 +59,17 @@ def order_corners(corners: Any) -> np.ndarray:
     if len(unique) != 4:
         raise ValueError("corners must not contain duplicate points")
 
-    sorted_y = pts[np.argsort(pts[:, 1], kind="mergesort")]
-    top = sorted_y[:2][np.argsort(sorted_y[:2, 0], kind="mergesort")]
-    bottom = sorted_y[2:][np.argsort(sorted_y[2:, 0], kind="mergesort")]
-    ordered = np.array([top[0], top[1], bottom[1], bottom[0]], dtype=np.float32)
+    hull = cv2.convexHull(pts).reshape(-1, 2)
+    if hull.shape != (4, 2):
+        raise ValueError("corners must form a convex quadrilateral")
+
+    sums = hull.sum(axis=1)
+    diffs = hull[:, 1] - hull[:, 0]
+    tl = hull[np.argmin(sums)]
+    br = hull[np.argmax(sums)]
+    tr = hull[np.argmin(diffs)]
+    bl = hull[np.argmax(diffs)]
+    ordered = np.array([tl, tr, br, bl], dtype=np.float32)
 
     if _has_self_intersection(ordered):
         raise ValueError("corners produce a self-crossing quadrilateral")
@@ -154,15 +161,28 @@ def normalize_manifest_item(item: dict[str, Any], dataset_root: Path) -> dict[st
     if label not in VALID_CLASSES:
         raise ValueError(f"invalid occupancy label {label!r}")
 
-    corners = order_corners(item.get("corners"))
+    corners = normalize_corners(item.get("corners"))
     return {
         "split": split,
         "image": str(image_rel),
         "image_path": str(image_path),
         "spot_id": str(spot_id),
         "label": label,
-        "corners": corners.tolist(),
+        "corners": corners,
     }
+
+
+def normalize_corners(corners: Any) -> list[list[float]]:
+    try:
+        pts = np.asarray(corners, dtype=np.float32)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("corners must be numeric [x, y] pairs") from exc
+    if pts.shape != (4, 2):
+        raise ValueError("corners must contain exactly four [x, y] points")
+    unique = np.unique(pts, axis=0)
+    if len(unique) != 4:
+        raise ValueError("corners must not contain duplicate points")
+    return pts.tolist()
 
 
 def build_patch_filename(entry: dict[str, Any]) -> str:
