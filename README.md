@@ -303,8 +303,48 @@ Week 5 handoff package:
 Notes:
 
 - Stage 2 training is gated by `datasets/acpds_stage2/validation_report.json` with `status: "passed"`.
-- `acpds_cls/weights/best.pt` is promoted automatically after successful Stage 2 training.
+- `acpds_cls/weights/best.pt` is promoted automatically only for the Week 5 `YOLOv8n-cls` handoff path; `s` and `m` stay as comparison runs unless `--promote-stage2` is passed explicitly.
 - The ACPDS split from the manifest is authoritative; this workflow does not rebuild train/val/test randomly.
+
+## Week 6 Workflow
+
+Run the Week 6 Stage 2 comparison workflow:
+
+```bash
+make week6-stage2 DEVICE=mps
+```
+
+Run the Week 6 export workflow for the promoted `YOLOv8n-cls` checkpoint:
+
+```bash
+make week6-export
+```
+
+Run SIFT localization against either a manifest JSON or a per-spot reference directory:
+
+```bash
+make localize-car LOCALIZE_ARGS="--query samples/query.jpg --references samples/localization_refs --output logs/localize_result.json"
+```
+
+Supported reference layouts:
+
+```text
+samples/localization_refs/
+  spot_1/
+    a.jpg
+    b.jpg
+  spot_2/
+    a.jpg
+```
+
+or:
+
+```json
+{
+  "spot_1": ["refs/spot_1/a.jpg", "refs/spot_1/b.jpg"],
+  "spot_2": "refs/spot_2/a.jpg"
+}
+```
 
 ---
 

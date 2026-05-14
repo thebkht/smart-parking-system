@@ -64,7 +64,7 @@ The edge device runs both inference stages locally.
 The current integrated runtime uses:
 
 - Stage 1 detector: `runs/stage1_det/yolov8s_stage1/weights/best.pt`
-- Stage 2 classifier: `runs/stage2_cls/yolov8m_stage2/weights/best.pt`
+- Stage 2 classifier: `runs/acpds_cls/yolov8m_stage2/weights/best.pt`
 
 ### 3.2 Backend layer
 
@@ -111,7 +111,9 @@ Additional data-preparation checks recorded in the manifest:
 
 ### 4.2 Stage 2 dataset
 
-Stage 2 uses cropped parking-spot patches with `free` and `occupied` labels. The checked-in combined dataset inventory is:
+Stage 2 uses cropped parking-spot patches with `free` and `occupied` labels extracted from ACPDS quadrilateral annotations. The extraction flow in `ml/extract_patches.py` normalizes corner order, applies `cv2.getPerspectiveTransform`, warps each spot into a `128 x 128` patch, and writes split-aware outputs under `datasets/acpds_stage2/`. Before training, the workflow requires a human validation gate recorded in `datasets/acpds_stage2/validation_report.json`; training is blocked unless that report is marked `passed`.
+
+The checked-in Stage 2 inventory, mirrored by `artifacts/final_manifest.json`, is:
 
 | Split | Free | Occupied |
 | --- | ---: | ---: |
@@ -119,12 +121,14 @@ Stage 2 uses cropped parking-spot patches with `free` and `occupied` labels. The
 | Val | 10383 | 13538 |
 | Test | 10291 | 13513 |
 
-The repo also contains cross-dataset exports:
+This split structure follows the ACPDS unique-lot evaluation goal rather than frame-random splitting. The intent is to measure generalization to unseen parking lots instead of memorization of camera-specific geometry. In practice, the Stage 2 dataset is derived from the Week 5 ACPDS manifest and patch-validation workflow rather than hand-curated image folders.
+
+The repo also contains optional cross-dataset exports for later generalization checks:
 
 - `datasets/pklot_test`: 221 free, 808 occupied
 - `datasets/cnrpark_test`: 9849 free, 11897 occupied
 
-For weather-specific analysis, the exported dataset is:
+When weather labels are available during preparation, the pipeline also materializes `datasets/stage2_weather/` for later analysis:
 
 | Weather | Free | Occupied |
 | --- | ---: | ---: |
