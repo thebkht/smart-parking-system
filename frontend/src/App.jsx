@@ -1,6 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
+import {
+  CameraIcon,
+  GearIcon,
+  MagnifyingGlassIcon,
+  PlayIcon,
+  StopIcon,
+  Cross2Icon,
+  ArrowRightIcon,
+  ArrowDownIcon,
+  ImageIcon,
+  TokensIcon,
+  UpdateIcon,
+} from "@radix-ui/react-icons";
 
+// ---------------------------------------------------------------------------
+// PropTypes shapes
+// ---------------------------------------------------------------------------
 const spotShape = PropTypes.shape({
   spot_id: PropTypes.string.isRequired,
   corners: PropTypes.arrayOf(PropTypes.arrayOf(PropTypes.number)).isRequired,
@@ -17,6 +33,9 @@ const layoutShape = PropTypes.shape({
   spots: PropTypes.arrayOf(spotShape),
 });
 
+// ---------------------------------------------------------------------------
+// Mock data
+// ---------------------------------------------------------------------------
 const MOCK_LAYOUT = {
   canvas: { width: 600, height: 400 },
   background_image: "bev_map.png",
@@ -149,6 +168,9 @@ const MOCK_STATUS = {
   spot_12: "occupied",
 };
 
+// ---------------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------------
 const API_BASE = "http://localhost:8000";
 
 async function apiGet(path) {
@@ -306,9 +328,7 @@ function StatusDot({ status }) {
 
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-stone-500">
-      <span
-        className={`inline-block w-[7px] h-[7px] rounded-full ${dotColor}`}
-      />
+      <span className={`inline-block size-1.75 rounded-full ${dotColor}`} />
       {status}
     </span>
   );
@@ -317,11 +337,11 @@ function StatusDot({ status }) {
 StatusDot.propTypes = { status: PropTypes.string.isRequired };
 
 // ---------------------------------------------------------------------------
-// Spinner helper
+// Spinner — Radix UpdateIcon with Tailwind spin
 // ---------------------------------------------------------------------------
 function Spinner() {
   return (
-    <span className="inline-block w-4 h-4 rounded-full border-2 border-stone-300 border-t-stone-800 animate-spin shrink-0" />
+    <UpdateIcon className="w-4 h-4 text-stone-500 animate-spin shrink-0" />
   );
 }
 
@@ -370,16 +390,19 @@ function OwnerSetup({ layout, setLayout }) {
       <div className="mb-6">
         <p className="text-[13px] text-stone-500 mb-4 leading-relaxed">
           Upload 4–5 overlapping photos of your parking lot. The SfM pipeline
-          will compute a bird's-eye-view layout and extract spot polygons
+          will compute a bird&apos;s-eye-view layout and extract spot polygons
           automatically.
         </p>
 
         {/* Drop zone */}
         <div
-          className="border-2 border-dashed border-stone-300 rounded-xl p-8 text-center bg-stone-50 cursor-pointer hover:border-stone-400 transition-colors"
+          className="border-2 border-dashed border-stone-300 rounded-xl p-8 text-center bg-stone-50
+                     cursor-pointer hover:border-stone-400 transition-colors"
           onClick={() => fileRef.current?.click()}
         >
-          <div className="text-4xl mb-2">📷</div>
+          <div className="flex justify-center mb-2">
+            <CameraIcon className="w-8 h-8 text-stone-400" />
+          </div>
           <p className="text-sm font-medium text-stone-800">
             {files.length
               ? `${files.length} photo${files.length > 1 ? "s" : ""} selected`
@@ -421,18 +444,20 @@ function OwnerSetup({ layout, setLayout }) {
           <button
             onClick={submit}
             disabled={files.length === 0}
-            className="px-5 py-2 rounded-md border border-stone-400 bg-white text-[13px] font-medium
-                       hover:bg-stone-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-md border border-stone-400
+                       bg-white text-[13px] font-medium hover:bg-stone-50 transition-colors
+                       disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            Run SfM layout →
+            Run SfM layout
+            <ArrowRightIcon className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => {
               setLayout(MOCK_LAYOUT);
               setStep("done");
             }}
-            className="px-4 py-2 rounded-md border border-stone-200 bg-transparent text-xs text-stone-500
-                       hover:bg-stone-50 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-md border border-stone-200 bg-transparent text-xs
+                       text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
           >
             Load sample handoff
           </button>
@@ -571,18 +596,22 @@ function OccupancyMap({ layout }) {
           <button
             onClick={startPolling}
             disabled={pollState !== "idle"}
-            className="text-xs px-3.5 py-1.5 rounded-md border border-stone-300 bg-transparent
-                       hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-md
+                       border border-stone-300 bg-transparent hover:bg-stone-50 transition-colors
+                       cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ▶ Start polling
+            <PlayIcon className="w-3 h-3" />
+            Start polling
           </button>
           <button
             onClick={stopPolling}
             disabled={pollState === "idle"}
-            className="text-xs px-3.5 py-1.5 rounded-md border border-stone-200 bg-transparent
-                       text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-md
+                       border border-stone-200 bg-transparent text-stone-500 hover:bg-stone-50
+                       transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ■ Stop
+            <StopIcon className="w-3 h-3" />
+            Stop
           </button>
         </div>
         <div className="flex items-center gap-3">
@@ -606,7 +635,7 @@ function OccupancyMap({ layout }) {
         ].map(([c, l]) => (
           <span key={l} className="flex items-center gap-1.5">
             <span
-              className="inline-block w-2.5 h-2.5 rounded-[2px]"
+              className="inline-block size-2.5 rounded-xs"
               style={{ background: c }}
             />
             {l}
@@ -623,15 +652,21 @@ function OccupancyMap({ layout }) {
         >
           <span className="font-mono text-[13px]">{selectedSpot}</span>
           <span
-            className={`text-xs font-medium ${status[selectedSpot] === "free" ? "text-green-700" : "text-red-700"}`}
+            className={`text-xs font-medium ${
+              status[selectedSpot] === "free"
+                ? "text-green-700"
+                : "text-red-700"
+            }`}
           >
             {status[selectedSpot] ?? "unknown"}
           </span>
           <button
             onClick={() => setSelectedSpot(null)}
-            className="text-[11px] text-stone-400 hover:text-stone-600 bg-transparent border-none cursor-pointer"
+            className="flex items-center justify-center p-0.5 rounded text-stone-400
+                       hover:text-stone-600 bg-transparent border-none cursor-pointer"
+            aria-label="Dismiss"
           >
-            ✕
+            <Cross2Icon className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
@@ -722,7 +757,7 @@ function FindMyCar({ layout }) {
         {/* Photo input */}
         <div
           className="border-2 border-dashed border-stone-300 rounded-xl overflow-hidden cursor-pointer
-                     min-h-[150px] relative bg-stone-50 hover:border-stone-400 transition-colors"
+                     min-h-37.5 relative bg-stone-50 hover:border-stone-400 transition-colors"
           onClick={() => !foundSpot && fileRef.current?.click()}
         >
           {preview ? (
@@ -732,8 +767,8 @@ function FindMyCar({ layout }) {
               className="w-full h-full object-cover block"
             />
           ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-              <span className="text-3xl">🚗</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              <TokensIcon className="w-8 h-8 text-stone-400" />
               <span className="text-xs text-stone-500">
                 Tap to take / upload photo
               </span>
@@ -755,10 +790,12 @@ function FindMyCar({ layout }) {
             <button
               onClick={park}
               disabled={!file}
-              className="py-2.5 rounded-md border border-stone-400 bg-white text-[13px] font-medium
-                         hover:bg-stone-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-md
+                         border border-stone-400 bg-white text-[13px] font-medium hover:bg-stone-50
+                         transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
-              POST /park — find my spot →
+              POST /park — find my spot
+              <ArrowRightIcon className="w-3.5 h-3.5" />
             </button>
           )}
 
@@ -778,10 +815,12 @@ function FindMyCar({ layout }) {
               </div>
               <button
                 onClick={find}
-                className="py-2.5 rounded-md border border-stone-300 bg-transparent text-[13px]
-                           hover:bg-stone-50 transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-md
+                           border border-stone-300 bg-transparent text-[13px] hover:bg-stone-50
+                           transition-colors cursor-pointer"
               >
-                GET /find/{sessionId} →
+                GET /find/{sessionId}
+                <ArrowRightIcon className="w-3.5 h-3.5" />
               </button>
             </>
           )}
@@ -817,10 +856,18 @@ function FindMyCar({ layout }) {
 
       {/* Right column — map */}
       <div>
-        <p className="text-xs text-stone-500 mb-2">
-          {step === "found"
-            ? "Your spot is highlighted below ↓"
-            : "Map will highlight your spot after matching"}
+        <p className="text-xs text-stone-500 mb-2 flex items-center gap-1">
+          {step === "found" ? (
+            <>
+              Your spot is highlighted below{" "}
+              <ArrowDownIcon className="w-3 h-3" />
+            </>
+          ) : (
+            <>
+              <ImageIcon className="w-3 h-3" /> Map will highlight your spot
+              after matching
+            </>
+          )}
         </p>
         <BEVMap
           layout={layout}
@@ -846,9 +893,9 @@ FindMyCar.propTypes = { layout: layoutShape };
 // Root App
 // ---------------------------------------------------------------------------
 const TABS = [
-  { id: "setup", label: "Owner setup", icon: "⚙" },
-  { id: "map", label: "Live occupancy", icon: "🅿" },
-  { id: "find", label: "Find my car", icon: "🔍" },
+  { id: "setup", label: "Owner setup", Icon: GearIcon },
+  { id: "map", label: "Live occupancy", Icon: UpdateIcon },
+  { id: "find", label: "Find my car", Icon: MagnifyingGlassIcon },
 ];
 
 export default function App() {
@@ -856,7 +903,7 @@ export default function App() {
   const [layout, setLayout] = useState(null);
 
   return (
-    <div className="font-sans max-w-[700px] mx-auto pb-10">
+    <div className="font-sans max-w-175 mx-auto pb-10">
       {/* Header */}
       <div className="border-b border-stone-200 mb-6">
         <div className="flex items-baseline gap-2 pb-3.5">
@@ -875,18 +922,20 @@ export default function App() {
 
         {/* Tab bar */}
         <div className="flex">
-          {TABS.map((t) => (
+          {TABS.map(({ id, label, Icon }) => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
+              key={id}
+              onClick={() => setTab(id)}
               className={[
-                "px-4 py-2 text-[13px] border-b-2 transition-colors cursor-pointer bg-transparent border-x-0 border-t-0",
-                tab === t.id
+                "inline-flex items-center gap-1.5 px-4 py-2 text-[13px] border-b-2 transition-colors",
+                "cursor-pointer bg-transparent border-x-0 border-t-0",
+                tab === id
                   ? "border-stone-900 text-stone-900 font-medium"
                   : "border-transparent text-stone-400 hover:text-stone-600",
               ].join(" ")}
             >
-              {t.icon} {t.label}
+              <Icon className="w-3.5 h-3.5" />
+              {label}
             </button>
           ))}
         </div>
