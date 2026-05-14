@@ -652,17 +652,17 @@ cd parking-mobile && npx expo install expo-camera axios
 python -c "import torch; print(torch.backends.mps.is_available())"
 
 # Run patch extraction
-python extract_patches.py
+python ml/extract_patches.py --dataset-root /path/to/acpds --output datasets/acpds_stage2
 # Expected output:
 # train:  5376 patches  occupied=2580 (48%)  free=2796 (52%)
 # val:    ~1420 patches  ...
 # test:   ~1440 patches  ...  (unseen lots)
 
 # Validate patches visually before training
-python -c "from extract_patches import validate_patches; validate_patches(data)"
+python ml/extract_patches.py --dataset-root /path/to/acpds --output datasets/acpds_stage2 --validate-only --validation-status passed
 
 # Train
-yolo classify train model=yolov8n-cls.pt data=acpds_stage2/ imgsz=128 epochs=30 device=mps
+python ml/train.py --stage2 --variant n --data datasets/acpds_stage2 --device mps
 ```
 
 Smart Parking System — PRD v6  ·  ACPDS \+ Quadrilateral Pooling \+ Find My Car \+ App  ·  Weeks 3–8
