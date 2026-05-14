@@ -429,6 +429,22 @@ def test_train_stage2_accuracy_defaults(monkeypatch, tmp_path):
     assert defaults["cos_lr"] is True
 
 
+def test_stage2_promotion_defaults_to_n_only(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["train.py", "--stage2", "--variant", "n"])
+    n_args = train.parse_args()
+    assert train.should_promote_stage2(n_args) is True
+
+    monkeypatch.setattr(sys, "argv", ["train.py", "--stage2", "--variant", "s"])
+    s_args = train.parse_args()
+    assert train.should_promote_stage2(s_args) is False
+
+
+def test_stage2_promotion_can_be_forced_for_non_n_variant(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["train.py", "--stage2", "--variant", "m", "--promote-stage2"])
+    args = train.parse_args()
+    assert train.should_promote_stage2(args) is True
+
+
 def test_order_corners_normalizes_shuffled_quad():
     ordered = extract_patches.order_corners([[20, 50], [70, 15], [15, 20], [80, 60]])
     assert np.allclose(ordered, np.array([[15, 20], [70, 15], [80, 60], [20, 50]], dtype=np.float32))

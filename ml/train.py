@@ -93,6 +93,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mixup", type=float, default=0.0)
     parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--cos-lr", action="store_true")
+    parser.add_argument(
+        "--promote-stage2",
+        action="store_true",
+        default=None,
+        help="Force Stage 2 checkpoint promotion to acpds_cls/weights/best.pt.",
+    )
+    parser.add_argument(
+        "--no-promote-stage2",
+        action="store_false",
+        dest="promote_stage2",
+        help="Skip Stage 2 checkpoint promotion after training.",
+    )
     return parser.parse_args()
 
 
@@ -423,6 +435,14 @@ def promote_stage2_checkpoint(checkpoint_path: Path, destination: str) -> Path:
     return destination_path
 
 
+def should_promote_stage2(args: argparse.Namespace) -> bool:
+    if not args.stage2:
+        return False
+    if args.promote_stage2 is not None:
+        return bool(args.promote_stage2)
+    return args.variant == "n"
+
+
 def main() -> None:
     args = parse_args()
     _check_version()
@@ -484,7 +504,7 @@ def main() -> None:
     selected_ckpt = _existing_checkpoint(best_ckpt, last_ckpt)
     metric_report = extract_metrics(defaults["task"], results)
     promoted_ckpt = None
-    if defaults["track"] == "stage2":
+    if defaults["track"] == "stage2" and should_promote_stage2(args):
         if selected_ckpt is None:
             raise SystemExit("Stage 2 training completed without writing best.pt or last.pt; promotion aborted.")
         promoted_ckpt = promote_stage2_checkpoint(Path(selected_ckpt), str(defaults["promoted_checkpoint"]))

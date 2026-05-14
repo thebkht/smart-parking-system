@@ -81,6 +81,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Sweep Stage 2 classifier occupied threshold on the selected split.",
     )
+    parser.add_argument(
+        "--output-json",
+        default=None,
+        help="Optional path to write the evaluation payload as JSON.",
+    )
     return parser.parse_args()
 
 
@@ -108,6 +113,14 @@ def print_rows(rows: list[dict], title: str) -> None:
     print("  ".join("-" * widths[header] for header in headers))
     for row in rows:
         print(template.format(*[str(row.get(header, "")) for header in headers]))
+
+
+def write_json(payload: dict[str, Any], path: str | None) -> None:
+    if not path:
+        return
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def stage2_root(data: str | None) -> Path:
@@ -346,7 +359,7 @@ def evaluate_stage2(weights: str, dataset_dir: Path, args: argparse.Namespace, l
         batch=args.batch,
     )
     return {
-        "model": Path(weights).parent.parent.name if Path(weights).exists() else Path(weights).name,
+        "model": model_label(weights),
         "dataset": label,
         "threshold": args.confidence_threshold,
         "top1_accuracy": metrics["top1_accuracy"],
@@ -358,6 +371,15 @@ def evaluate_stage2(weights: str, dataset_dir: Path, args: argparse.Namespace, l
         "support_occupied": metrics["support"]["occupied"],
         "confusion_matrix": json.dumps(metrics["confusion_matrix"]),
     }
+
+
+def model_label(weights: str) -> str:
+    path = Path(weights)
+    if not path.exists():
+        return path.name
+    if path.parent.name == "weights" and path.parent.parent.name:
+        return path.parent.parent.name
+    return path.stem
 
 
 def eval_split_dir(root: Path, split: str) -> Path:
@@ -382,6 +404,7 @@ def evaluate_compare(args: argparse.Namespace) -> None:
             rows.append(row)
         print_rows(rows, "Stage 2 Model Comparison")
         append_csv(rows, Path(args.log_dir), "stage2_model_comparison.csv")
+        write_json({"mode": "stage2_compare", "rows": rows}, args.output_json)
         return
 
     data_yaml = stage1_data(args.data) if mode == "stage1" else single_model_data(args.data)
@@ -413,6 +436,7 @@ def evaluate_compare(args: argparse.Namespace) -> None:
         )
     print_rows(rows, title)
     append_csv(rows, Path(args.log_dir), filename)
+    write_json({"mode": mode, "rows": rows}, args.output_json)
 
 
 def evaluate_cross_dataset(args: argparse.Namespace) -> None:
@@ -424,6 +448,7 @@ def evaluate_cross_dataset(args: argparse.Namespace) -> None:
     row = evaluate_stage2(args.weights, dataset_dir, args, dataset_dir.name)
     print_rows([row], "Stage 2 Cross-Dataset Evaluation")
     append_csv([row], Path(args.log_dir), "stage2_cross_dataset.csv")
+    write_json({"mode": "stage2_cross_dataset", "rows": [row]}, args.output_json)
 
 
 def evaluate_per_weather(args: argparse.Namespace) -> None:
@@ -441,6 +466,7 @@ def evaluate_per_weather(args: argparse.Namespace) -> None:
         rows.append(evaluate_stage2(args.weights, weather_dir, args, weather))
     print_rows(rows, "Stage 2 Per-Weather Evaluation")
     append_csv(rows, Path(args.log_dir), "stage2_per_weather.csv")
+    write_json({"mode": "stage2_per_weather", "rows": rows}, args.output_json)
 
 
 def evaluate_threshold_sweep(args: argparse.Namespace) -> None:
@@ -478,6 +504,10 @@ def evaluate_threshold_sweep(args: argparse.Namespace) -> None:
             best_row = dict(row)
     print_rows([best_row] if best_row else [], "Best Threshold Sweep Result")
     append_csv(rows, Path(args.log_dir), "stage2_threshold_sweep.csv")
+    write_json(
+        {"mode": "stage2_threshold_sweep", "rows": rows, "best_row": best_row},
+        args.output_json,
+    )
 
 
 def main() -> None:
@@ -509,11 +539,28 @@ def main() -> None:
         row = evaluate_stage2(args.weights, eval_split_dir(root, args.split), args, f"{root.name}/{args.split}")
         print_rows([row], "Stage 2 Classification Evaluation")
         append_csv([row], Path(args.log_dir), "stage2_evaluation.csv")
+        write_json({"mode": "stage2", "rows": [row]}, args.output_json)
         return
     if mode == "single_model":
         evaluate_single_model(args)
+        write_json(
+            {"mode": "single_model", "rows": [latest_csv_row(Path(args.log_dir) / "single_model_evaluation.csv")]},
+            args.output_json,
+        )
         return
     evaluate_stage1(args)
+    write_json(
+        {"mode": "stage1", "rows": [latest_csv_row(Path(args.log_dir) / "stage1_evaluation.csv")]},
+        args.output_json,
+    )
+
+
+def latest_csv_row(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    with open(path, newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    return rows[-1] if rows else None
 
 
 if __name__ == "__main__":

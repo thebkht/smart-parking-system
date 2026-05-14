@@ -119,13 +119,24 @@ def checkpoint_entry(path: Path) -> dict[str, Any]:
     }
 
 
+def first_existing_checkpoint(paths: Iterable[Path]) -> dict[str, Any]:
+    candidates = list(paths)
+    for path in candidates:
+        if path.exists():
+            return checkpoint_entry(path)
+    return checkpoint_entry(candidates[0])
+
+
 def collect_checkpoints(runs_dir: Path, artifacts_dir: Path) -> dict[str, Any]:
     stage1_s = runs_dir / "stage1_det" / "yolov8s_stage1" / "weights" / "best.pt"
     stage1_n = runs_dir / "stage1_det" / "yolov8n_stage1" / "weights" / "best.pt"
     stage1_m = runs_dir / "stage1_det" / "yolov8m_stage1" / "weights" / "best.pt"
     stage2 = {
-        variant: checkpoint_entry(
-            runs_dir / "stage2_cls" / f"yolov8{variant}_stage2" / "weights" / "best.pt"
+        variant: first_existing_checkpoint(
+            [
+                runs_dir / "acpds_cls" / f"yolov8{variant}_stage2" / "weights" / "best.pt",
+                runs_dir / "stage2_cls" / f"yolov8{variant}_stage2" / "weights" / "best.pt",
+            ]
         )
         for variant in EXPECTED_STAGE2_MODELS
     }

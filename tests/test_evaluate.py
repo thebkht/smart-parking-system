@@ -1,4 +1,5 @@
 import sys
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -97,3 +98,42 @@ def test_evaluate_single_model_uses_detection_metrics(tmp_path, monkeypatch, cap
 def test_evaluation_mode_distinguishes_single_model():
     args = SimpleNamespace(stage1=False, stage2=False, single_model=True)
     assert evaluate.evaluation_mode(args) == "single_model"
+
+
+def test_model_label_prefers_run_directory_name(tmp_path):
+    weights = tmp_path / "runs" / "acpds_cls" / "yolov8m_stage2" / "weights" / "best.pt"
+    weights.parent.mkdir(parents=True, exist_ok=True)
+    weights.write_bytes(b"pt")
+
+    assert evaluate.model_label(str(weights)) == "yolov8m_stage2"
+
+
+def test_main_writes_stage2_output_json(tmp_path, monkeypatch):
+    make_image(tmp_path / "val" / "free" / "free_ok.jpg")
+    make_image(tmp_path / "val" / "occupied" / "occupied_ok.jpg")
+    output_json = tmp_path / "result.json"
+    monkeypatch.setattr(evaluate, "YOLO", FakeYOLO)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate.py",
+            "--stage2",
+            "--weights",
+            "fake.pt",
+            "--data",
+            str(tmp_path),
+            "--split",
+            "val",
+            "--device",
+            "cpu",
+            "--output-json",
+            str(output_json),
+        ],
+    )
+
+    evaluate.main()
+
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    assert payload["mode"] == "stage2"
+    assert payload["rows"][0]["top1_accuracy"] == 1.0
