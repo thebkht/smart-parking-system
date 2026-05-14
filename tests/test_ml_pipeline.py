@@ -3,12 +3,15 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import cv2
+import numpy as np
 import pytest
 from PIL import Image
 import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from ml import extract_patches, sfm_layout
 from ml import prepare_dataset, train
 
 
@@ -389,6 +392,7 @@ def test_train_requires_explicit_mode(monkeypatch):
 def test_train_stage2_mode_resolution(monkeypatch, tmp_path):
     data_dir = tmp_path / "stage2_data"
     data_dir.mkdir()
+    (data_dir / "validation_report.json").write_text(json.dumps({"status": "passed"}), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(train, "STAGE2_DATA_DIR", str(data_dir))
     monkeypatch.setattr(sys, "argv", ["train.py", "--stage2"])
@@ -414,6 +418,7 @@ def test_train_single_model_mode_resolution(monkeypatch, tmp_path):
 def test_train_stage2_accuracy_defaults(monkeypatch, tmp_path):
     data_dir = tmp_path / "stage2_data"
     data_dir.mkdir()
+    (data_dir / "validation_report.json").write_text(json.dumps({"status": "passed"}), encoding="utf-8")
     monkeypatch.setattr(train, "STAGE2_DATA_DIR", str(data_dir))
     monkeypatch.setattr(sys, "argv", ["train.py", "--stage2"])
     args = train.parse_args()
@@ -422,6 +427,174 @@ def test_train_stage2_accuracy_defaults(monkeypatch, tmp_path):
     assert defaults["patience"] == train.STAGE2_PATIENCE
     assert defaults["dropout"] == 0.1
     assert defaults["cos_lr"] is True
+
+
+def test_order_corners_normalizes_shuffled_quad():
+    ordered = extract_patches.order_corners([[20, 50], [70, 15], [15, 20], [80, 60]])
+    assert np.allclose(ordered, np.array([[15, 20], [70, 15], [80, 60], [20, 50]], dtype=np.float32))
+
+
+def test_order_corners_rejects_duplicate_points():
+    with pytest.raises(ValueError):
+        extract_patches.order_corners([[0, 0], [0, 0], [10, 10], [0, 10]])
+
+
+def test_warp_patch_emits_fixed_size_image():
+    image = np.zeros((40, 60, 3), dtype=np.uint8)
+    warped = extract_patches.warp_patch(image, [[5, 5], [35, 5], [35, 25], [5, 25]], size=128)
+    assert warped.shape == (128, 128, 3)
+
+
+def test_normalize_manifest_item_preserves_split_and_label(tmp_path):
+    dataset_root = tmp_path / "acpds"
+    dataset_root.mkdir()
+    item = extract_patches.normalize_manifest_item(
+        {
+            "image": "images/frame.jpg",
+            "split": "test",
+            "spot_id": "spot_7",
+            "corners": [[1, 1], [9, 1], [9, 9], [1, 9]],
+            "occupancy": True,
+        },
+        dataset_root,
+    )
+    assert item["split"] == "test"
+    assert item["label"] == "occupied"
+    assert item["image_path"].endswith("images/frame.jpg")
+
+
+def test_sample_validation_entries_caps_at_available_count():
+    entries = [
+        {"split": "train", "label": "free", "patch_path": "a"},
+        {"split": "train", "label": "occupied", "patch_path": "b"},
+        {"split": "val", "label": "free", "patch_path": "c"},
+    ]
+    sampled = extract_patches.sample_validation_entries(entries, sample_count=20, seed=7)
+    assert len(sampled) == 3
+
+
+def test_extract_dataset_writes_acpds_outputs(tmp_path):
+    dataset_root = tmp_path / "acpds"
+    images_dir = dataset_root / "images"
+    images_dir.mkdir(parents=True)
+    for name, color in (("frame_a.jpg", 90), ("frame_b.jpg", 140), ("frame_c.jpg", 180)):
+        make_image(images_dir / name, color)
+    manifest = {
+        "samples": [
+            {
+                "image": "images/frame_a.jpg",
+                "split": "train",
+                "spot_id": "spot_1",
+                "corners": [[2, 2], [14, 2], [14, 12], [2, 12]],
+                "occupancy": False,
+            },
+            {
+                "image": "images/frame_a.jpg",
+                "split": "train",
+                "spot_id": "spot_2",
+                "corners": [[16, 2], [28, 2], [28, 12], [16, 12]],
+                "occupancy": True,
+            },
+            {
+                "image": "images/frame_b.jpg",
+                "split": "val",
+                "spot_id": "spot_3",
+                "corners": [[2, 2], [14, 2], [14, 12], [2, 12]],
+                "occupancy": False,
+            },
+            {
+                "image": "images/frame_b.jpg",
+                "split": "val",
+                "spot_id": "spot_4",
+                "corners": [[16, 2], [28, 2], [28, 12], [16, 12]],
+                "occupancy": True,
+            },
+            {
+                "image": "images/frame_c.jpg",
+                "split": "test",
+                "spot_id": "spot_5",
+                "corners": [[2, 2], [14, 2], [14, 12], [2, 12]],
+                "occupancy": False,
+            },
+            {
+                "image": "images/frame_c.jpg",
+                "split": "test",
+                "spot_id": "spot_6",
+                "corners": [[16, 2], [28, 2], [28, 12], [16, 12]],
+                "occupancy": True,
+            },
+        ]
+    }
+    manifest_path = dataset_root / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    output_dir = tmp_path / "acpds_stage2"
+
+    patch_index, report = extract_patches.extract_dataset(dataset_root, manifest_path, output_dir, size=128, seed=7)
+    validation = extract_patches.validate_patches(output_dir, sample_count=20, seed=7, status="passed")
+
+    assert len(patch_index) == 6
+    assert report["counts"]["train"] == {"free": 1, "occupied": 1}
+    assert report["counts"]["val"] == {"free": 1, "occupied": 1}
+    assert report["counts"]["test"] == {"free": 1, "occupied": 1}
+    assert validation["status"] == "passed"
+    assert len(list((output_dir / "train" / "free").glob("*.jpg"))) == 1
+    assert len(list((output_dir / "train" / "occupied").glob("*.jpg"))) == 1
+    assert (output_dir / "dataset_report.json").exists()
+    assert (output_dir / "validation_report.json").exists()
+    assert (output_dir / "map_sample.json").exists()
+
+
+def test_ensure_stage2_validation_passed_requires_passed_status(tmp_path):
+    data_dir = tmp_path / "acpds_stage2"
+    data_dir.mkdir()
+    (data_dir / "validation_report.json").write_text(json.dumps({"status": "pending"}), encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        train.ensure_stage2_validation_passed(str(data_dir))
+    assert "not passed" in str(exc.value)
+
+
+def test_promote_stage2_checkpoint_copies_file(tmp_path):
+    checkpoint = tmp_path / "runs" / "weights" / "best.pt"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_bytes(b"checkpoint")
+    destination = tmp_path / "acpds_cls" / "weights" / "best.pt"
+    promoted = train.promote_stage2_checkpoint(checkpoint, str(destination))
+    assert promoted == destination
+    assert destination.read_bytes() == b"checkpoint"
+
+
+def test_promote_stage2_checkpoint_fails_for_missing_file(tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        train.promote_stage2_checkpoint(tmp_path / "missing.pt", str(tmp_path / "dest.pt"))
+    assert "not found for promotion" in str(exc.value)
+
+
+def test_sfm_layout_writes_expected_artifacts(tmp_path):
+    images_dir = tmp_path / "images"
+    images_dir.mkdir()
+    make_image(images_dir / "a.jpg", 80)
+    make_image(images_dir / "b.jpg", 120)
+    output_dir = tmp_path / "layout"
+
+    paths = sfm_layout.image_paths(images_dir)
+    frames = sfm_layout.load_images(paths)
+    bev = sfm_layout.build_bev_canvas(frames)
+    output_dir.mkdir()
+    bev_path = output_dir / "bev_map.png"
+    assert cv2.imwrite(str(bev_path), bev)
+    spots, source = sfm_layout.load_spots(None, bev.shape[1], bev.shape[0])
+    layout = {
+        "canvas": {"width": bev.shape[1], "height": bev.shape[0]},
+        "background_image": bev_path.name,
+        "spot_source": source,
+        "spots": spots,
+    }
+    (output_dir / "layout.json").write_text(json.dumps(layout), encoding="utf-8")
+
+    assert bev_path.exists()
+    assert (output_dir / "layout.json").exists()
+    assert source == "placeholder_grid"
+    assert spots
 
 
 def test_train_stage1_allows_custom_checkpoint_and_run_paths(monkeypatch, tmp_path):

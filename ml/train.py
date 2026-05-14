@@ -29,14 +29,14 @@ from ultralytics.engine.trainer import BaseTrainer
 from ultralytics.utils.tal import TaskAlignedAssigner
 
 STAGE1_YAML = "ml/stage1.yaml"
-STAGE2_DATA_DIR = "datasets/stage2_data"
+STAGE2_DATA_DIR = "datasets/acpds_stage2"
 SINGLE_MODEL_YAML = "ml/single_model.yaml"
 
 STAGE1_EPOCHS = 50
 STAGE2_EPOCHS = 50
 SINGLE_MODEL_EPOCHS = 50
 STAGE1_IMGSZ = 768
-STAGE2_IMGSZ = 64
+STAGE2_IMGSZ = 128
 SINGLE_MODEL_IMGSZ = 640
 DEFAULT_BATCH = 16
 STAGE2_BATCH = 64
@@ -47,9 +47,10 @@ STAGE1_PATIENCE = 15
 STAGE2_PATIENCE = 20
 SINGLE_MODEL_PATIENCE = 15
 STAGE1_PROJECT = "runs/stage1_det"
-STAGE2_PROJECT = "runs/stage2_cls"
+STAGE2_PROJECT = "runs/acpds_cls"
 SINGLE_MODEL_PROJECT = "runs/single_model_det"
 MODEL_DIR = "models"
+STAGE2_PROMOTED_CHECKPOINT = "acpds_cls/weights/best.pt"
 MIN_ULTRALYTICS = (8, 4, 38)
 
 
@@ -313,8 +314,8 @@ def resolve_stage2_data(data: str | None) -> str:
     if not path.exists():
         raise SystemExit(
             f"Stage 2 data not found: {path}\n"
-            "Run: python ml/prepare_dataset.py --stage2 --pklot-dir <roboflow-export> "
-            "[--cnrpark-dir <cnrpatches>]"
+            "Run: python ml/extract_patches.py --dataset-root <acpds-root> --output datasets/acpds_stage2 "
+            "--run-validation --validation-status passed"
         )
     return str(path)
 
@@ -346,6 +347,7 @@ def task_defaults(args: argparse.Namespace) -> dict[str, object]:
             "patience": args.patience if args.patience is not None else STAGE2_PATIENCE,
             "dropout": args.dropout if args.dropout is not None else 0.1,
             "cos_lr": args.cos_lr or True,
+            "promoted_checkpoint": STAGE2_PROMOTED_CHECKPOINT,
         }
     if args.single_model:
         return {
@@ -396,6 +398,31 @@ def extract_metrics(task: str, results) -> dict[str, object]:
     }
 
 
+def ensure_stage2_validation_passed(data_path: str) -> None:
+    report_path = Path(data_path) / "validation_report.json"
+    if not report_path.exists():
+        raise SystemExit(
+            f"Stage 2 validation gate missing: {report_path}\n"
+            "Run: python ml/extract_patches.py --dataset-root <acpds-root> --output datasets/acpds_stage2 "
+            "--run-validation --validation-status passed"
+        )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if report.get("status") != "passed":
+        raise SystemExit(
+            f"Stage 2 validation gate not passed: {report_path}\n"
+            "Re-run validation after visual review with --validation-status passed."
+        )
+
+
+def promote_stage2_checkpoint(checkpoint_path: Path, destination: str) -> Path:
+    if not checkpoint_path.exists():
+        raise SystemExit(f"Stage 2 checkpoint not found for promotion: {checkpoint_path}")
+    destination_path = Path(destination)
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(checkpoint_path, destination_path)
+    return destination_path
+
+
 def main() -> None:
     args = parse_args()
     _check_version()
@@ -412,6 +439,8 @@ def main() -> None:
         f"batch={defaults['batch']}"
     )
     print(f"Track  : {defaults['track']}  lr0={defaults['lr0']}  patience={defaults['patience']}")
+    if defaults["track"] == "stage2":
+        ensure_stage2_validation_passed(str(defaults["data_path"]))
 
     model = YOLO(defaults["weights"])
     train_kwargs = {
@@ -454,6 +483,11 @@ def main() -> None:
     best_ckpt, last_ckpt = _checkpoint_paths(defaults["project_dir"], defaults["run_name"])
     selected_ckpt = _existing_checkpoint(best_ckpt, last_ckpt)
     metric_report = extract_metrics(defaults["task"], results)
+    promoted_ckpt = None
+    if defaults["track"] == "stage2":
+        if selected_ckpt is None:
+            raise SystemExit("Stage 2 training completed without writing best.pt or last.pt; promotion aborted.")
+        promoted_ckpt = promote_stage2_checkpoint(Path(selected_ckpt), str(defaults["promoted_checkpoint"]))
     report = {
         "task": defaults["task"],
         "track": defaults["track"],
@@ -481,6 +515,7 @@ def main() -> None:
         "actual_run_dir": str(actual_run_dir),
         "expected_run_dir": str(expected_run_dir),
         "selected_ckpt": str(selected_ckpt) if selected_ckpt else None,
+        "promoted_ckpt": str(promoted_ckpt) if promoted_ckpt else None,
         **metric_report,
     }
 
@@ -491,6 +526,8 @@ def main() -> None:
         print(f"Selected ckpt  : {selected_ckpt}")
     else:
         print("Selected ckpt  : none written")
+    if promoted_ckpt:
+        print(f"Promoted ckpt  : {promoted_ckpt}")
     if defaults["task"] == "classify":
         print(f"Top-1 accuracy : {metric_report.get('top1_accuracy')}")
         print(f"Top-5 accuracy : {metric_report.get('top5_accuracy')}")
