@@ -27,9 +27,10 @@ class FakeResult:
 
 class FakeYOLO:
     probs_by_name = {"free_ok.jpg": 0.2, "occupied_ok.jpg": 0.8}
+    init_calls = []
 
-    def __init__(self, _weights: str):
-        pass
+    def __init__(self, _weights: str, **kwargs):
+        self.__class__.init_calls.append(kwargs)
 
     def __call__(self, image_path, **_kwargs):
         if isinstance(image_path, list):
@@ -137,3 +138,26 @@ def test_main_writes_stage2_output_json(tmp_path, monkeypatch):
     payload = json.loads(output_json.read_text(encoding="utf-8"))
     assert payload["mode"] == "stage2"
     assert payload["rows"][0]["top1_accuracy"] == 1.0
+
+
+def test_stage2_inference_batch_for_exported_artifacts():
+    assert evaluate.stage2_inference_batch("artifacts/models/best.onnx", 64) == 1
+    assert evaluate.stage2_inference_batch("artifacts/models/best.mlpackage", 64) == 1
+    assert evaluate.stage2_inference_batch("acpds_cls/weights/best.pt", 64) == 64
+
+
+def test_stage2_probabilities_forces_classify_task(tmp_path, monkeypatch):
+    make_image(tmp_path / "val" / "free" / "free_ok.jpg")
+    make_image(tmp_path / "val" / "occupied" / "occupied_ok.jpg")
+    FakeYOLO.init_calls = []
+    monkeypatch.setattr(evaluate, "YOLO", FakeYOLO)
+
+    evaluate.stage2_probabilities(
+        "artifacts/models/best.onnx",
+        tmp_path / "val",
+        device="cpu",
+        imgsz=128,
+        batch=64,
+    )
+
+    assert FakeYOLO.init_calls[0]["task"] == "classify"

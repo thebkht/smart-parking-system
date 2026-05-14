@@ -208,12 +208,13 @@ def stage2_probabilities(
     imgsz: int,
     batch: int,
 ) -> list[tuple[str, float]]:
-    model = YOLO(weights)
+    model = YOLO(weights, task="classify")
     probabilities: list[tuple[str, float]] = []
     samples = classification_samples(dataset_dir)
+    effective_batch = stage2_inference_batch(weights, batch)
 
-    for start in range(0, len(samples), batch):
-        chunk = samples[start:start + batch]
+    for start in range(0, len(samples), effective_batch):
+        chunk = samples[start:start + effective_batch]
         results = model(
             [str(image_path) for image_path, _expected in chunk],
             device=device,
@@ -223,6 +224,13 @@ def stage2_probabilities(
         for (_image_path, expected), result in zip(chunk, results):
             probabilities.append((expected, occupied_probability(result)))
     return probabilities
+
+
+def stage2_inference_batch(weights: str, requested_batch: int) -> int:
+    suffix = Path(weights).suffix.lower()
+    if suffix in {".onnx", ".mlpackage"}:
+        return 1
+    return max(1, requested_batch)
 
 
 def occupied_probability(result) -> float:
