@@ -198,7 +198,7 @@ async function apiPost(path, body) {
 }
 
 // ---------------------------------------------------------------------------
-// BEVMap
+// BEVMap — enlarged text & stroke
 // ---------------------------------------------------------------------------
 function BEVMap({
   layout,
@@ -209,7 +209,7 @@ function BEVMap({
 }) {
   if (!layout) return null;
   const { canvas, spots } = layout;
-  const VW = 560;
+  const VW = 680;
   const VH = (canvas.height / canvas.width) * VW;
   const sx = VW / canvas.width;
   const sy = VH / canvas.height;
@@ -218,17 +218,17 @@ function BEVMap({
     <svg
       viewBox={`0 0 ${VW} ${VH}`}
       width="100%"
-      className="block rounded-lg border border-stone-200"
+      className="block rounded-xl border border-stone-200"
       aria-label="Parking lot BEV map"
     >
-      <rect width={VW} height={VH} fill="#f5f5f4" rx="8" />
+      <rect width={VW} height={VH} fill="#f5f5f4" rx="10" />
       <rect
         x={VW * 0.06}
         y={VH * 0.1}
         width={VW * 0.88}
         height={VH * 0.8}
         fill="#e7e5e4"
-        rx="4"
+        rx="6"
         opacity="0.5"
       />
       <text
@@ -237,7 +237,7 @@ function BEVMap({
         textAnchor="middle"
         dominantBaseline="middle"
         fill="#a8a29e"
-        fontSize="11"
+        fontSize="14"
         fontFamily="monospace"
       >
         BEV map · {canvas.width}×{canvas.height}
@@ -252,10 +252,9 @@ function BEVMap({
         const isHighlit = highlightSpot === spot.spot_id;
         const isDimmed = dimUnhighlighted && highlightSpot && !isHighlit;
 
-        let fill = "#e7e5e4";
-        let stroke = "#d4d0cb";
-        let textFill = "#78716c";
-
+        let fill = "#e7e5e4",
+          stroke = "#d4d0cb",
+          textFill = "#78716c";
         if (occ === "free") {
           fill = "#1a7a4a22";
           stroke = "#1a7a4a";
@@ -286,17 +285,17 @@ function BEVMap({
               points={pts}
               fill={fill}
               stroke={stroke}
-              strokeWidth={isHighlit ? 2 : 1}
+              strokeWidth={isHighlit ? 3 : 1.5}
             />
             <text
               x={cx}
               y={cy}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="9"
+              fontSize="12"
               fill={textFill}
               fontFamily="monospace"
-              fontWeight="500"
+              fontWeight="600"
             >
               {spot.spot_id.replace("spot_", "P")}
             </text>
@@ -325,23 +324,21 @@ function StatusDot({ status }) {
       : status === "polling"
         ? "bg-amber-500"
         : "bg-stone-400";
-
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-stone-500">
-      <span className={`inline-block size-1.75 rounded-full ${dotColor}`} />
+    <span className="inline-flex items-center gap-2 text-sm text-stone-500">
+      <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`} />
       {status}
     </span>
   );
 }
-
 StatusDot.propTypes = { status: PropTypes.string.isRequired };
 
 // ---------------------------------------------------------------------------
-// Spinner — Radix UpdateIcon with Tailwind spin
+// Spinner
 // ---------------------------------------------------------------------------
 function Spinner() {
   return (
-    <UpdateIcon className="w-4 h-4 text-stone-500 animate-spin shrink-0" />
+    <UpdateIcon className="w-5 h-5 text-stone-500 animate-spin shrink-0" />
   );
 }
 
@@ -386,77 +383,75 @@ function OwnerSetup({ layout, setLayout }) {
   };
 
   return (
-    <div className="max-w-xl mx-auto">
-      <div className="mb-6">
-        <p className="text-[13px] text-stone-500 mb-4 leading-relaxed">
-          Upload 4–5 overlapping photos of your parking lot. The SfM pipeline
-          will compute a bird&apos;s-eye-view layout and extract spot polygons
-          automatically.
-        </p>
+    <div className="max-w-2xl mx-auto">
+      <p className="text-base text-stone-500 mb-5 leading-relaxed">
+        Upload 4–5 overlapping photos of your parking lot. The SfM pipeline will
+        compute a bird&apos;s-eye-view layout and extract spot polygons
+        automatically.
+      </p>
 
-        {/* Drop zone */}
-        <div
-          className="border-2 border-dashed border-stone-300 rounded-xl p-8 text-center bg-stone-50
-                     cursor-pointer hover:border-stone-400 transition-colors"
-          onClick={() => fileRef.current?.click()}
-        >
-          <div className="flex justify-center mb-2">
-            <CameraIcon className="w-8 h-8 text-stone-400" />
-          </div>
-          <p className="text-sm font-medium text-stone-800">
-            {files.length
-              ? `${files.length} photo${files.length > 1 ? "s" : ""} selected`
-              : "Click to select photos"}
-          </p>
-          <p className="text-xs text-stone-400 mt-1">
-            JPG or PNG · minimum 4 images · 60%+ overlap recommended
-          </p>
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFiles}
-            className="hidden"
-          />
+      {/* Drop zone */}
+      <div
+        className="border-2 border-dashed border-stone-300 rounded-2xl p-10 text-center bg-stone-50
+                   cursor-pointer hover:border-stone-400 transition-colors"
+        onClick={() => fileRef.current?.click()}
+      >
+        <div className="flex justify-center mb-3">
+          <CameraIcon className="w-12 h-12 text-stone-400" />
         </div>
-
-        {/* File chips */}
-        {files.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2.5">
-            {files.map((f, i) => (
-              <span
-                key={i}
-                className="text-[11px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-mono"
-              >
-                {f.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+        <p className="text-base font-medium text-stone-800">
+          {files.length
+            ? `${files.length} photo${files.length > 1 ? "s" : ""} selected`
+            : "Click to select photos"}
+        </p>
+        <p className="text-sm text-stone-400 mt-1.5">
+          JPG or PNG · minimum 4 images · 60%+ overlap recommended
+        </p>
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={handleFiles}
+          className="hidden"
+        />
       </div>
+
+      {/* File chips */}
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {files.map((f, i) => (
+            <span
+              key={i}
+              className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-mono"
+            >
+              {f.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-600 mt-2.5">{error}</p>}
 
       {/* Actions */}
       {(step === "idle" || step === "ready") && (
-        <div className="flex gap-2">
+        <div className="flex gap-3 mt-6">
           <button
             onClick={submit}
             disabled={files.length === 0}
-            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-md border border-stone-400
-                       bg-white text-[13px] font-medium hover:bg-stone-50 transition-colors
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-stone-400
+                       bg-white text-sm font-medium hover:bg-stone-50 transition-colors
                        disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             Run SfM layout
-            <ArrowRightIcon className="w-3.5 h-3.5" />
+            <ArrowRightIcon className="w-4 h-4" />
           </button>
           <button
             onClick={() => {
               setLayout(MOCK_LAYOUT);
               setStep("done");
             }}
-            className="px-4 py-2 rounded-md border border-stone-200 bg-transparent text-xs
+            className="px-5 py-3 rounded-lg border border-stone-200 bg-transparent text-sm
                        text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
           >
             Load sample handoff
@@ -465,35 +460,33 @@ function OwnerSetup({ layout, setLayout }) {
       )}
 
       {step === "processing" && (
-        <div className="flex items-center gap-3 py-3">
+        <div className="flex items-center gap-3 py-4">
           <Spinner />
-          <span className="text-[13px] text-stone-500">
-            Running SfM pipeline…
-          </span>
+          <span className="text-sm text-stone-500">Running SfM pipeline…</span>
         </div>
       )}
 
       {/* Layout preview */}
       {layout && (
-        <div className="mt-7">
-          <div className="flex justify-between items-center mb-2.5">
-            <p className="text-[13px] font-medium text-stone-800">
+        <div className="mt-8">
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-base font-medium text-stone-800">
               Layout ready — {layout.spots.length} spots detected
             </p>
-            <span className="text-[11px] font-mono text-stone-500 bg-stone-100 px-2 py-0.5 rounded">
+            <span className="text-xs font-mono text-stone-500 bg-stone-100 px-2.5 py-1 rounded-md">
               {layout.spot_source}
             </span>
           </div>
           <BEVMap layout={layout} />
-          <div className="flex gap-2 mt-2.5 items-center">
+          <div className="flex gap-3 mt-3 items-center">
             <button
               onClick={reset}
-              className="text-xs px-3.5 py-1.5 rounded-md border border-stone-200 bg-transparent
+              className="text-sm px-4 py-2 rounded-lg border border-stone-200 bg-transparent
                          text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
             >
               Re-upload
             </button>
-            <span className="text-xs text-stone-500">
+            <span className="text-sm text-stone-500">
               Canvas {layout.canvas.width}×{layout.canvas.height} ·{" "}
               {layout.source_images.length} source images
             </span>
@@ -555,14 +548,13 @@ function OccupancyMap({ layout }) {
     ? Object.values(status).filter((v) => v === "occupied").length
     : 0;
 
-  if (!layout) {
+  if (!layout)
     return (
-      <div className="text-center py-16 text-stone-500 text-[13px]">
+      <div className="text-center py-20 text-stone-500 text-base">
         No layout loaded. Go to <strong>Owner Setup</strong> first to generate
         the parking map.
       </div>
     );
-  }
 
   const stats = [
     { label: "Free spots", value: freeCount, color: "text-green-700" },
@@ -577,13 +569,13 @@ function OccupancyMap({ layout }) {
   return (
     <div>
       {/* Stats cards */}
-      <div className="grid grid-cols-3 gap-2.5 mb-5">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         {stats.map(({ label, value, color }) => (
-          <div key={label} className="bg-stone-100 rounded-lg px-3.5 py-3">
-            <p className="text-[11px] text-stone-400 uppercase tracking-wide">
+          <div key={label} className="bg-stone-100 rounded-xl px-5 py-4">
+            <p className="text-xs text-stone-400 uppercase tracking-wider font-medium">
               {label}
             </p>
-            <p className={`mt-1 text-[22px] font-medium font-mono ${color}`}>
+            <p className={`mt-1.5 text-4xl font-medium font-mono ${color}`}>
               {status ? value : "–"}
             </p>
           </div>
@@ -591,32 +583,32 @@ function OccupancyMap({ layout }) {
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-between mb-3.5">
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-3">
           <button
             onClick={startPolling}
             disabled={pollState !== "idle"}
-            className="inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-md
+            className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg
                        border border-stone-300 bg-transparent hover:bg-stone-50 transition-colors
                        cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <PlayIcon className="w-3 h-3" />
+            <PlayIcon className="w-4 h-4" />
             Start polling
           </button>
           <button
             onClick={stopPolling}
             disabled={pollState === "idle"}
-            className="inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-md
+            className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg
                        border border-stone-200 bg-transparent text-stone-500 hover:bg-stone-50
                        transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <StopIcon className="w-3 h-3" />
+            <StopIcon className="w-4 h-4" />
             Stop
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {lastUpdated && (
-            <span className="text-[11px] text-stone-400 font-mono">
+            <span className="text-sm text-stone-400 font-mono">
               {lastUpdated.toLocaleTimeString()}
             </span>
           )}
@@ -627,46 +619,42 @@ function OccupancyMap({ layout }) {
       <BEVMap layout={layout} status={status} onSpotClick={setSelectedSpot} />
 
       {/* Legend */}
-      <div className="flex gap-4 mt-2.5 text-[11px] text-stone-500 items-center">
+      <div className="flex gap-5 mt-3 text-sm text-stone-500 items-center">
         {[
           ["#1a7a4a", "Free"],
           ["#c0392b", "Occupied"],
           ["#e7e5e4", "Unknown"],
         ].map(([c, l]) => (
-          <span key={l} className="flex items-center gap-1.5">
+          <span key={l} className="flex items-center gap-2">
             <span
-              className="inline-block size-2.5 rounded-xs"
+              className="inline-block w-3 h-3 rounded-sm"
               style={{ background: c }}
             />
             {l}
           </span>
         ))}
-        <span className="ml-auto">click a spot to select</span>
+        <span className="ml-auto text-sm">click a spot to select</span>
       </div>
 
       {/* Selected spot panel */}
       {selectedSpot && status && (
         <div
-          className="mt-3 px-3.5 py-2.5 rounded-lg border border-stone-300 bg-stone-50
+          className="mt-4 px-5 py-3.5 rounded-xl border border-stone-300 bg-stone-50
                         flex justify-between items-center"
         >
-          <span className="font-mono text-[13px]">{selectedSpot}</span>
+          <span className="font-mono text-base">{selectedSpot}</span>
           <span
-            className={`text-xs font-medium ${
-              status[selectedSpot] === "free"
-                ? "text-green-700"
-                : "text-red-700"
-            }`}
+            className={`text-sm font-medium ${status[selectedSpot] === "free" ? "text-green-700" : "text-red-700"}`}
           >
             {status[selectedSpot] ?? "unknown"}
           </span>
           <button
             onClick={() => setSelectedSpot(null)}
-            className="flex items-center justify-center p-0.5 rounded text-stone-400
+            className="flex items-center justify-center p-1 rounded text-stone-400
                        hover:text-stone-600 bg-transparent border-none cursor-pointer"
             aria-label="Dismiss"
           >
-            <Cross2Icon className="w-3.5 h-3.5" />
+            <Cross2Icon className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -737,27 +725,26 @@ function FindMyCar({ layout }) {
     setConfidence(null);
   };
 
-  if (!layout) {
+  if (!layout)
     return (
-      <div className="text-center py-16 text-stone-500 text-[13px]">
+      <div className="text-center py-20 text-stone-500 text-base">
         No layout loaded. Go to <strong>Owner Setup</strong> first.
       </div>
     );
-  }
 
   return (
-    <div className="grid grid-cols-2 gap-5">
+    <div className="grid grid-cols-2 gap-7">
       {/* Left column */}
       <div>
-        <p className="text-[13px] text-stone-500 mb-3.5 leading-relaxed">
+        <p className="text-base text-stone-500 mb-4 leading-relaxed">
           Take a photo from near where you parked. SIFT feature matching will
           identify your spot.
         </p>
 
         {/* Photo input */}
         <div
-          className="border-2 border-dashed border-stone-300 rounded-xl overflow-hidden cursor-pointer
-                     min-h-37.5 relative bg-stone-50 hover:border-stone-400 transition-colors"
+          className="border-2 border-dashed border-stone-300 rounded-2xl overflow-hidden cursor-pointer
+                     min-h-48 relative bg-stone-50 hover:border-stone-400 transition-colors"
           onClick={() => !foundSpot && fileRef.current?.click()}
         >
           {preview ? (
@@ -767,9 +754,9 @@ function FindMyCar({ layout }) {
               className="w-full h-full object-cover block"
             />
           ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-              <TokensIcon className="w-8 h-8 text-stone-400" />
-              <span className="text-xs text-stone-500">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <TokensIcon className="w-12 h-12 text-stone-400" />
+              <span className="text-sm text-stone-500">
                 Tap to take / upload photo
               </span>
             </div>
@@ -785,24 +772,24 @@ function FindMyCar({ layout }) {
         </div>
 
         {/* Step buttons */}
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-4 flex flex-col gap-3">
           {(step === "idle" || step === "ready") && (
             <button
               onClick={park}
               disabled={!file}
-              className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-md
-                         border border-stone-400 bg-white text-[13px] font-medium hover:bg-stone-50
+              className="inline-flex items-center justify-center gap-2 py-3 rounded-xl
+                         border border-stone-400 bg-white text-sm font-medium hover:bg-stone-50
                          transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               POST /park — find my spot
-              <ArrowRightIcon className="w-3.5 h-3.5" />
+              <ArrowRightIcon className="w-4 h-4" />
             </button>
           )}
 
           {step === "matching" && (
-            <div className="flex items-center gap-2.5 py-2.5">
+            <div className="flex items-center gap-3 py-3">
               <Spinner />
-              <span className="text-xs text-stone-500">
+              <span className="text-sm text-stone-500">
                 Running SIFT localization…
               </span>
             </div>
@@ -810,41 +797,41 @@ function FindMyCar({ layout }) {
 
           {step === "parked" && (
             <>
-              <div className="px-3 py-2 rounded-md bg-stone-100 text-xs font-mono">
+              <div className="px-4 py-3 rounded-xl bg-stone-100 text-sm font-mono">
                 session_id: <strong>{sessionId}</strong>
               </div>
               <button
                 onClick={find}
-                className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-md
-                           border border-stone-300 bg-transparent text-[13px] hover:bg-stone-50
+                className="inline-flex items-center justify-center gap-2 py-3 rounded-xl
+                           border border-stone-300 bg-transparent text-sm hover:bg-stone-50
                            transition-colors cursor-pointer"
               >
                 GET /find/{sessionId}
-                <ArrowRightIcon className="w-3.5 h-3.5" />
+                <ArrowRightIcon className="w-4 h-4" />
               </button>
             </>
           )}
 
           {step === "locating" && (
-            <div className="flex items-center gap-2.5 py-2.5">
+            <div className="flex items-center gap-3 py-3">
               <Spinner />
-              <span className="text-xs text-stone-500">Querying backend…</span>
+              <span className="text-sm text-stone-500">Querying backend…</span>
             </div>
           )}
 
           {step === "found" && (
             <>
-              <div className="px-3 py-2.5 rounded-lg border border-amber-400 bg-amber-50">
-                <p className="text-[13px] font-medium text-amber-800 mb-1">
+              <div className="px-4 py-4 rounded-xl border border-amber-400 bg-amber-50">
+                <p className="text-base font-medium text-amber-800 mb-1">
                   Your car: <span className="font-mono">{foundSpot}</span>
                 </p>
-                <p className="text-[11px] text-amber-700">
+                <p className="text-sm text-amber-700">
                   Confidence: {(confidence * 100).toFixed(0)}%
                 </p>
               </div>
               <button
                 onClick={reset}
-                className="text-xs py-1.5 rounded-md border border-stone-200 bg-transparent
+                className="text-sm py-2.5 rounded-xl border border-stone-200 bg-transparent
                            text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
               >
                 New session
@@ -856,15 +843,15 @@ function FindMyCar({ layout }) {
 
       {/* Right column — map */}
       <div>
-        <p className="text-xs text-stone-500 mb-2 flex items-center gap-1">
+        <p className="text-sm text-stone-500 mb-2.5 flex items-center gap-1.5">
           {step === "found" ? (
             <>
               Your spot is highlighted below{" "}
-              <ArrowDownIcon className="w-3 h-3" />
+              <ArrowDownIcon className="w-4 h-4" />
             </>
           ) : (
             <>
-              <ImageIcon className="w-3 h-3" /> Map will highlight your spot
+              <ImageIcon className="w-4 h-4" /> Map will highlight your spot
               after matching
             </>
           )}
@@ -878,7 +865,7 @@ function FindMyCar({ layout }) {
           dimUnhighlighted={!!foundSpot}
         />
         {step === "found" && (
-          <p className="text-[11px] text-stone-400 mt-1.5 font-mono">
+          <p className="text-xs text-stone-400 mt-2 font-mono">
             amber = your car · GET /find/{sessionId}
           </p>
         )}
@@ -903,18 +890,18 @@ export default function App() {
   const [layout, setLayout] = useState(null);
 
   return (
-    <div className="font-sans max-w-175 mx-auto pb-10">
+    <div className="font-sans max-w-5xl mx-auto px-6 pb-14">
       {/* Header */}
-      <div className="border-b border-stone-200 mb-6">
-        <div className="flex items-baseline gap-2 pb-3.5">
-          <span className="text-[13px] font-mono font-medium text-stone-900">
+      <div className="border-b border-stone-200 mb-8">
+        <div className="flex items-baseline gap-3 pb-4">
+          <span className="text-lg font-mono font-semibold text-stone-900">
             SmartParking
           </span>
-          <span className="text-[11px] text-stone-400 font-mono">
+          <span className="text-sm text-stone-400 font-mono">
             v6 · edge inference
           </span>
           {layout && (
-            <span className="ml-auto text-[11px] font-mono text-stone-400">
+            <span className="ml-auto text-sm font-mono text-stone-400">
               layout: {layout.spots.length} spots · {layout.spot_source}
             </span>
           )}
@@ -927,14 +914,14 @@ export default function App() {
               key={id}
               onClick={() => setTab(id)}
               className={[
-                "inline-flex items-center gap-1.5 px-4 py-2 text-[13px] border-b-2 transition-colors",
+                "inline-flex items-center gap-2 px-5 py-3 text-sm border-b-2 transition-colors",
                 "cursor-pointer bg-transparent border-x-0 border-t-0",
                 tab === id
-                  ? "border-stone-900 text-stone-900 font-medium"
+                  ? "border-stone-900 text-stone-900 font-semibold"
                   : "border-transparent text-stone-400 hover:text-stone-600",
               ].join(" ")}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-4 h-4" />
               {label}
             </button>
           ))}
