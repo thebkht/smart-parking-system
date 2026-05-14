@@ -278,6 +278,7 @@ The project achieved its main system goal: a working two-stage edge pipeline tha
 
 - very strong Stage 1 scene-held-out localization performance
 - a reproducible `n` / `s` / `m` Stage 2 comparison
+- a working SIFT + FLANN localization prototype with a sample `1/1` correct query evaluation
 - compact ONNX and Core ML export artifacts for the promoted Week 5 checkpoint
 - strong bandwidth savings relative to continuous video streaming
 
@@ -287,12 +288,13 @@ First, the Stage 2 classifier did not achieve the original 98% target. Even the 
 
 ## 9. Conclusion
 
-This project demonstrates that a laptop-based edge parking system can combine full-frame parking-space localization and per-space occupancy classification into a practical two-stage inference pipeline. The checked-in Week 6 state uses a YOLO Stage 1 parking-space detector, a promoted `yolov8n-cls` checkpoint for the handoff path, and comparison checkpoints for `s` and `m` variants. The system achieves strong Stage 1 localization performance, useful Stage 2 comparison coverage, compact export artifacts, and bandwidth reduction of more than 99.9% compared with continuous video transmission.
+This project demonstrates that a laptop-based edge parking system can combine full-frame parking-space localization and per-space occupancy classification into a practical two-stage inference pipeline. The checked-in Week 6 state uses a YOLO Stage 1 parking-space detector, a promoted `yolov8n-cls` checkpoint for the handoff path, and comparison checkpoints for `s` and `m` variants. The system achieves strong Stage 1 localization performance, useful Stage 2 comparison coverage, a working proof-of-function SIFT localization path, compact export artifacts, and bandwidth reduction of more than 99.9% compared with continuous video transmission.
 
 The final repo state is suitable for class demonstration and technical submission because it includes:
 
 - trained checkpoints for both inference stages
 - evaluation logs for model comparison, threshold sweep, cross-dataset testing, and per-weather analysis
+- sample localization references plus a localization evaluation harness
 - exported deployment artifacts
 - an integrated edge runtime and backend
 - regenerated acceptance summaries showing all tracked PRD checks as complete

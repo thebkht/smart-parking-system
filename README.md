@@ -405,7 +405,7 @@ or:
 }
 ```
 
-Starter sample references are available under [samples/localization_refs](/Users/thebkht/Projects/smart-parking-system/samples/localization_refs). The current starter set is meant for proof-of-function only. In a sample run using `photo_2026-04-23_21.29.43.jpeg` as the query, the SIFT matcher ranked `spot_2` first with 861 inliers, far ahead of the other tentative spot folders.
+Starter sample references are available under [samples/localization_refs](/Users/thebkht/Projects/smart-parking-system/samples/localization_refs). The current starter set is meant for proof-of-function only. In the current sample evaluation run, `ml/evaluate_localization.py` matched `1/1` labeled queries correctly: `photo_2026-04-23_21.29.43.jpeg` was assigned to `spot_2` with 861 inliers and about 603 ms runtime.
 
 ---
 
