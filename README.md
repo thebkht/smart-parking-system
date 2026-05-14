@@ -129,14 +129,14 @@ Key points:
 
 **Week 5**
 
-- [ ] Scaffold React app (Vite + React): 3 screens with routing
-- [ ] Build Leaflet.js map component: render 2D layout + quadrilateral polygon overlays per spot
+- [x] Scaffold React app (Vite + React): 3 screens with routing
+- [x] Build Leaflet.js map component: render 2D layout + quadrilateral polygon overlays per spot
 
 **Week 6**
 
-- [ ] Owner setup screen: photo upload → `POST /layout` → spinner → display BEV map with polygon overlays
-- [ ] Live occupancy map screen: poll `GET /status` every 2–5 s → color spots green / red in real time
-- [ ] Integrate BEV map image from [@thebkht](https://github.com/thebkht) into the owner setup flow
+- [x] Owner setup screen: photo upload → `POST /layout` → spinner → display BEV map with polygon overlays
+- [x] Live occupancy map screen: poll `GET /status` every 2–5 s → color spots green / red in real time
+- [x] Integrate BEV map image from [@thebkht](https://github.com/thebkht) into the owner setup flow
 
 **Week 7**
 
