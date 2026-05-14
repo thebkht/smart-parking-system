@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This project implements a two-stage smart parking system that performs inference on an edge device rather than streaming raw video to the cloud. The deployed pipeline uses a Stage 1 YOLO parking-space detector to localize parking spaces in full-frame images, then applies a Stage 2 YOLOv8 classification model to cropped space patches to predict `free` or `occupied`. The system outputs compact JSON payloads and stores them through a minimal FastAPI backend. In the checked-in final artifact set, the Stage 1 detector achieved up to 0.995 mAP@50 on a scene-held-out validation split, while the selected Stage 2 classifier (`yolov8m-cls`) reached 0.8958 top-1 accuracy and 0.8994 F1 at the default threshold of 0.5, improving to 0.9187 accuracy and 0.9242 F1 at the best offline threshold of 0.1. The runtime benchmark reached 350.8 FPS on Apple MPS and 2290.7 FPS for the exported Core ML INT8 artifact. Compared with a conservative 1080p H.264 camera stream, the JSON reporting path reduced bandwidth by 99.9%.
+This project implements a two-stage smart parking system that performs inference on an edge device rather than streaming raw video to the cloud. The deployed pipeline uses a Stage 1 YOLO parking-space detector to localize parking spaces in full-frame images, then applies a Stage 2 YOLOv8 classification model to cropped space patches to predict `free` or `occupied`. The system outputs compact JSON payloads and stores them through a minimal FastAPI backend. In the checked-in Week 6 comparison set, the Stage 1 detector achieved up to 0.995 mAP@50 on a scene-held-out validation split, while the best observed Stage 2 test accuracy was 0.8768 with `yolov8s-cls` at threshold 0.5. The Week 6 export bundle for the promoted `yolov8n-cls` checkpoint produced `best.onnx`, `best_int8.onnx`, and `best.mlpackage` artifacts, each materially smaller than raw video streaming. Compared with a conservative 1080p H.264 camera stream, the JSON reporting path reduced bandwidth by 99.9%.
 
 ## 1. Introduction
 
@@ -64,7 +64,7 @@ The edge device runs both inference stages locally.
 The current integrated runtime uses:
 
 - Stage 1 detector: `runs/stage1_det/yolov8s_stage1/weights/best.pt`
-- Stage 2 classifier: `runs/acpds_cls/yolov8m_stage2/weights/best.pt`
+- Stage 2 classifier: `acpds_cls/weights/best.pt` for the Week 5 handoff, with Week 6 comparison checkpoints under `runs/acpds_cls/`
 
 ### 3.2 Backend layer
 
@@ -169,29 +169,30 @@ For integrated runtime and documentation consistency, the final runbook uses the
 
 ### 5.2 Stage 2 classifier
 
-Stage 2 uses YOLOv8 classification models trained on cropped parking-spot patches. Three classifier sizes were compared:
+Stage 2 uses YOLOv8 classification models trained on cropped parking-spot patches. The Week 6 comparison at threshold `0.5` produced:
 
-| Model | Threshold | Accuracy | Precision | Recall | F1 | Size (MB) |
+| Model | Split | Accuracy | Precision | Recall | F1 | Size (MB) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `yolov8n_stage2` | 0.5 | 0.8708 | 0.9914 | 0.7784 | 0.8721 | 2.83 |
-| `yolov8s_stage2` | 0.5 | 0.8804 | 0.9897 | 0.7969 | 0.8829 | 9.78 |
-| `yolov8m_stage2` | 0.5 | 0.8958 | 0.9910 | 0.8233 | 0.8994 | 30.22 |
-| `yolov8m_stage2` | 0.3 | 0.9085 | 0.9885 | 0.8483 | 0.9130 | 30.22 |
+| `yolov8n_stage2` | Val | 0.8499 | 0.9258 | 0.7170 | 0.8082 | 2.83 |
+| `yolov8s_stage2` | Val | 0.8602 | 0.9707 | 0.7043 | 0.8163 | 9.78 |
+| `yolov8m_stage2` | Val | 0.8537 | 0.9435 | 0.7106 | 0.8107 | 30.22 |
+| `yolov8n_stage2` | Test | 0.8678 | 0.9693 | 0.6972 | 0.8110 | 2.83 |
+| `yolov8s_stage2` | Test | 0.8768 | 0.9955 | 0.7003 | 0.8222 | 9.78 |
+| `yolov8m_stage2` | Test | 0.8742 | 0.9660 | 0.7161 | 0.8225 | 30.22 |
 
-The `m` model provided the best F1 and overall accuracy among the saved comparison checkpoints, so it became the final selected classifier.
+The important result is that increasing model size did not close the gap to the original 98% target. `yolov8s-cls` produced the best test accuracy, while `yolov8m-cls` only improved F1 by 0.0003 over `s` despite being roughly three times larger. This suggests that Stage 2 patch quality is a stronger bottleneck than classifier capacity.
 
 ## 6. Evaluation Results
 
-### 6.1 Stage 2 threshold sweep
+### 6.1 Stage 2 comparison conclusion
 
-Because the deployed edge path converts classifier probability into a binary occupancy decision, threshold selection matters. The saved sweep over `yolov8m_stage2` found the best validation result at threshold `0.1`:
+Because the deployed edge path converts classifier probability into a binary occupancy decision, threshold selection matters, but the Week 6 comparison already shows a broader issue: the default-threshold results plateau well below the target regardless of model size.
 
-- accuracy: 0.9187
-- precision: 0.9783
-- recall: 0.8758
-- F1: 0.9242
+- Best validation accuracy: `0.8602` with `yolov8s_stage2`
+- Best test accuracy: `0.8768` with `yolov8s_stage2`
+- Best test F1: `0.8225` with `yolov8m_stage2`
 
-The current edge configuration remains at threshold `0.3`, which matches the saved comparison run and provides a more conservative deployment choice for demos while still outperforming the default 0.5 threshold.
+The accuracy spread between `n`, `s`, and `m` is small. That pattern is consistent with a data-quality bottleneck rather than an underpowered classifier.
 
 ### 6.2 Cross-dataset evaluation
 
@@ -245,18 +246,18 @@ This is a short reproducible stability check rather than a long soak test, but i
 
 ## 7. Runtime Benchmark and Bandwidth Results
 
-### 7.1 Inference benchmark
+### 7.1 Export artifacts
 
-The checked-in benchmark results for the exported final classifier path are:
+The Week 6 export workflow for the promoted `yolov8n-cls` checkpoint generated:
 
-| Backend | FPS | Latency (ms) | Model Size (MB) |
-| --- | ---: | ---: | ---: |
-| YOLO MPS | 350.8 | 2.9 | 31.7 |
-| YOLO CPU | 263.9 | 3.8 | 31.7 |
-| ONNX FP32 | 337.5 | 3.0 | 63.1 |
-| Core ML INT8 | 2290.7 | 0.4 | 15.9 |
+| Artifact | Size (MB) |
+| --- | ---: |
+| `artifacts/models/best.pt` | 2.83 |
+| `artifacts/models/best.onnx` | 5.51 |
+| `artifacts/models/best_int8.onnx` | 1.44 |
+| `artifacts/models/best.mlpackage` | 1.44 |
 
-These numbers show that the patch-classification stage is well-suited for edge deployment. Even the plain PyTorch MPS path is fast enough for real-time parking updates, while the INT8 export provides very large additional headroom.
+These artifacts confirm that the Stage 2 classifier can be packaged into compact deployment formats. The ONNX and Core ML exports are useful for downstream runtime benchmarking, but the Week 6 milestone here is artifact generation and size tracking rather than final latency claims.
 
 ### 7.2 Bandwidth analysis
 
@@ -276,16 +277,13 @@ This result directly supports the edge-computing rationale of the project. The s
 The project achieved its main system goal: a working two-stage edge pipeline that performs local inference and exports only structured occupancy status. The strongest outcomes are:
 
 - very strong Stage 1 scene-held-out localization performance
-- clear Stage 2 improvement from `n` to `m` classifiers
-- a threshold sweep showing measurable gains from deployment-aware calibration
-- high runtime throughput on MPS and extremely high throughput for the INT8 export
+- a reproducible `n` / `s` / `m` Stage 2 comparison
+- compact ONNX and Core ML export artifacts for the promoted Week 5 checkpoint
 - strong bandwidth savings relative to continuous video streaming
 
 The main limitations are also clear.
 
-First, Stage 2 cross-dataset and weather-specific results are lower than the in-domain validation results. The largest weakness is recall under domain shift, especially for occupied spots. Second, the saved stability test is short; a longer 30-minute or multi-hour soak test would provide stronger reliability evidence. Third, the current final artifact summary records the latest per-weather row rather than a full aggregated weather table, so the report must read the CSV itself to describe all weather conditions.
-
-Another important detail is threshold policy. The best offline threshold for the final classifier is `0.1`, but the deployed config remains at `0.3`. This is reasonable for a demo-oriented edge system, but a production system would likely require threshold tuning using a deployment-specific validation set and cost-sensitive error analysis.
+First, the Stage 2 classifier did not achieve the original 98% target. Even the best Week 6 result, `yolov8s-cls` at 0.8768 test accuracy, remains far below that goal. Second, the small spread across `n`, `s`, and `m` implies that increasing model capacity is not the main lever. The more likely limiting factor is patch quality: partial vehicles, heavy black borders, low-information crops, and label ambiguity. Third, the saved stability test is short; a longer 30-minute or multi-hour soak test would provide stronger reliability evidence.
 
 ## 9. Conclusion
 
