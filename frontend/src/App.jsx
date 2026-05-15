@@ -1,3 +1,4 @@
+import LeafletMap from "./LeafletMap";
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
 import {
@@ -198,123 +199,6 @@ async function apiPost(path, body) {
 }
 
 // ---------------------------------------------------------------------------
-// BEVMap — enlarged text & stroke
-// ---------------------------------------------------------------------------
-function BEVMap({
-  layout,
-  status,
-  highlightSpot,
-  onSpotClick,
-  dimUnhighlighted,
-}) {
-  if (!layout) return null;
-  const { canvas, spots } = layout;
-  const VW = 680;
-  const VH = (canvas.height / canvas.width) * VW;
-  const sx = VW / canvas.width;
-  const sy = VH / canvas.height;
-
-  return (
-    <svg
-      viewBox={`0 0 ${VW} ${VH}`}
-      width="100%"
-      className="block rounded-xl border border-stone-200"
-      aria-label="Parking lot BEV map"
-    >
-      <rect width={VW} height={VH} fill="#f5f5f4" rx="10" />
-      <rect
-        x={VW * 0.06}
-        y={VH * 0.1}
-        width={VW * 0.88}
-        height={VH * 0.8}
-        fill="#e7e5e4"
-        rx="6"
-        opacity="0.5"
-      />
-      <text
-        x={VW / 2}
-        y={VH / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill="#a8a29e"
-        fontSize="14"
-        fontFamily="monospace"
-      >
-        BEV map · {canvas.width}×{canvas.height}
-      </text>
-      {spots.map((spot) => {
-        const pts = spot.corners
-          .map(([x, y]) => `${x * sx},${y * sy}`)
-          .join(" ");
-        const cx = (spot.corners.reduce((s, [x]) => s + x, 0) / 4) * sx;
-        const cy = (spot.corners.reduce((s, [, y]) => s + y, 0) / 4) * sy;
-        const occ = status?.[spot.spot_id];
-        const isHighlit = highlightSpot === spot.spot_id;
-        const isDimmed = dimUnhighlighted && highlightSpot && !isHighlit;
-
-        let fill = "#e7e5e4",
-          stroke = "#d4d0cb",
-          textFill = "#78716c";
-        if (occ === "free") {
-          fill = "#1a7a4a22";
-          stroke = "#1a7a4a";
-          textFill = "#0f5c36";
-        }
-        if (occ === "occupied") {
-          fill = "#c0392b22";
-          stroke = "#c0392b";
-          textFill = "#922b21";
-        }
-        if (isHighlit) {
-          fill = "#e8960022";
-          stroke = "#e89600";
-          textFill = "#7d5200";
-        }
-
-        return (
-          <g
-            key={spot.spot_id}
-            onClick={() => onSpotClick?.(spot.spot_id)}
-            style={{
-              cursor: onSpotClick ? "pointer" : "default",
-              opacity: isDimmed ? 0.3 : 1,
-              transition: "opacity 0.3s",
-            }}
-          >
-            <polygon
-              points={pts}
-              fill={fill}
-              stroke={stroke}
-              strokeWidth={isHighlit ? 3 : 1.5}
-            />
-            <text
-              x={cx}
-              y={cy}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="12"
-              fill={textFill}
-              fontFamily="monospace"
-              fontWeight="600"
-            >
-              {spot.spot_id.replace("spot_", "P")}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-BEVMap.propTypes = {
-  layout: layoutShape,
-  status: PropTypes.objectOf(PropTypes.string),
-  highlightSpot: PropTypes.string,
-  onSpotClick: PropTypes.func,
-  dimUnhighlighted: PropTypes.bool,
-};
-
-// ---------------------------------------------------------------------------
 // StatusDot
 // ---------------------------------------------------------------------------
 function StatusDot({ status }) {
@@ -477,7 +361,7 @@ function OwnerSetup({ layout, setLayout }) {
               {layout.spot_source}
             </span>
           </div>
-          <BEVMap layout={layout} />
+          <LeafletMap layout={layout} />
           <div className="flex gap-3 mt-3 items-center">
             <button
               onClick={reset}
@@ -616,7 +500,11 @@ function OccupancyMap({ layout }) {
         </div>
       </div>
 
-      <BEVMap layout={layout} status={status} onSpotClick={setSelectedSpot} />
+      <LeafletMap
+        layout={layout}
+        status={status}
+        onSpotClick={setSelectedSpot}
+      />
 
       {/* Legend */}
       <div className="flex gap-5 mt-3 text-sm text-stone-500 items-center">
@@ -856,7 +744,7 @@ function FindMyCar({ layout }) {
             </>
           )}
         </p>
-        <BEVMap
+        <LeafletMap
           layout={layout}
           status={Object.fromEntries(
             (layout?.spots ?? []).map((s) => [s.spot_id, "unknown"]),
