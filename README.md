@@ -40,7 +40,7 @@ Key points:
 
 **Week 6**
 
-- [x] Train `YOLOv8s-cls` and `YOLOv8m-cls` on ACPDS — best observed test accuracy was `0.8768` with `YOLOv8s-cls`, below the original `>=98%` target
+- [x] Train `YOLOv8s-cls` and `YOLOv8m-cls` on ACPDS — the promoted `YOLOv8n-cls` checkpoint still leads the checked-in Week 6 test comparison at `0.9772`, with `s=0.9691` and `m=0.9738`
 - [x] Run INT8 quantization on `YOLOv8n-cls` — generated `artifacts/models/best_int8.onnx` and `artifacts/models/best.mlpackage`
 - [x] Implement SIFT car localization (`cv2.SIFT_create()` + FLANN matcher)
 - [x] Write Dataset section of report
@@ -361,11 +361,11 @@ Expected outputs:
 
 Observed Week 6 comparison result:
 
-- `yolov8n-cls`: test accuracy `0.8678`, F1 `0.8110`, size `2.83 MB`
-- `yolov8s-cls`: test accuracy `0.8768`, F1 `0.8222`, size `9.78 MB`
-- `yolov8m-cls`: test accuracy `0.8742`, F1 `0.8225`, size `30.22 MB`
+- `yolov8n-cls`: test accuracy `0.9772`, F1 `0.9715`, size `2.83 MB`
+- `yolov8s-cls`: test accuracy `0.9691`, F1 `0.9615`, size `9.78 MB`
+- `yolov8m-cls`: test accuracy `0.9738`, F1 `0.9672`, size `30.22 MB`
 
-This means Week 6 improved comparison coverage, but not the original `>=98%` accuracy target. The current evidence points more toward Stage 2 patch/data quality as the bottleneck than raw model size.
+This means Week 6 improved comparison coverage, but the larger `s` and `m` variants did not beat the promoted `n` checkpoint. The original `>=98%` target is still narrowly missed on the checked-in test split, and the current evidence points more toward Stage 2 patch/data quality than raw model size.
 
 Notes:
 

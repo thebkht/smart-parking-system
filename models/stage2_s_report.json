@@ -19,13 +19,15 @@
     "dropout": 0.1,
     "cos_lr": true
   },
-  "train_time_s": 315.06,
-  "best_ckpt": "runs/acpds_cls/yolov8s_stage2/weights/best.pt",
-  "last_ckpt": "runs/acpds_cls/yolov8s_stage2/weights/last.pt",
-  "actual_run_dir": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/acpds_cls/yolov8s_stage2",
+  "train_time_s": 529.82,
+  "best_ckpt": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/acpds_cls/yolov8s_stage2-2/weights/best.pt",
+  "last_ckpt": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/acpds_cls/yolov8s_stage2-2/weights/last.pt",
+  "actual_run_dir": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/acpds_cls/yolov8s_stage2-2",
   "expected_run_dir": "runs/acpds_cls/yolov8s_stage2",
-  "selected_ckpt": "runs/acpds_cls/yolov8s_stage2/weights/best.pt",
+  "synced_best_ckpt": "runs/acpds_cls/yolov8s_stage2/weights/best.pt",
+  "synced_last_ckpt": "runs/acpds_cls/yolov8s_stage2/weights/last.pt",
+  "selected_ckpt": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/acpds_cls/yolov8s_stage2-2/weights/best.pt",
   "promoted_ckpt": null,
-  "top1_accuracy": 0.8602251410484314,
+  "top1_accuracy": 0.9816176295280457,
   "top5_accuracy": 1.0
 }
