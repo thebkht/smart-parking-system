@@ -1,6 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
+import {
+  CameraIcon,
+  GearIcon,
+  MagnifyingGlassIcon,
+  PlayIcon,
+  StopIcon,
+  Cross2Icon,
+  ArrowRightIcon,
+  ArrowDownIcon,
+  ImageIcon,
+  TokensIcon,
+  UpdateIcon,
+} from "@radix-ui/react-icons";
 
+// ---------------------------------------------------------------------------
+// PropTypes shapes
+// ---------------------------------------------------------------------------
 const spotShape = PropTypes.shape({
   spot_id: PropTypes.string.isRequired,
   corners: PropTypes.arrayOf(PropTypes.arrayOf(PropTypes.number)).isRequired,
@@ -17,6 +33,9 @@ const layoutShape = PropTypes.shape({
   spots: PropTypes.arrayOf(spotShape),
 });
 
+// ---------------------------------------------------------------------------
+// Mock data
+// ---------------------------------------------------------------------------
 const MOCK_LAYOUT = {
   canvas: { width: 600, height: 400 },
   background_image: "bev_map.png",
@@ -149,6 +168,9 @@ const MOCK_STATUS = {
   spot_12: "occupied",
 };
 
+// ---------------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------------
 const API_BASE = "http://localhost:8000";
 
 async function apiGet(path) {
@@ -175,6 +197,9 @@ async function apiPost(path, body) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// BEVMap — enlarged text & stroke
+// ---------------------------------------------------------------------------
 function BEVMap({
   layout,
   status,
@@ -184,7 +209,7 @@ function BEVMap({
 }) {
   if (!layout) return null;
   const { canvas, spots } = layout;
-  const VW = 560;
+  const VW = 680;
   const VH = (canvas.height / canvas.width) * VW;
   const sx = VW / canvas.width;
   const sy = VH / canvas.height;
@@ -193,17 +218,17 @@ function BEVMap({
     <svg
       viewBox={`0 0 ${VW} ${VH}`}
       width="100%"
-      style={{ display: "block", borderRadius: 8, border: "1px solid #e7e5e4" }}
+      className="block rounded-xl border border-stone-200"
       aria-label="Parking lot BEV map"
     >
-      <rect width={VW} height={VH} fill="#f5f5f4" rx="8" />
+      <rect width={VW} height={VH} fill="#f5f5f4" rx="10" />
       <rect
         x={VW * 0.06}
         y={VH * 0.1}
         width={VW * 0.88}
         height={VH * 0.8}
         fill="#e7e5e4"
-        rx="4"
+        rx="6"
         opacity="0.5"
       />
       <text
@@ -212,7 +237,7 @@ function BEVMap({
         textAnchor="middle"
         dominantBaseline="middle"
         fill="#a8a29e"
-        fontSize="11"
+        fontSize="14"
         fontFamily="monospace"
       >
         BEV map · {canvas.width}×{canvas.height}
@@ -227,10 +252,9 @@ function BEVMap({
         const isHighlit = highlightSpot === spot.spot_id;
         const isDimmed = dimUnhighlighted && highlightSpot && !isHighlit;
 
-        let fill = "#e7e5e4";
-        let stroke = "#d4d0cb";
-        let textFill = "#78716c";
-
+        let fill = "#e7e5e4",
+          stroke = "#d4d0cb",
+          textFill = "#78716c";
         if (occ === "free") {
           fill = "#1a7a4a22";
           stroke = "#1a7a4a";
@@ -261,17 +285,17 @@ function BEVMap({
               points={pts}
               fill={fill}
               stroke={stroke}
-              strokeWidth={isHighlit ? 2 : 1}
+              strokeWidth={isHighlit ? 3 : 1.5}
             />
             <text
               x={cx}
               y={cy}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="9"
+              fontSize="12"
               fill={textFill}
               fontFamily="monospace"
-              fontWeight="500"
+              fontWeight="600"
             >
               {spot.spot_id.replace("spot_", "P")}
             </text>
@@ -290,41 +314,37 @@ BEVMap.propTypes = {
   dimUnhighlighted: PropTypes.bool,
 };
 
+// ---------------------------------------------------------------------------
+// StatusDot
+// ---------------------------------------------------------------------------
 function StatusDot({ status }) {
-  const c =
+  const dotColor =
     status === "connected"
-      ? "#27ae60"
+      ? "bg-green-500"
       : status === "polling"
-        ? "#e89600"
-        : "#aaa";
+        ? "bg-amber-500"
+        : "bg-stone-400";
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        fontSize: 12,
-        color: "#78716c",
-      }}
-    >
-      <span
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          background: c,
-          display: "inline-block",
-        }}
-      />
+    <span className="inline-flex items-center gap-2 text-sm text-stone-500">
+      <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`} />
       {status}
     </span>
   );
 }
+StatusDot.propTypes = { status: PropTypes.string.isRequired };
 
-StatusDot.propTypes = {
-  status: PropTypes.string.isRequired,
-};
+// ---------------------------------------------------------------------------
+// Spinner
+// ---------------------------------------------------------------------------
+function Spinner() {
+  return (
+    <UpdateIcon className="w-5 h-5 text-stone-500 animate-spin shrink-0" />
+  );
+}
 
+// ---------------------------------------------------------------------------
+// OwnerSetup
+// ---------------------------------------------------------------------------
 function OwnerSetup({ layout, setLayout }) {
   const [files, setFiles] = useState([]);
   const [step, setStep] = useState("idle");
@@ -351,11 +371,7 @@ function OwnerSetup({ layout, setLayout }) {
     const result = await apiPost("/layout", {
       images: files.map((f) => f.name),
     });
-    if (result) {
-      setLayout(result);
-    } else {
-      setLayout(MOCK_LAYOUT);
-    }
+    setLayout(result ?? MOCK_LAYOUT);
     setStep("done");
   };
 
@@ -367,193 +383,110 @@ function OwnerSetup({ layout, setLayout }) {
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
-      <div style={{ marginBottom: 24 }}>
-        <p
-          style={{
-            fontSize: 13,
-            color: "#78716c",
-            margin: "0 0 16px",
-            lineHeight: 1.6,
-          }}
-        >
-          Upload 4–5 overlapping photos of your parking lot. The SfM pipeline
-          will compute a bird's-eye-view layout and extract spot polygons
-          automatically.
-        </p>
+    <div className="max-w-2xl mx-auto">
+      <p className="text-base text-stone-500 mb-5 leading-relaxed">
+        Upload 4–5 overlapping photos of your parking lot. The SfM pipeline will
+        compute a bird&apos;s-eye-view layout and extract spot polygons
+        automatically.
+      </p>
 
-        <div
-          style={{
-            border: "1.5px dashed #d4d0cb",
-            borderRadius: 10,
-            padding: "32px 24px",
-            textAlign: "center",
-            background: "#f5f5f4",
-            cursor: "pointer",
-          }}
-          onClick={() => fileRef.current?.click()}
-        >
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 14,
-              color: "#1c1917",
-              fontWeight: 500,
-            }}
-          >
-            {files.length
-              ? `${files.length} photo${files.length > 1 ? "s" : ""} selected`
-              : "Click to select photos"}
-          </p>
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#78716c" }}>
-            JPG or PNG · minimum 4 images · 60%+ overlap recommended
-          </p>
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFiles}
-            style={{ display: "none" }}
-          />
+      {/* Drop zone */}
+      <div
+        className="border-2 border-dashed border-stone-300 rounded-2xl p-10 text-center bg-stone-50
+                   cursor-pointer hover:border-stone-400 transition-colors"
+        onClick={() => fileRef.current?.click()}
+      >
+        <div className="flex justify-center mb-3">
+          <CameraIcon className="w-12 h-12 text-stone-400" />
         </div>
-
-        {files.length > 0 && (
-          <div
-            style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}
-          >
-            {files.map((f, i) => (
-              <span
-                key={i}
-                style={{
-                  fontSize: 11,
-                  background: "#eff6ff",
-                  color: "#1d4ed8",
-                  padding: "3px 8px",
-                  borderRadius: 4,
-                  fontFamily: "monospace",
-                }}
-              >
-                {f.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {error && (
-          <p style={{ fontSize: 12, color: "#dc2626", marginTop: 8 }}>
-            {error}
-          </p>
-        )}
+        <p className="text-base font-medium text-stone-800">
+          {files.length
+            ? `${files.length} photo${files.length > 1 ? "s" : ""} selected`
+            : "Click to select photos"}
+        </p>
+        <p className="text-sm text-stone-400 mt-1.5">
+          JPG or PNG · minimum 4 images · 60%+ overlap recommended
+        </p>
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={handleFiles}
+          className="hidden"
+        />
       </div>
 
-      {step === "idle" || step === "ready" ? (
-        <div style={{ display: "flex", gap: 8 }}>
+      {/* File chips */}
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {files.map((f, i) => (
+            <span
+              key={i}
+              className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-mono"
+            >
+              {f.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-600 mt-2.5">{error}</p>}
+
+      {/* Actions */}
+      {(step === "idle" || step === "ready") && (
+        <div className="flex gap-3 mt-6">
           <button
             onClick={submit}
             disabled={files.length === 0}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 6,
-              border: "1px solid #a8a29e",
-              background: "#ffffff",
-              cursor: files.length ? "pointer" : "not-allowed",
-              fontSize: 13,
-              fontWeight: 500,
-              opacity: files.length ? 1 : 0.45,
-            }}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-stone-400
+                       bg-white text-sm font-medium hover:bg-stone-50 transition-colors
+                       disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            Run SfM layout →
+            Run SfM layout
+            <ArrowRightIcon className="w-4 h-4" />
           </button>
           <button
             onClick={() => {
               setLayout(MOCK_LAYOUT);
               setStep("done");
             }}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 6,
-              border: "1px solid #e7e5e4",
-              background: "transparent",
-              cursor: "pointer",
-              fontSize: 12,
-              color: "#78716c",
-            }}
+            className="px-5 py-3 rounded-lg border border-stone-200 bg-transparent text-sm
+                       text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
           >
             Load sample handoff
           </button>
         </div>
-      ) : step === "processing" ? (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 0",
-          }}
-        >
-          <div
-            style={{
-              width: 18,
-              height: 18,
-              border: "2px solid #d4d0cb",
-              borderTopColor: "#1c1917",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-            }}
-          />
-          <span style={{ fontSize: 13, color: "#78716c" }}>
-            Running SfM pipeline…
-          </span>
-        </div>
-      ) : null}
+      )}
 
+      {step === "processing" && (
+        <div className="flex items-center gap-3 py-4">
+          <Spinner />
+          <span className="text-sm text-stone-500">Running SfM pipeline…</span>
+        </div>
+      )}
+
+      {/* Layout preview */}
       {layout && (
-        <div style={{ marginTop: 28 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 10,
-            }}
-          >
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>
+        <div className="mt-8">
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-base font-medium text-stone-800">
               Layout ready — {layout.spots.length} spots detected
             </p>
-            <span
-              style={{
-                fontSize: 11,
-                fontFamily: "monospace",
-                color: "#78716c",
-                background: "#f5f5f4",
-                padding: "2px 8px",
-                borderRadius: 4,
-              }}
-            >
+            <span className="text-xs font-mono text-stone-500 bg-stone-100 px-2.5 py-1 rounded-md">
               {layout.spot_source}
             </span>
           </div>
           <BEVMap layout={layout} />
-          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+          <div className="flex gap-3 mt-3 items-center">
             <button
               onClick={reset}
-              style={{
-                fontSize: 12,
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "1px solid #e7e5e4",
-                background: "transparent",
-                cursor: "pointer",
-                color: "#78716c",
-              }}
+              className="text-sm px-4 py-2 rounded-lg border border-stone-200 bg-transparent
+                         text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
             >
               Re-upload
             </button>
-            <span
-              style={{ fontSize: 12, color: "#78716c", alignSelf: "center" }}
-            >
+            <span className="text-sm text-stone-500">
               Canvas {layout.canvas.width}×{layout.canvas.height} ·{" "}
               {layout.source_images.length} source images
             </span>
@@ -569,6 +502,9 @@ OwnerSetup.propTypes = {
   setLayout: PropTypes.func.isRequired,
 };
 
+// ---------------------------------------------------------------------------
+// OccupancyMap
+// ---------------------------------------------------------------------------
 function OccupancyMap({ layout }) {
   const [status, setStatus] = useState(null);
   const [pollState, setPollState] = useState("idle");
@@ -599,12 +535,10 @@ function OccupancyMap({ layout }) {
     poll();
     intervalRef.current = setInterval(poll, 3000);
   };
-
   const stopPolling = () => {
     clearInterval(intervalRef.current);
     setPollState("idle");
   };
-
   useEffect(() => () => clearInterval(intervalRef.current), []);
 
   const freeCount = status
@@ -614,125 +548,67 @@ function OccupancyMap({ layout }) {
     ? Object.values(status).filter((v) => v === "occupied").length
     : 0;
 
-  if (!layout) {
+  if (!layout)
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "60px 0",
-          color: "#78716c",
-          fontSize: 13,
-        }}
-      >
+      <div className="text-center py-20 text-stone-500 text-base">
         No layout loaded. Go to <strong>Owner Setup</strong> first to generate
         the parking map.
       </div>
     );
-  }
+
+  const stats = [
+    { label: "Free spots", value: freeCount, color: "text-green-700" },
+    { label: "Occupied", value: occCount, color: "text-red-700" },
+    {
+      label: "Total spots",
+      value: layout.spots.length,
+      color: "text-stone-500",
+    },
+  ];
 
   return (
     <div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 10,
-          marginBottom: 20,
-        }}
-      >
-        {[
-          { label: "Free spots", value: freeCount, accent: "#1a7a4a" },
-          { label: "Occupied", value: occCount, accent: "#c0392b" },
-          {
-            label: "Total spots",
-            value: layout.spots.length,
-            accent: "#78716c",
-          },
-        ].map(({ label, value, accent }) => (
-          <div
-            key={label}
-            style={{
-              background: "#f5f5f4",
-              borderRadius: 8,
-              padding: "12px 14px",
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 11,
-                color: "#78716c",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
+      {/* Stats cards */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {stats.map(({ label, value, color }) => (
+          <div key={label} className="bg-stone-100 rounded-xl px-5 py-4">
+            <p className="text-xs text-stone-400 uppercase tracking-wider font-medium">
               {label}
             </p>
-            <p
-              style={{
-                margin: "4px 0 0",
-                fontSize: 22,
-                fontWeight: 500,
-                color: accent,
-                fontFamily: "monospace",
-              }}
-            >
+            <p className={`mt-1.5 text-4xl font-medium font-mono ${color}`}>
               {status ? value : "–"}
             </p>
           </div>
         ))}
       </div>
 
-      <div
-        style={{
-          marginBottom: 14,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", gap: 8 }}>
+      {/* Controls */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-3">
           <button
             onClick={startPolling}
             disabled={pollState !== "idle"}
-            style={{
-              fontSize: 12,
-              padding: "6px 14px",
-              borderRadius: 6,
-              border: "1px solid #d4d0cb",
-              background: "transparent",
-              cursor: pollState === "idle" ? "pointer" : "not-allowed",
-              opacity: pollState === "idle" ? 1 : 0.5,
-            }}
+            className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg
+                       border border-stone-300 bg-transparent hover:bg-stone-50 transition-colors
+                       cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ▶ Start polling
+            <PlayIcon className="w-4 h-4" />
+            Start polling
           </button>
           <button
             onClick={stopPolling}
             disabled={pollState === "idle"}
-            style={{
-              fontSize: 12,
-              padding: "6px 14px",
-              borderRadius: 6,
-              border: "1px solid #e7e5e4",
-              background: "transparent",
-              cursor: pollState !== "idle" ? "pointer" : "not-allowed",
-              opacity: pollState !== "idle" ? 1 : 0.5,
-              color: "#78716c",
-            }}
+            className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg
+                       border border-stone-200 bg-transparent text-stone-500 hover:bg-stone-50
+                       transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ■ Stop
+            <StopIcon className="w-4 h-4" />
+            Stop
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="flex items-center gap-4">
           {lastUpdated && (
-            <span
-              style={{
-                fontSize: 11,
-                color: "#78716c",
-                fontFamily: "monospace",
-              }}
-            >
+            <span className="text-sm text-stone-400 font-mono">
               {lastUpdated.toLocaleTimeString()}
             </span>
           )}
@@ -742,75 +618,43 @@ function OccupancyMap({ layout }) {
 
       <BEVMap layout={layout} status={status} onSpotClick={setSelectedSpot} />
 
-      <div
-        style={{
-          marginTop: 10,
-          display: "flex",
-          gap: 16,
-          fontSize: 11,
-          color: "#78716c",
-        }}
-      >
+      {/* Legend */}
+      <div className="flex gap-5 mt-3 text-sm text-stone-500 items-center">
         {[
           ["#1a7a4a", "Free"],
           ["#c0392b", "Occupied"],
           ["#e7e5e4", "Unknown"],
         ].map(([c, l]) => (
-          <span
-            key={l}
-            style={{ display: "flex", alignItems: "center", gap: 5 }}
-          >
+          <span key={l} className="flex items-center gap-2">
             <span
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                background: c,
-                display: "inline-block",
-              }}
+              className="inline-block w-3 h-3 rounded-sm"
+              style={{ background: c }}
             />
             {l}
           </span>
         ))}
-        <span style={{ marginLeft: "auto" }}>click a spot to select</span>
+        <span className="ml-auto text-sm">click a spot to select</span>
       </div>
 
+      {/* Selected spot panel */}
       {selectedSpot && status && (
         <div
-          style={{
-            marginTop: 12,
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: "1px solid #d4d0cb",
-            background: "#f5f5f4",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
+          className="mt-4 px-5 py-3.5 rounded-xl border border-stone-300 bg-stone-50
+                        flex justify-between items-center"
         >
-          <span style={{ fontFamily: "monospace", fontSize: 13 }}>
-            {selectedSpot}
-          </span>
+          <span className="font-mono text-base">{selectedSpot}</span>
           <span
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              color: status[selectedSpot] === "free" ? "#1a7a4a" : "#c0392b",
-            }}
+            className={`text-sm font-medium ${status[selectedSpot] === "free" ? "text-green-700" : "text-red-700"}`}
           >
             {status[selectedSpot] ?? "unknown"}
           </span>
           <button
             onClick={() => setSelectedSpot(null)}
-            style={{
-              fontSize: 11,
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "#78716c",
-            }}
+            className="flex items-center justify-center p-1 rounded text-stone-400
+                       hover:text-stone-600 bg-transparent border-none cursor-pointer"
+            aria-label="Dismiss"
           >
-            ✕
+            <Cross2Icon className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -818,10 +662,11 @@ function OccupancyMap({ layout }) {
   );
 }
 
-OccupancyMap.propTypes = {
-  layout: layoutShape,
-};
+OccupancyMap.propTypes = { layout: layoutShape };
 
+// ---------------------------------------------------------------------------
+// FindMyCar
+// ---------------------------------------------------------------------------
 function FindMyCar({ layout }) {
   const [step, setStep] = useState("idle");
   const [sessionId, setSessionId] = useState(null);
@@ -829,7 +674,7 @@ function FindMyCar({ layout }) {
   const [confidence, setConfidence] = useState(null);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); // eslint-disable-line no-unused-vars
   const fileRef = useRef();
 
   const handleFile = (e) => {
@@ -848,11 +693,9 @@ function FindMyCar({ layout }) {
     setError(null);
     await new Promise((r) => setTimeout(r, 1800));
     const result = await apiPost("/park", { filename: file?.name });
-    if (result?.session_id) {
-      setSessionId(result.session_id);
-    } else {
-      setSessionId("sess_" + Math.random().toString(36).slice(2, 8));
-    }
+    setSessionId(
+      result?.session_id ?? "sess_" + Math.random().toString(36).slice(2, 8),
+    );
     setStep("parked");
   };
 
@@ -882,276 +725,164 @@ function FindMyCar({ layout }) {
     setConfidence(null);
   };
 
-  if (!layout) {
+  if (!layout)
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "60px 0",
-          color: "#78716c",
-          fontSize: 13,
-        }}
-      >
+      <div className="text-center py-20 text-stone-500 text-base">
         No layout loaded. Go to <strong>Owner Setup</strong> first.
       </div>
     );
-  }
 
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        <div>
-          <p
-            style={{
-              fontSize: 13,
-              color: "#78716c",
-              margin: "0 0 14px",
-              lineHeight: 1.6,
-            }}
-          >
-            Take a photo from near where you parked. SIFT feature matching will
-            identify your spot.
-          </p>
+    <div className="grid grid-cols-2 gap-7">
+      {/* Left column */}
+      <div>
+        <p className="text-base text-stone-500 mb-4 leading-relaxed">
+          Take a photo from near where you parked. SIFT feature matching will
+          identify your spot.
+        </p>
 
-          <div
-            style={{
-              border: "1.5px dashed #d4d0cb",
-              borderRadius: 10,
-              overflow: "hidden",
-              cursor: "pointer",
-              minHeight: 150,
-              position: "relative",
-              background: "#f5f5f4",
-            }}
-            onClick={() => !foundSpot && fileRef.current?.click()}
-          >
-            {preview ? (
-              <img
-                src={preview}
-                alt="Your photo"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                }}
-              >
-                <span style={{ fontSize: 28 }}>🚗</span>
-                <span style={{ fontSize: 12, color: "#78716c" }}>
-                  Tap to take / upload photo
-                </span>
-              </div>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFile}
-              style={{ display: "none" }}
+        {/* Photo input */}
+        <div
+          className="border-2 border-dashed border-stone-300 rounded-2xl overflow-hidden cursor-pointer
+                     min-h-48 relative bg-stone-50 hover:border-stone-400 transition-colors"
+          onClick={() => !foundSpot && fileRef.current?.click()}
+        >
+          {preview ? (
+            <img
+              src={preview}
+              alt="Your photo"
+              className="w-full h-full object-cover block"
             />
-          </div>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <TokensIcon className="w-12 h-12 text-stone-400" />
+              <span className="text-sm text-stone-500">
+                Tap to take / upload photo
+              </span>
+            </div>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFile}
+            className="hidden"
+          />
+        </div>
 
-          <div
-            style={{
-              marginTop: 12,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            {(step === "idle" || step === "ready") && (
+        {/* Step buttons */}
+        <div className="mt-4 flex flex-col gap-3">
+          {(step === "idle" || step === "ready") && (
+            <button
+              onClick={park}
+              disabled={!file}
+              className="inline-flex items-center justify-center gap-2 py-3 rounded-xl
+                         border border-stone-400 bg-white text-sm font-medium hover:bg-stone-50
+                         transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              POST /park — find my spot
+              <ArrowRightIcon className="w-4 h-4" />
+            </button>
+          )}
+
+          {step === "matching" && (
+            <div className="flex items-center gap-3 py-3">
+              <Spinner />
+              <span className="text-sm text-stone-500">
+                Running SIFT localization…
+              </span>
+            </div>
+          )}
+
+          {step === "parked" && (
+            <>
+              <div className="px-4 py-3 rounded-xl bg-stone-100 text-sm font-mono">
+                session_id: <strong>{sessionId}</strong>
+              </div>
               <button
-                onClick={park}
-                disabled={!file}
-                style={{
-                  padding: "9px 0",
-                  borderRadius: 6,
-                  border: "1px solid #a8a29e",
-                  background: "#ffffff",
-                  cursor: file ? "pointer" : "not-allowed",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  opacity: file ? 1 : 0.45,
-                }}
+                onClick={find}
+                className="inline-flex items-center justify-center gap-2 py-3 rounded-xl
+                           border border-stone-300 bg-transparent text-sm hover:bg-stone-50
+                           transition-colors cursor-pointer"
               >
-                POST /park — find my spot →
+                GET /find/{sessionId}
+                <ArrowRightIcon className="w-4 h-4" />
               </button>
-            )}
-            {step === "matching" && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "9px 0",
-                }}
-              >
-                <div
-                  style={{
-                    width: 16,
-                    height: 16,
-                    border: "2px solid #d4d0cb",
-                    borderTopColor: "#1c1917",
-                    borderRadius: "50%",
-                    animation: "spin 0.8s linear infinite",
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ fontSize: 12, color: "#78716c" }}>
-                  Running SIFT localization…
-                </span>
-              </div>
-            )}
-            {step === "parked" && (
-              <>
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 6,
-                    background: "#f5f5f4",
-                    fontSize: 12,
-                    fontFamily: "monospace",
-                  }}
-                >
-                  session_id: <strong>{sessionId}</strong>
-                </div>
-                <button
-                  onClick={find}
-                  style={{
-                    padding: "9px 0",
-                    borderRadius: 6,
-                    border: "1px solid #d4d0cb",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: 13,
-                  }}
-                >
-                  GET /find/{sessionId} →
-                </button>
-              </>
-            )}
-            {step === "locating" && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "9px 0",
-                }}
-              >
-                <div
-                  style={{
-                    width: 16,
-                    height: 16,
-                    border: "2px solid #d4d0cb",
-                    borderTopColor: "#1c1917",
-                    borderRadius: "50%",
-                    animation: "spin 0.8s linear infinite",
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ fontSize: 12, color: "#78716c" }}>
-                  Querying backend…
-                </span>
-              </div>
-            )}
-            {step === "found" && (
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #e89600",
-                  background: "#e8960011",
-                }}
-              >
-                <p
-                  style={{
-                    margin: "0 0 4px",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "#7d5200",
-                  }}
-                >
-                  Your car:{" "}
-                  <span style={{ fontFamily: "monospace" }}>{foundSpot}</span>
+            </>
+          )}
+
+          {step === "locating" && (
+            <div className="flex items-center gap-3 py-3">
+              <Spinner />
+              <span className="text-sm text-stone-500">Querying backend…</span>
+            </div>
+          )}
+
+          {step === "found" && (
+            <>
+              <div className="px-4 py-4 rounded-xl border border-amber-400 bg-amber-50">
+                <p className="text-base font-medium text-amber-800 mb-1">
+                  Your car: <span className="font-mono">{foundSpot}</span>
                 </p>
-                <p style={{ margin: 0, fontSize: 11, color: "#7d5200" }}>
+                <p className="text-sm text-amber-700">
                   Confidence: {(confidence * 100).toFixed(0)}%
                 </p>
               </div>
-            )}
-            {step === "found" && (
               <button
                 onClick={reset}
-                style={{
-                  fontSize: 12,
-                  padding: "6px 0",
-                  borderRadius: 6,
-                  border: "1px solid #e7e5e4",
-                  background: "transparent",
-                  cursor: "pointer",
-                  color: "#78716c",
-                }}
+                className="text-sm py-2.5 rounded-xl border border-stone-200 bg-transparent
+                           text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
               >
                 New session
               </button>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <p style={{ fontSize: 12, color: "#78716c", margin: "0 0 8px" }}>
-            {step === "found"
-              ? "Your spot is highlighted below ↓"
-              : "Map will highlight your spot after matching"}
-          </p>
-          <BEVMap
-            layout={layout}
-            status={Object.fromEntries(
-              (layout?.spots ?? []).map((s) => [s.spot_id, "unknown"]),
-            )}
-            highlightSpot={foundSpot}
-            dimUnhighlighted={!!foundSpot}
-          />
-          {step === "found" && (
-            <p
-              style={{
-                fontSize: 11,
-                color: "#78716c",
-                marginTop: 6,
-                fontFamily: "monospace",
-              }}
-            >
-              amber = your car · GET /find/{sessionId}
-            </p>
+            </>
           )}
         </div>
+      </div>
+
+      {/* Right column — map */}
+      <div>
+        <p className="text-sm text-stone-500 mb-2.5 flex items-center gap-1.5">
+          {step === "found" ? (
+            <>
+              Your spot is highlighted below{" "}
+              <ArrowDownIcon className="w-4 h-4" />
+            </>
+          ) : (
+            <>
+              <ImageIcon className="w-4 h-4" /> Map will highlight your spot
+              after matching
+            </>
+          )}
+        </p>
+        <BEVMap
+          layout={layout}
+          status={Object.fromEntries(
+            (layout?.spots ?? []).map((s) => [s.spot_id, "unknown"]),
+          )}
+          highlightSpot={foundSpot}
+          dimUnhighlighted={!!foundSpot}
+        />
+        {step === "found" && (
+          <p className="text-xs text-stone-400 mt-2 font-mono">
+            amber = your car · GET /find/{sessionId}
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-FindMyCar.propTypes = {
-  layout: layoutShape,
-};
+FindMyCar.propTypes = { layout: layoutShape };
 
+// ---------------------------------------------------------------------------
+// Root App
+// ---------------------------------------------------------------------------
 const TABS = [
-  { id: "setup", label: "Owner setup", icon: "⚙" },
-  { id: "map", label: "Live occupancy", icon: "🅿" },
-  { id: "find", label: "Find my car", icon: "🔍" },
+  { id: "setup", label: "Owner setup", Icon: GearIcon },
+  { id: "map", label: "Live occupancy", Icon: UpdateIcon },
+  { id: "find", label: "Find my car", Icon: MagnifyingGlassIcon },
 ];
 
 export default function App() {
@@ -1159,79 +890,39 @@ export default function App() {
   const [layout, setLayout] = useState(null);
 
   return (
-    <div
-      style={{
-        fontFamily: "system-ui, sans-serif",
-        maxWidth: 700,
-        margin: "0 auto",
-        padding: "0 0 40px",
-      }}
-    >
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
-      <div
-        style={{
-          borderBottom: "1px solid #e7e5e4",
-          marginBottom: 24,
-          paddingBottom: 0,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: 8,
-            paddingBottom: 14,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 13,
-              fontFamily: "monospace",
-              fontWeight: 500,
-              color: "#1c1917",
-            }}
-          >
+    <div className="font-sans max-w-5xl mx-auto px-6 pb-14">
+      {/* Header */}
+      <div className="border-b border-stone-200 mb-8">
+        <div className="flex items-baseline gap-3 pb-4">
+          <span className="text-lg font-mono font-semibold text-stone-900">
             SmartParking
           </span>
-          <span
-            style={{ fontSize: 11, color: "#78716c", fontFamily: "monospace" }}
-          >
+          <span className="text-sm text-stone-400 font-mono">
             v6 · edge inference
           </span>
           {layout && (
-            <span
-              style={{
-                marginLeft: "auto",
-                fontSize: 11,
-                fontFamily: "monospace",
-                color: "#78716c",
-              }}
-            >
+            <span className="ml-auto text-sm font-mono text-stone-400">
               layout: {layout.spots.length} spots · {layout.spot_source}
             </span>
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 0 }}>
-          {TABS.map((t) => (
+        {/* Tab bar */}
+        <div className="flex">
+          {TABS.map(({ id, label, Icon }) => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                padding: "8px 16px",
-                fontSize: 13,
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                borderBottom:
-                  tab === t.id ? "2px solid #1c1917" : "2px solid transparent",
-                color: tab === t.id ? "#1c1917" : "#78716c",
-                fontWeight: tab === t.id ? 500 : 400,
-                transition: "color 0.15s",
-              }}
+              key={id}
+              onClick={() => setTab(id)}
+              className={[
+                "inline-flex items-center gap-2 px-5 py-3 text-sm border-b-2 transition-colors",
+                "cursor-pointer bg-transparent border-x-0 border-t-0",
+                tab === id
+                  ? "border-stone-900 text-stone-900 font-semibold"
+                  : "border-transparent text-stone-400 hover:text-stone-600",
+              ].join(" ")}
             >
-              {t.icon} {t.label}
+              <Icon className="w-4 h-4" />
+              {label}
             </button>
           ))}
         </div>
