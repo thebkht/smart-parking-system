@@ -38,8 +38,17 @@ class HistoryResponse(BaseModel):
 
 class SpotPolygon(BaseModel):
     spot_id: str
-    points: List[List[float]]   # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+    points: Optional[List[List[float]]] = None   # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+    corners: Optional[List[List[float]]] = None  # alias used by ML pipeline
     label: Optional[str] = None
+
+    def get_points(self) -> List[List[float]]:
+        """Return points regardless of whether corners or points was used."""
+        if self.points is not None:
+            return self.points
+        if self.corners is not None:
+            return self.corners
+        raise ValueError(f"Spot {self.spot_id!r} has neither points nor corners.")
 
 
 class LayoutPayload(BaseModel):
@@ -263,7 +272,7 @@ async def save_map(layout: LayoutPayload) -> dict:
                 points     = excluded.points,
                 created_at = excluded.created_at
             """,
-            (spot.spot_id, spot.label, json.dumps(spot.points), now),
+            (spot.spot_id, spot.label, json.dumps(spot.get_points()), now),
         )
 
     conn.commit()
