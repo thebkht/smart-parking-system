@@ -5,9 +5,9 @@ import sqlite3
 from asyncio import sleep
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Literal
+from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,10 @@ DB = Path("parking.db")
 LATEST_FRAME_PATH = Path("logs/latest_frame.jpg")
 _conn: sqlite3.Connection | None = None
 
+
+# ---------------------------------------------------------------------------
+# Pydantic models
+# ---------------------------------------------------------------------------
 
 class ParkingUpdate(BaseModel):
     spots: Dict[str, Literal["occupied", "free"]] = Field(default_factory=dict)
@@ -32,19 +36,90 @@ class HistoryResponse(BaseModel):
     items: List[HistoryItem]
 
 
+class SpotPolygon(BaseModel):
+    spot_id: str
+    points: Optional[List[List[float]]] = None   # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+    corners: Optional[List[List[float]]] = None  # alias used by ML pipeline
+    label: Optional[str] = None
+
+    def get_points(self) -> List[List[float]]:
+        """Return points regardless of whether corners or points was used."""
+        if self.points is not None:
+            return self.points
+        if self.corners is not None:
+            return self.corners
+        raise ValueError(f"Spot {self.spot_id!r} has neither points nor corners.")
+
+
+class LayoutPayload(BaseModel):
+    spots: List[SpotPolygon]
+    image_width: Optional[int] = None
+    image_height: Optional[int] = None
+
+
+class ParkSession(BaseModel):
+    spot_id: str
+    status: Literal["occupied", "free"]
+    timestamp: str
+    confidence: Optional[float] = None
+
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+
 def init_db(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
     global _conn
     if conn is None:
         conn = sqlite3.connect(DB, check_same_thread=False)
+
+    # Original table
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            payload TEXT NOT NULL,
-            recorded TEXT NOT NULL
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            payload   TEXT    NOT NULL,
+            recorded  TEXT    NOT NULL
         )
         """
     )
+
+    # NEW: parking lot layout (quad polygons)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS layout (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            data         TEXT    NOT NULL,
+            updated_at   TEXT    NOT NULL
+        )
+        """
+    )
+
+    # NEW: spot reference metadata
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS spot_references (
+            spot_id      TEXT    PRIMARY KEY,
+            label        TEXT,
+            points       TEXT    NOT NULL,
+            created_at   TEXT    NOT NULL
+        )
+        """
+    )
+
+    # NEW: parking sessions (car arrives / leaves)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS park_sessions (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            spot_id      TEXT    NOT NULL,
+            status       TEXT    NOT NULL,
+            confidence   REAL,
+            recorded_at  TEXT    NOT NULL
+        )
+        """
+    )
+
     conn.commit()
     _conn = conn
     return conn
@@ -60,6 +135,10 @@ def get_conn() -> sqlite3.Connection:
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+
+# ---------------------------------------------------------------------------
+# MJPEG stream helper
+# ---------------------------------------------------------------------------
 
 async def generate_mjpeg_stream(
     frame_path: Path = LATEST_FRAME_PATH,
@@ -97,13 +176,26 @@ async def generate_mjpeg_stream(
 init_db()
 
 
+# ---------------------------------------------------------------------------
+# Endpoints — original 5
+# ---------------------------------------------------------------------------
+
 @app.post("/update")
 async def update(payload: ParkingUpdate) -> dict:
     conn = get_conn()
+    # Log the update
     conn.execute(
         "INSERT INTO log (payload, recorded) VALUES (?, ?)",
         (payload.model_dump_json(), utc_now_iso()),
     )
+    # Also write a park_session row for each spot
+    now = utc_now_iso()
+    for spot_id, status in payload.spots.items():
+        confidence = payload.confidence.get(spot_id)
+        conn.execute(
+            "INSERT INTO park_sessions (spot_id, status, confidence, recorded_at) VALUES (?, ?, ?, ?)",
+            (spot_id, status, confidence, now),
+        )
     conn.commit()
     return {"status": "ok"}
 
@@ -111,7 +203,9 @@ async def update(payload: ParkingUpdate) -> dict:
 @app.get("/status")
 async def status() -> dict:
     conn = get_conn()
-    row = conn.execute("SELECT payload FROM log ORDER BY id DESC LIMIT 1").fetchone()
+    row = conn.execute(
+        "SELECT payload FROM log ORDER BY id DESC LIMIT 1"
+    ).fetchone()
     return json.loads(row[0]) if row else {}
 
 
@@ -123,7 +217,10 @@ async def history(limit: int = 100) -> HistoryResponse:
         (limit,),
     ).fetchall()
     items = [
-        HistoryItem(payload=ParkingUpdate(**json.loads(payload)), recorded_at=recorded)
+        HistoryItem(
+            payload=ParkingUpdate(**json.loads(payload)),
+            recorded_at=recorded,
+        )
         for payload, recorded in rows
     ]
     return HistoryResponse(items=items)
@@ -146,3 +243,75 @@ async def stream() -> StreamingResponse:
             "Access-Control-Allow-Origin": "*",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# NEW Endpoints — /map and /sessions
+# ---------------------------------------------------------------------------
+
+@app.post("/map")
+async def save_map(layout: LayoutPayload) -> dict:
+    """Save the parking lot layout (quad polygons for each spot)."""
+    conn = get_conn()
+    now = utc_now_iso()
+
+    # Save full layout snapshot
+    conn.execute(
+        "INSERT INTO layout (data, updated_at) VALUES (?, ?)",
+        (layout.model_dump_json(), now),
+    )
+
+    # Upsert each spot into spot_references
+    for spot in layout.spots:
+        conn.execute(
+            """
+            INSERT INTO spot_references (spot_id, label, points, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(spot_id) DO UPDATE SET
+                label      = excluded.label,
+                points     = excluded.points,
+                created_at = excluded.created_at
+            """,
+            (spot.spot_id, spot.label, json.dumps(spot.get_points()), now),
+        )
+
+    conn.commit()
+    return {"status": "ok", "spots_saved": len(layout.spots)}
+
+
+@app.get("/map")
+async def get_map() -> dict:
+    """Return the latest parking lot layout with quad polygons."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT data, updated_at FROM layout ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="No layout found. POST /map first.")
+
+    data = json.loads(row[0])
+    data["updated_at"] = row[1]
+    return data
+
+
+@app.get("/sessions")
+async def get_sessions(spot_id: Optional[str] = None, limit: int = 100) -> dict:
+    """Return recent parking sessions, optionally filtered by spot_id."""
+    conn = get_conn()
+    if spot_id:
+        rows = conn.execute(
+            "SELECT spot_id, status, confidence, recorded_at FROM park_sessions WHERE spot_id=? ORDER BY id DESC LIMIT ?",
+            (spot_id, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT spot_id, status, confidence, recorded_at FROM park_sessions ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+
+    sessions = [
+        {"spot_id": r[0], "status": r[1], "confidence": r[2], "recorded_at": r[3]}
+        for r in rows
+    ]
+    return {"sessions": sessions, "count": len(sessions)}

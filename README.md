@@ -95,18 +95,18 @@ Key points:
 
 **Week 5**
 
-- [ ] Refactor `detect.py` to load quad polygon ROIs from `GET /map` at startup — no hardcoded `FIXED_ROIS`
-- [ ] Add temporal smoothing (majority vote over N frames)
-- [ ] Implement all 7 FastAPI endpoints + full SQLite schema (`log`, `layout`, `spot_references`, `park_sessions`)
-- [ ] FPS benchmark: pre-trained classifier at `128×128` on MPS and CPU
+- [x] Refactor `detect.py` to load quad polygon ROIs from `GET /map` at startup — no hardcoded `FIXED_ROIS`
+- [x] Add temporal smoothing (majority vote over N frames)
+- [x] Implement all 7 FastAPI endpoints + full SQLite schema (`log`, `layout`, `spot_references`, `park_sessions`)
+- [x] FPS benchmark: pre-trained classifier at `128×128` on MPS and CPU
 
 **Week 6**
 
-- [ ] Integrate `acpds_cls/weights/best.pt` from [@thebkht](https://github.com/thebkht) into `detect.py`
-- [ ] Full pipeline end-to-end: camera → Stage 1 → warp → Stage 2 → JSON → API
-- [ ] FPS benchmark across all backends: MPS / CPU / ONNX FP32 / ONNX INT8
-- [ ] Bandwidth measurement and comparison vs H.264 streaming
-- [ ] Write System Architecture and Inference Pipeline sections of report
+- [x] Integrate `acpds_cls/weights/best.pt` from [@thebkht](https://github.com/thebkht) into `detect.py`
+- [x] Full pipeline end-to-end: camera → Stage 1 → warp → Stage 2 → JSON → API
+- [x] FPS benchmark across all backends: MPS / CPU / ONNX FP32 / ONNX INT8
+- [x] Bandwidth measurement and comparison vs H.264 streaming
+- [x] Write System Architecture and Inference Pipeline sections of report
 
 **Week 7**
 
