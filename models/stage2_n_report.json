@@ -19,34 +19,13 @@
     "dropout": 0.1,
     "cos_lr": true
   },
-  "train_time_s": 165.59,
+  "train_time_s": 544.49,
   "best_ckpt": "runs/acpds_cls/yolov8n_stage2/weights/best.pt",
   "last_ckpt": "runs/acpds_cls/yolov8n_stage2/weights/last.pt",
-  "actual_run_dir": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/acpds_cls/yolov8n_stage2",
+  "actual_run_dir": "/Users/thebkht/Projects/smart-parking-system/runs/classify/runs/acpds_cls/yolov8n_stage2-2",
   "expected_run_dir": "runs/acpds_cls/yolov8n_stage2",
   "selected_ckpt": "runs/acpds_cls/yolov8n_stage2/weights/best.pt",
   "promoted_ckpt": "acpds_cls/weights/best.pt",
-  "top1_accuracy": 0.8499062061309814,
-  "top5_accuracy": 1.0,
-  "test_evaluation": {
-    "dataset": "acpds_stage2/test",
-    "threshold": 0.5,
-    "top1_accuracy": 0.8678,
-    "precision": 0.9693,
-    "recall": 0.6972,
-    "f1": 0.811,
-    "sample_count": 779,
-    "support_free": 462,
-    "support_occupied": 317,
-    "confusion_matrix": [
-      [
-        455,
-        7
-      ],
-      [
-        96,
-        221
-      ]
-    ]
-  }
+  "top1_accuracy": 0.9826680421829224,
+  "top5_accuracy": 1.0
 }

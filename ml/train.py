@@ -170,6 +170,11 @@ def _checkpoint_paths(project_dir: str, run_name: str) -> tuple[Path, Path]:
     return weights_dir / "best.pt", weights_dir / "last.pt"
 
 
+def _checkpoint_paths_for_run_dir(run_dir: Path) -> tuple[Path, Path]:
+    weights_dir = run_dir / "weights"
+    return weights_dir / "best.pt", weights_dir / "last.pt"
+
+
 def _existing_checkpoint(best_ckpt: Path, last_ckpt: Path) -> Path | None:
     if best_ckpt.exists():
         return best_ckpt
@@ -500,8 +505,9 @@ def main() -> None:
     actual_run_dir = Path(str(getattr(results, "save_dir", expected_run_dir)))
     _sync_run_outputs(actual_run_dir, expected_run_dir)
 
-    best_ckpt, last_ckpt = _checkpoint_paths(defaults["project_dir"], defaults["run_name"])
+    best_ckpt, last_ckpt = _checkpoint_paths_for_run_dir(actual_run_dir)
     selected_ckpt = _existing_checkpoint(best_ckpt, last_ckpt)
+    synced_best_ckpt, synced_last_ckpt = _checkpoint_paths(defaults["project_dir"], defaults["run_name"])
     metric_report = extract_metrics(defaults["task"], results)
     promoted_ckpt = None
     if defaults["track"] == "stage2" and should_promote_stage2(args):
@@ -534,6 +540,8 @@ def main() -> None:
         "last_ckpt": str(last_ckpt),
         "actual_run_dir": str(actual_run_dir),
         "expected_run_dir": str(expected_run_dir),
+        "synced_best_ckpt": str(synced_best_ckpt),
+        "synced_last_ckpt": str(synced_last_ckpt),
         "selected_ckpt": str(selected_ckpt) if selected_ckpt else None,
         "promoted_ckpt": str(promoted_ckpt) if promoted_ckpt else None,
         **metric_report,
@@ -542,6 +550,8 @@ def main() -> None:
     print(f"\nTraining complete ({elapsed:.0f}s)")
     print(f"Best checkpoint : {best_ckpt}")
     print(f"Last checkpoint : {last_ckpt}")
+    if actual_run_dir != expected_run_dir:
+        print(f"Synced alias    : {synced_best_ckpt}")
     if selected_ckpt:
         print(f"Selected ckpt  : {selected_ckpt}")
     else:
