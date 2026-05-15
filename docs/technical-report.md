@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This project implements a two-stage smart parking system that performs inference on an edge device rather than streaming raw video to the cloud. The deployed pipeline uses a Stage 1 YOLO parking-space detector to localize parking spaces in full-frame images, then applies a Stage 2 YOLOv8 classification model to cropped space patches to predict `free` or `occupied`. The system outputs compact JSON payloads and stores them through a minimal FastAPI backend. In the checked-in Week 6 comparison set, the Stage 1 detector achieved up to 0.995 mAP@50 on a scene-held-out validation split, while the best observed Stage 2 test accuracy was 0.8768 with `yolov8s-cls` at threshold 0.5. The Week 6 export bundle for the promoted `yolov8n-cls` checkpoint produced `best.onnx`, `best_int8.onnx`, and `best.mlpackage` artifacts, each materially smaller than raw video streaming. Compared with a conservative 1080p H.264 camera stream, the JSON reporting path reduced bandwidth by 99.9%.
+This project implements a two-stage smart parking system that performs inference on an edge device rather than streaming raw video to the cloud. The deployed pipeline uses a Stage 1 YOLO parking-space detector to localize parking spaces in full-frame images, then applies a Stage 2 YOLOv8 classification model to cropped space patches to predict `free` or `occupied`. The system outputs compact JSON payloads and stores them through a minimal FastAPI backend. In the checked-in Week 6 comparison set, the Stage 1 detector achieved up to 0.995 mAP@50 on a scene-held-out validation split, while the promoted `yolov8n-cls` checkpoint remained the best Stage 2 test model at 0.9772 accuracy and 0.9715 F1 at threshold 0.5. The Week 6 export bundle for the promoted `yolov8n-cls` checkpoint produced `best.onnx`, `best_int8.onnx`, and `best.mlpackage` artifacts, each materially smaller than raw video streaming. Compared with a conservative 1080p H.264 camera stream, the JSON reporting path reduced bandwidth by 99.9%.
 
 ## 1. Introduction
 
@@ -173,14 +173,14 @@ Stage 2 uses YOLOv8 classification models trained on cropped parking-spot patche
 
 | Model | Split | Accuracy | Precision | Recall | F1 | Size (MB) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `yolov8n_stage2` | Val | 0.8499 | 0.9258 | 0.7170 | 0.8082 | 2.83 |
-| `yolov8s_stage2` | Val | 0.8602 | 0.9707 | 0.7043 | 0.8163 | 9.78 |
-| `yolov8m_stage2` | Val | 0.8537 | 0.9435 | 0.7106 | 0.8107 | 30.22 |
-| `yolov8n_stage2` | Test | 0.8678 | 0.9693 | 0.6972 | 0.8110 | 2.83 |
-| `yolov8s_stage2` | Test | 0.8768 | 0.9955 | 0.7003 | 0.8222 | 9.78 |
-| `yolov8m_stage2` | Test | 0.8742 | 0.9660 | 0.7161 | 0.8225 | 30.22 |
+| `yolov8n_stage2` | Val | 0.9827 | 0.9784 | 0.9819 | 0.9802 | 2.83 |
+| `yolov8s_stage2` | Val | 0.9816 | 0.9727 | 0.9856 | 0.9791 | 9.78 |
+| `yolov8m_stage2` | Val | 0.9795 | 0.9670 | 0.9868 | 0.9768 | 30.22 |
+| `yolov8n_stage2` | Test | 0.9772 | 0.9864 | 0.9570 | 0.9715 | 2.83 |
+| `yolov8s_stage2` | Test | 0.9691 | 0.9745 | 0.9488 | 0.9615 | 9.78 |
+| `yolov8m_stage2` | Test | 0.9738 | 0.9846 | 0.9504 | 0.9672 | 30.22 |
 
-The important result is that increasing model size did not close the gap to the original 98% target. `yolov8s-cls` produced the best test accuracy, while `yolov8m-cls` only improved F1 by 0.0003 over `s` despite being roughly three times larger. This suggests that Stage 2 patch quality is a stronger bottleneck than classifier capacity.
+The important result is that increasing model size did not improve the deployed handoff checkpoint. The promoted `yolov8n-cls` model remained best on both validation and test accuracy while also being the smallest artifact, which points away from classifier capacity as the main bottleneck. The more likely limitation is Stage 2 patch quality: partial vehicles, thick border regions after the perspective warp, low-information crops, and some label ambiguity.
 
 ## 6. Evaluation Results
 
@@ -188,11 +188,11 @@ The important result is that increasing model size did not close the gap to the 
 
 Because the deployed edge path converts classifier probability into a binary occupancy decision, threshold selection matters, but the Week 6 comparison already shows a broader issue: the default-threshold results plateau well below the target regardless of model size.
 
-- Best validation accuracy: `0.8602` with `yolov8s_stage2`
-- Best test accuracy: `0.8768` with `yolov8s_stage2`
-- Best test F1: `0.8225` with `yolov8m_stage2`
+- Best validation accuracy: `0.9827` with `yolov8n_stage2`
+- Best test accuracy: `0.9772` with `yolov8n_stage2`
+- Best test F1: `0.9715` with `yolov8n_stage2`
 
-The accuracy spread between `n`, `s`, and `m` is small. That pattern is consistent with a data-quality bottleneck rather than an underpowered classifier.
+The accuracy spread between `n`, `s`, and `m` is small, and the smallest model actually leads the comparison. That pattern is consistent with a data-quality bottleneck rather than an underpowered classifier.
 
 ### 6.2 Cross-dataset evaluation
 
@@ -284,7 +284,7 @@ The project achieved its main system goal: a working two-stage edge pipeline tha
 
 The main limitations are also clear.
 
-First, the Stage 2 classifier did not achieve the original 98% target. Even the best Week 6 result, `yolov8s-cls` at 0.8768 test accuracy, remains far below that goal. Second, the small spread across `n`, `s`, and `m` implies that increasing model capacity is not the main lever. The more likely limiting factor is patch quality: partial vehicles, heavy black borders, low-information crops, and label ambiguity. Third, the saved stability test is short; a longer 30-minute or multi-hour soak test would provide stronger reliability evidence.
+First, the Stage 2 classifier still did not exceed the original 98% target on the checked-in test split. The best Week 6 result is the promoted `yolov8n-cls` checkpoint at 0.9772 test accuracy, which is close but still below that goal. Second, the small spread across `n`, `s`, and `m`, combined with `n` leading both accuracy and artifact size, implies that increasing model capacity is not the main lever. The more likely limiting factor is patch quality: partial vehicles, heavy black borders, low-information crops, and label ambiguity. Third, the saved stability test is short; a longer 30-minute or multi-hour soak test would provide stronger reliability evidence.
 
 ## 9. Conclusion
 

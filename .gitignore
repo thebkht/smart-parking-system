@@ -37,7 +37,7 @@ downloads/
 .idea/
 .vscode/
 
-datasets/
+datasets/*
 
 # Exact Week 5 handoff artifacts that must stay trackable
 !acpds_cls/

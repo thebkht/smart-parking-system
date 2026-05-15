@@ -36,6 +36,7 @@ import cv2
 import numpy as np
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
+IGNORED_REFERENCE_DIR_NAMES = {"query_candidates", "unlabeled_pool", "__pycache__"}
 
 
 @dataclass(frozen=True)
@@ -141,23 +142,38 @@ def reference_images_for_value(spot_id: str, image_values: Any, base_dir: Path) 
 
 def discover_reference_directory(root: Path) -> list[ReferenceImage]:
     references: list[ReferenceImage] = []
-    subdirs = [path for path in sorted(root.iterdir()) if path.is_dir()]
-    if subdirs:
-        for subdir in subdirs:
-            for image_path in iter_image_paths(subdir):
-                references.append(ReferenceImage(spot_id=subdir.name, image_path=image_path.resolve()))
-        if references:
-            return references
+    direct_images = list(iter_image_paths(root))
+    if direct_images:
+        for image_path in direct_images:
+            stem = image_path.stem
+            if "__" in stem:
+                spot_id = stem.split("__", 1)[0]
+            else:
+                spot_id = stem
+            references.append(ReferenceImage(spot_id=spot_id, image_path=image_path.resolve()))
+        return references
 
-    for image_path in iter_image_paths(root):
-        stem = image_path.stem
-        if "__" in stem:
-            spot_id = stem.split("__", 1)[0]
-        else:
-            spot_id = stem
-        references.append(ReferenceImage(spot_id=spot_id, image_path=image_path.resolve()))
+    for subdir in sorted(path for path in root.iterdir() if path.is_dir()):
+        references.extend(discover_references_from_subdir(subdir))
     if not references:
         raise SystemExit(f"No reference images found in {root}")
+    return references
+
+
+def discover_references_from_subdir(root: Path) -> list[ReferenceImage]:
+    if root.name in IGNORED_REFERENCE_DIR_NAMES:
+        return []
+
+    direct_images = list(iter_image_paths(root))
+    if direct_images:
+        return [
+            ReferenceImage(spot_id=root.name, image_path=image_path.resolve())
+            for image_path in direct_images
+        ]
+
+    references: list[ReferenceImage] = []
+    for subdir in sorted(path for path in root.iterdir() if path.is_dir()):
+        references.extend(discover_references_from_subdir(subdir))
     return references
 
 

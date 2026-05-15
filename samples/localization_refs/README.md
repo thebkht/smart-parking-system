@@ -41,3 +41,5 @@ Example command:
 ```bash
 make localize-car LOCALIZE_ARGS="--query samples/localization_refs/query_candidates/photo_2026-04-23_21.29.43.jpeg --references samples/localization_refs --output logs/localize_result.json"
 ```
+
+When `--references` points at the workspace root, localization only uses labeled spot folders and ignores helper directories such as `query_candidates/` and `unlabeled_pool/`.
