@@ -252,16 +252,20 @@ async def stream() -> StreamingResponse:
 @app.post("/map")
 async def save_map(layout: LayoutPayload) -> dict:
     """Save the parking lot layout (quad polygons for each spot)."""
+    # Validate ALL spots first before touching the database
+    for spot in layout.spots:
+        try:
+            spot.get_points()
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
     conn = get_conn()
     now = utc_now_iso()
 
-    # Save full layout snapshot
     conn.execute(
         "INSERT INTO layout (data, updated_at) VALUES (?, ?)",
         (layout.model_dump_json(), now),
     )
-
-    # Upsert each spot into spot_references
     for spot in layout.spots:
         conn.execute(
             """
@@ -274,10 +278,8 @@ async def save_map(layout: LayoutPayload) -> dict:
             """,
             (spot.spot_id, spot.label, json.dumps(spot.get_points()), now),
         )
-
     conn.commit()
     return {"status": "ok", "spots_saved": len(layout.spots)}
-
 
 @app.get("/map")
 async def get_map() -> dict:
