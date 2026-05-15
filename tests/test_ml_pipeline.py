@@ -224,6 +224,45 @@ def test_prepare_stage1_excludes_empty_label_frames(tmp_path):
     assert report["leakage_checks"]["scene_leakage_detected"] is False
 
 
+def test_extract_patches_normalize_corners_returns_consistent_winding():
+    corners = [
+        [1377.4720458984375, 1250.155029296875],
+        [1123.4720458984375, 1446.155029296875],
+        [831.3809814453125, 1076.074951171875],
+        [1039.2900390625, 942.802001953125],
+    ]
+
+    ordered = np.asarray(extract_patches.normalize_corners(corners), dtype=np.float32)
+
+    assert ordered.shape == (4, 2)
+    assert len(np.unique(ordered, axis=0)) == 4
+    assert cv2.contourArea(ordered) > 1.0
+    assert np.argmin(ordered.sum(axis=1)) == 0
+    assert np.argmax(ordered.sum(axis=1)) == 2
+
+
+def test_extract_patches_warp_patch_preserves_non_uniform_roi():
+    image = np.zeros((1600, 1600, 3), dtype=np.uint8)
+    for y in range(image.shape[0]):
+        image[y, :, 0] = y % 251
+    for x in range(image.shape[1]):
+        image[:, x, 1] = x % 239
+    image[:, :, 2] = (image[:, :, 0] // 2) + (image[:, :, 1] // 3)
+
+    corners = [
+        [1377.4720458984375, 1250.155029296875],
+        [1123.4720458984375, 1446.155029296875],
+        [831.3809814453125, 1076.074951171875],
+        [1039.2900390625, 942.802001953125],
+    ]
+
+    patch = extract_patches.warp_patch(image, corners, size=128)
+
+    assert patch.shape == (128, 128, 3)
+    assert not extract_patches.is_uniform_patch(patch)
+    assert len(np.unique(patch.reshape(-1, 3), axis=0)) > 100
+
+
 def test_collect_roboflow_patches_uses_polygon_boxes(tmp_path):
     root = tmp_path / "pklot"
     make_image(root / "train" / "images" / "parking_lot_1_mp4-0_jpg.rf.aaaa.jpg", 128)
@@ -427,6 +466,22 @@ def test_train_stage2_accuracy_defaults(monkeypatch, tmp_path):
     assert defaults["patience"] == train.STAGE2_PATIENCE
     assert defaults["dropout"] == 0.1
     assert defaults["cos_lr"] is True
+
+
+def test_stage2_promotion_defaults_to_n_only(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["train.py", "--stage2", "--variant", "n"])
+    n_args = train.parse_args()
+    assert train.should_promote_stage2(n_args) is True
+
+    monkeypatch.setattr(sys, "argv", ["train.py", "--stage2", "--variant", "s"])
+    s_args = train.parse_args()
+    assert train.should_promote_stage2(s_args) is False
+
+
+def test_stage2_promotion_can_be_forced_for_non_n_variant(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["train.py", "--stage2", "--variant", "m", "--promote-stage2"])
+    args = train.parse_args()
+    assert train.should_promote_stage2(args) is True
 
 
 def test_order_corners_normalizes_shuffled_quad():

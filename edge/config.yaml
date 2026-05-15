@@ -1,5 +1,5 @@
 model:
-  stage2_path: artifacts/models/best.mlpackage
+  stage2_path: acpds_cls/weights/best.pt  
   device: mps
 stage1:
   imgsz: 1280

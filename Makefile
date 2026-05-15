@@ -24,6 +24,7 @@ STAGE1_VARIANT ?= s
 STAGE2_VARIANT ?= n
 STAGE1_WEIGHTS ?= runs/stage1_det/yolov8$(STAGE1_VARIANT)_stage1/weights/best.pt
 STAGE2_WEIGHTS ?= acpds_cls/weights/best.pt
+STAGE2_SPLIT ?= val
 BENCHMARK_IMAGE ?= samples/demo.jpg
 BENCHMARK_ROI ?= 50 100 200 250
 BACKEND_HOST ?= 127.0.0.1
@@ -41,6 +42,9 @@ EVALUATE_STAGE2_ARGS ?=
 COMPARE_STAGE2_ARGS ?=
 SWEEP_STAGE2_ARGS ?=
 EXPORT_STAGE2_ARGS ?=
+EXPORT_EVAL_DEVICE ?= cpu
+LOCALIZE_ARGS ?=
+WEEK6_LOG_DIR ?= logs/week6
 STABILITY_DURATION ?= 1800
 STABILITY_ARGS ?=
 
@@ -49,6 +53,7 @@ STABILITY_ARGS ?=
 	train-stage1 train-stage2 train-stage2-all \
 	evaluate-stage1 evaluate-stage2 compare-stage2 sweep-stage2 \
 	export-stage2 benchmark-stage2 bandwidth stability test lint finalize \
+	localize-car week6-stage2 week6-export \
 	backend edge predict
 
 check-python:
@@ -90,13 +95,13 @@ evaluate-stage1:
 	$(VENV_PYTHON) ml/evaluate.py --stage1 --weights $(STAGE1_WEIGHTS) --split val --device $(DEVICE) $(EVALUATE_STAGE1_ARGS)
 
 evaluate-stage2:
-	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights $(STAGE2_WEIGHTS) --split val --device $(DEVICE) $(EVALUATE_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights $(STAGE2_WEIGHTS) --split $(STAGE2_SPLIT) --device $(DEVICE) $(EVALUATE_STAGE2_ARGS)
 
 compare-stage2:
-	$(VENV_PYTHON) ml/evaluate.py --stage2 --split val --device $(DEVICE) --compare \
-		runs/stage2_cls/yolov8n_stage2/weights/best.pt \
-		runs/stage2_cls/yolov8s_stage2/weights/best.pt \
-		runs/stage2_cls/yolov8m_stage2/weights/best.pt \
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --split $(STAGE2_SPLIT) --device $(DEVICE) --compare \
+		runs/acpds_cls/yolov8n_stage2/weights/best.pt \
+		runs/acpds_cls/yolov8s_stage2/weights/best.pt \
+		runs/acpds_cls/yolov8m_stage2/weights/best.pt \
 		$(COMPARE_STAGE2_ARGS)
 
 sweep-stage2:
@@ -104,6 +109,32 @@ sweep-stage2:
 
 export-stage2:
 	$(VENV_PYTHON) ml/export.py --weights $(STAGE2_WEIGHTS) --imgsz 128 $(EXPORT_STAGE2_ARGS)
+
+localize-car:
+	$(VENV_PYTHON) ml/localize.py $(LOCALIZE_ARGS)
+
+week6-stage2:
+	$(VENV_PYTHON) ml/train.py --stage2 --variant s --device $(DEVICE) $(TRAIN_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8s_stage2/weights/best.pt --split val --device $(DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_s_val.json $(EVALUATE_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8s_stage2/weights/best.pt --split test --device $(DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_s_test.json $(EVALUATE_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/train.py --stage2 --variant m --device $(DEVICE) $(TRAIN_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8m_stage2/weights/best.pt --split val --device $(DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_m_val.json $(EVALUATE_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8m_stage2/weights/best.pt --split test --device $(DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_m_test.json $(EVALUATE_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --split val --device $(DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_compare_val.json --compare \
+		acpds_cls/weights/best.pt \
+		runs/acpds_cls/yolov8s_stage2/weights/best.pt \
+		runs/acpds_cls/yolov8m_stage2/weights/best.pt \
+		$(COMPARE_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --split test --device $(DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_compare_test.json --compare \
+		acpds_cls/weights/best.pt \
+		runs/acpds_cls/yolov8s_stage2/weights/best.pt \
+		runs/acpds_cls/yolov8m_stage2/weights/best.pt \
+		$(COMPARE_STAGE2_ARGS)
+
+week6-export:
+	$(VENV_PYTHON) ml/export.py --weights acpds_cls/weights/best.pt --imgsz 128 --summary-json artifacts/models/export_summary.json $(EXPORT_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split val --device $(EXPORT_EVAL_DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_export_onnx_val.json $(EVALUATE_STAGE2_ARGS)
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split test --device $(EXPORT_EVAL_DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_export_onnx_test.json $(EVALUATE_STAGE2_ARGS)
 
 benchmark-stage2:
 	$(VENV_PYTHON) edge/benchmark.py \

@@ -1,0 +1,9 @@
+{
+  "spot_1": [
+    "spot_1/ref_1.jpg",
+    "spot_1/ref_2.jpg"
+  ],
+  "spot_2": [
+    "spot_2/ref_1.jpg"
+  ]
+}

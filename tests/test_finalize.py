@@ -145,3 +145,14 @@ def test_best_csv_row_selects_highest_metric(tmp_path):
     row = finalize.best_csv_row(csv_path, "f1")
 
     assert row == {"model": "a", "f1": "0.92", "threshold": "0.1"}
+
+
+def test_collect_checkpoints_prefers_acpds_stage2_layout(tmp_path):
+    checkpoint = tmp_path / "runs" / "acpds_cls" / "yolov8s_stage2" / "weights" / "best.pt"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_bytes(b"pt")
+
+    manifest = finalize.collect_checkpoints(tmp_path / "runs", tmp_path / "artifacts")
+
+    assert manifest["stage2"]["s"]["present"] is True
+    assert manifest["stage2"]["s"]["path"].endswith("runs/acpds_cls/yolov8s_stage2/weights/best.pt")

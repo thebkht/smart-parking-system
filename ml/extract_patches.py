@@ -63,13 +63,11 @@ def order_corners(corners: Any) -> np.ndarray:
     if hull.shape != (4, 2):
         raise ValueError("corners must form a convex quadrilateral")
 
-    sums = hull.sum(axis=1)
-    diffs = hull[:, 1] - hull[:, 0]
-    tl = hull[np.argmin(sums)]
-    br = hull[np.argmax(sums)]
-    tr = hull[np.argmin(diffs)]
-    bl = hull[np.argmax(diffs)]
-    ordered = np.array([tl, tr, br, bl], dtype=np.float32)
+    center = hull.mean(axis=0)
+    angles = np.arctan2(hull[:, 1] - center[1], hull[:, 0] - center[0])
+    ordered = hull[np.argsort(angles)]
+    start = int(np.argmin(ordered.sum(axis=1)))
+    ordered = np.roll(ordered, -start, axis=0).astype(np.float32)
 
     if _has_self_intersection(ordered):
         raise ValueError("corners produce a self-crossing quadrilateral")
@@ -101,6 +99,13 @@ def warp_patch(image: np.ndarray, corners: Any, size: int = 128) -> np.ndarray:
     dst = np.array([[0, 0], [size - 1, 0], [size - 1, size - 1], [0, size - 1]], dtype=np.float32)
     matrix = cv2.getPerspectiveTransform(ordered, dst)
     return cv2.warpPerspective(image, matrix, (size, size))
+
+
+def is_uniform_patch(patch: np.ndarray) -> bool:
+    if patch.size == 0:
+        return True
+    flattened = patch.reshape(-1, patch.shape[-1]) if patch.ndim == 3 else patch.reshape(-1, 1)
+    return bool(np.all(flattened == flattened[0]))
 
 
 def _resolve_manifest_path(dataset_root: Path, manifest: str | None) -> Path:
@@ -173,16 +178,11 @@ def normalize_manifest_item(item: dict[str, Any], dataset_root: Path) -> dict[st
 
 
 def normalize_corners(corners: Any) -> list[list[float]]:
-    try:
-        pts = np.asarray(corners, dtype=np.float32)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("corners must be numeric [x, y] pairs") from exc
-    if pts.shape != (4, 2):
-        raise ValueError("corners must contain exactly four [x, y] points")
-    unique = np.unique(pts, axis=0)
-    if len(unique) != 4:
-        raise ValueError("corners must not contain duplicate points")
-    return pts.tolist()
+    # The ACPDS author code expects each ROI to be a quadrilateral whose
+    # four points are ordered consistently around the polygon. We canonicalize
+    # incoming corners to a stable TL,TR,BR,BL winding here so later warps and
+    # any downstream ROI-grid logic operate on the same contract.
+    return order_corners(corners).tolist()
 
 
 def build_patch_filename(entry: dict[str, Any]) -> str:
@@ -205,6 +205,7 @@ def extract_dataset(
     source_images = {split: set() for split in VALID_SPLITS}
     invalid_polygons: list[dict[str, Any]] = []
     missing_images: list[str] = []
+    uniform_patches: list[dict[str, Any]] = []
     patch_index: list[dict[str, Any]] = []
 
     for entry in entries:
@@ -222,6 +223,16 @@ def extract_dataset(
             patch = warp_patch(frame, entry["corners"], size=size)
         except ValueError as exc:
             invalid_polygons.append({"image": entry["image"], "spot_id": entry["spot_id"], "error": str(exc)})
+            continue
+        if is_uniform_patch(patch):
+            uniform_patches.append(
+                {
+                    "image": entry["image"],
+                    "spot_id": entry["spot_id"],
+                    "split": entry["split"],
+                    "label": entry["label"],
+                }
+            )
             continue
 
         split = str(entry["split"])
@@ -249,6 +260,8 @@ def extract_dataset(
         "counts": counts,
         "invalid_polygons_skipped": len(invalid_polygons),
         "invalid_polygons": invalid_polygons,
+        "uniform_patches_skipped": len(uniform_patches),
+        "uniform_patches": uniform_patches,
         "missing_images": sorted(set(missing_images)),
         "unique_source_images": {split: len(paths) for split, paths in source_images.items()},
         "patch_size": {"width": size, "height": size},
@@ -313,7 +326,7 @@ def validate_patches(
         target = validation_dir / f"{index:02d}__{src.name}"
         shutil.copy2(src, target)
         patch = cv2.imread(str(src), cv2.IMREAD_GRAYSCALE)
-        blank_like = bool(patch is not None and float(np.std(patch)) < 1.0)
+        blank_like = bool(patch is not None and is_uniform_patch(patch))
         report_items.append(
             {
                 "source_image": item["image"],

@@ -93,6 +93,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mixup", type=float, default=0.0)
     parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--cos-lr", action="store_true")
+    parser.add_argument(
+        "--promote-stage2",
+        action="store_true",
+        default=None,
+        help="Force Stage 2 checkpoint promotion to acpds_cls/weights/best.pt.",
+    )
+    parser.add_argument(
+        "--no-promote-stage2",
+        action="store_false",
+        dest="promote_stage2",
+        help="Skip Stage 2 checkpoint promotion after training.",
+    )
     return parser.parse_args()
 
 
@@ -155,6 +167,11 @@ def _state_dict_is_finite(state_dict: dict[str, object]) -> bool:
 
 def _checkpoint_paths(project_dir: str, run_name: str) -> tuple[Path, Path]:
     weights_dir = Path(project_dir) / run_name / "weights"
+    return weights_dir / "best.pt", weights_dir / "last.pt"
+
+
+def _checkpoint_paths_for_run_dir(run_dir: Path) -> tuple[Path, Path]:
+    weights_dir = run_dir / "weights"
     return weights_dir / "best.pt", weights_dir / "last.pt"
 
 
@@ -423,6 +440,14 @@ def promote_stage2_checkpoint(checkpoint_path: Path, destination: str) -> Path:
     return destination_path
 
 
+def should_promote_stage2(args: argparse.Namespace) -> bool:
+    if not args.stage2:
+        return False
+    if args.promote_stage2 is not None:
+        return bool(args.promote_stage2)
+    return args.variant == "n"
+
+
 def main() -> None:
     args = parse_args()
     _check_version()
@@ -480,11 +505,12 @@ def main() -> None:
     actual_run_dir = Path(str(getattr(results, "save_dir", expected_run_dir)))
     _sync_run_outputs(actual_run_dir, expected_run_dir)
 
-    best_ckpt, last_ckpt = _checkpoint_paths(defaults["project_dir"], defaults["run_name"])
+    best_ckpt, last_ckpt = _checkpoint_paths_for_run_dir(actual_run_dir)
     selected_ckpt = _existing_checkpoint(best_ckpt, last_ckpt)
+    synced_best_ckpt, synced_last_ckpt = _checkpoint_paths(defaults["project_dir"], defaults["run_name"])
     metric_report = extract_metrics(defaults["task"], results)
     promoted_ckpt = None
-    if defaults["track"] == "stage2":
+    if defaults["track"] == "stage2" and should_promote_stage2(args):
         if selected_ckpt is None:
             raise SystemExit("Stage 2 training completed without writing best.pt or last.pt; promotion aborted.")
         promoted_ckpt = promote_stage2_checkpoint(Path(selected_ckpt), str(defaults["promoted_checkpoint"]))
@@ -514,6 +540,8 @@ def main() -> None:
         "last_ckpt": str(last_ckpt),
         "actual_run_dir": str(actual_run_dir),
         "expected_run_dir": str(expected_run_dir),
+        "synced_best_ckpt": str(synced_best_ckpt),
+        "synced_last_ckpt": str(synced_last_ckpt),
         "selected_ckpt": str(selected_ckpt) if selected_ckpt else None,
         "promoted_ckpt": str(promoted_ckpt) if promoted_ckpt else None,
         **metric_report,
@@ -522,6 +550,8 @@ def main() -> None:
     print(f"\nTraining complete ({elapsed:.0f}s)")
     print(f"Best checkpoint : {best_ckpt}")
     print(f"Last checkpoint : {last_ckpt}")
+    if actual_run_dir != expected_run_dir:
+        print(f"Synced alias    : {synced_best_ckpt}")
     if selected_ckpt:
         print(f"Selected ckpt  : {selected_ckpt}")
     else:
