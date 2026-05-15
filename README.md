@@ -167,7 +167,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] **Fix `POST /layout` call** — align to the canonical name once @abdusattormv resolves the contract, then update the fetch path and `backend/README.md`
 - [ ] **Remove mock fallbacks from Find My Car** — replace fake `session_id` generation and random spot fallback with the real `POST /park` → store `session_id` → `GET /find/{session_id}` flow once [@abdusattormv](https://github.com/abdusattormv) ships the endpoints
 - [ ] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
-- [ ] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
+- [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
 - [ ] React Native (Expo) wrapper — native camera access for mobile demo; if timeline is at risk, decide by end of Week 7 and formally drop from deliverables/docs if not feasible
 - [ ] Write App section of technical report — 3 screens, tech stack, Leaflet integration, Find My Car flow
 
