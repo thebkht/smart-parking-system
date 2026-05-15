@@ -27,5 +27,41 @@
   "selected_ckpt": "runs/acpds_cls/yolov8n_stage2/weights/best.pt",
   "promoted_ckpt": "acpds_cls/weights/best.pt",
   "top1_accuracy": 0.9826680421829224,
-  "top5_accuracy": 1.0
+  "top5_accuracy": 1.0,
+  "evaluation": {
+    "checkpoint": "acpds_cls/weights/best.pt",
+    "threshold": 0.5,
+    "val": {
+      "model": "acpds_cls",
+      "dataset": "acpds_stage2/val",
+      "threshold": 0.5,
+      "top1_accuracy": 0.9827,
+      "precision": 0.9784,
+      "recall": 0.9819,
+      "f1": 0.9802,
+      "sample_count": 1904,
+      "support_free": 1073,
+      "support_occupied": 831,
+      "confusion_matrix": "[[1055, 18], [15, 816]]"
+    },
+    "test": {
+      "model": "acpds_cls",
+      "dataset": "acpds_stage2/test",
+      "threshold": 0.5,
+      "top1_accuracy": 0.9772,
+      "precision": 0.9864,
+      "recall": 0.957,
+      "f1": 0.9715,
+      "sample_count": 1490,
+      "support_free": 885,
+      "support_occupied": 605,
+      "confusion_matrix": "[[877, 8], [26, 579]]"
+    },
+    "delta_test_minus_val": {
+      "top1_accuracy": -0.0055,
+      "precision": 0.008,
+      "recall": -0.0249,
+      "f1": -0.0087
+    }
+  }
 }
