@@ -362,7 +362,38 @@ def normalize_rois(raw_rois: dict | None) -> Dict[str, Tuple[int, int, int, int]
     return normalized
 
 
-def load_rois(config_path: Path) -> Dict[str, Tuple[int, int, int, int]]:
+def fetch_rois_from_backend(
+    backend_url: str = "http://127.0.0.1:8000",
+    timeout: float = 3.0,
+) -> Dict[str, Tuple[int, int, int, int]]:
+    """Fetch quad polygon ROIs from GET /map and convert to bounding boxes."""
+    try:
+        response = requests.get(f"{backend_url}/map", timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+        rois: Dict[str, Tuple[int, int, int, int]] = {}
+        for spot in data.get("spots", []):
+            spot_id = spot["spot_id"]
+            points = spot["points"]  # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            x1, y1 = int(min(xs)), int(min(ys))
+            x2, y2 = int(max(xs)), int(max(ys))
+            rois[spot_id] = (x1, y1, x2, y2)
+        if rois:
+            print(f"Loaded {len(rois)} ROIs from backend /map.")
+            return rois
+        print("Backend /map returned no spots, falling back to config ROIs.")
+    except Exception as exc:
+        print(f"Could not fetch ROIs from backend: {exc}. Using config ROIs.")
+    return {}
+
+
+def load_rois(config_path: Path, backend_url: str = "http://127.0.0.1:8000") -> Dict[str, Tuple[int, int, int, int]]:
+    """Load ROIs: try backend /map first, fall back to config file."""
+    rois = fetch_rois_from_backend(backend_url)
+    if rois:
+        return rois
     cfg = load_config(config_path)
     return normalize_rois(cfg.get("rois"))
 
@@ -1644,7 +1675,10 @@ def main() -> None:
     args = parse_args()
     cfg = load_config(Path(args.config))
     args = resolve_settings(args, cfg)
-    fixed_rois = normalize_rois(cfg.get("rois"))
+    backend_base = args.backend_url.rsplit("/", 1)[0] if args.backend_url.endswith("/update") else args.backend_url
+    fixed_rois = load_rois(Path(args.config), backend_url=backend_base)
+    if not fixed_rois:
+        fixed_rois = normalize_rois(cfg.get("rois"))
     args.perspective_transform = load_perspective_transform(cfg)
 
     if args.camera is not None:
