@@ -374,7 +374,9 @@ def fetch_rois_from_backend(
         rois: Dict[str, Tuple[int, int, int, int]] = {}
         for spot in data.get("spots", []):
             spot_id = spot["spot_id"]
-            points = spot["points"]  # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+            points = spot.get("points") or spot.get("corners")
+            if not points:
+                continue  # skip spots with no usable geometry # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
             xs = [p[0] for p in points]
             ys = [p[1] for p in points]
             x1, y1 = int(min(xs)), int(min(ys))
