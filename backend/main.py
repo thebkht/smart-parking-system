@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import shutil
+import tempfile
+from pathlib import Path as FilePath
 from asyncio import sleep
 from datetime import datetime, timezone
 from pathlib import Path
@@ -330,3 +333,113 @@ async def get_sessions(spot_id: Optional[str] = None, limit: int = 100) -> dict:
         for r in rows
     ]
     return {"sessions": sessions, "count": len(sessions)}
+
+# ---------------------------------------------------------------------------
+# Find My Car endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/park")
+async def park(photo: bytes = None) -> dict:
+    """Accept a driver photo, localize to a spot via SIFT, save session."""
+    from fastapi import UploadFile, File
+    raise HTTPException(status_code=501, detail="Use multipart/form-data. See /park docs.")
+
+
+from fastapi import UploadFile, File
+
+@app.post("/park")
+async def park_car(photo: UploadFile = File(...)) -> dict:
+    """Accept a driver photo, run SIFT localization, insert park_session row."""
+    import sys
+    sys.path.insert(0, str(Path("ml")))
+    from localize import localize_query
+
+    # Save uploaded photo to a temp file
+    suffix = Path(photo.filename).suffix if photo.filename else ".jpg"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+        contents = await photo.read()
+        tmp_path.write_bytes(contents)
+
+    try:
+        refs_path = Path("samples/localization_refs")
+        if not refs_path.exists():
+            raise HTTPException(status_code=503, detail="No reference images found.")
+
+        result = localize_query(
+            tmp_path,
+            refs_path,
+            ratio_threshold=0.75,
+            min_matches=8,
+            min_inliers=6,
+            ransac_threshold=5.0,
+            top_k=3,
+        )
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    spot_id = result.get("spot_id")
+    score = float(result.get("score", 0.0))
+
+    conn = get_conn()
+    now = utc_now_iso()
+    cursor = conn.execute(
+        """
+        INSERT INTO park_sessions (spot_id, status, confidence, recorded_at)
+        VALUES (?, 'occupied', ?, ?)
+        """,
+        (spot_id, score, now),
+    )
+    conn.commit()
+    session_id = cursor.lastrowid
+
+    return {
+        "session_id": session_id,
+        "spot_id": spot_id,
+        "similarity_score": score,
+        "elapsed_ms": result.get("elapsed_ms"),
+        "localized": spot_id is not None,
+    }
+
+
+@app.get("/find/{session_id}")
+async def find_car(session_id: int) -> dict:
+    """Look up a park session and return spot_id + corner coordinates."""
+    conn = get_conn()
+
+    # Get session
+    row = conn.execute(
+        "SELECT spot_id, confidence, recorded_at FROM park_sessions WHERE id = ?",
+        (session_id,),
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found.")
+
+    spot_id, confidence, recorded_at = row
+
+    # Get corners from spot_references
+    spot_row = conn.execute(
+        "SELECT points FROM spot_references WHERE spot_id = ?",
+        (spot_id,),
+    ).fetchone()
+
+    corners = json.loads(spot_row[0]) if spot_row else None
+
+    return {
+        "session_id": session_id,
+        "spot_id": spot_id,
+        "corners": corners,
+        "similarity_score": confidence,
+        "recorded_at": recorded_at,
+    }
+
+
+# Canonical name is /map — add /layout as alias for frontend compatibility
+@app.post("/layout")
+async def save_layout_alias(layout: LayoutPayload) -> dict:
+    """Alias for POST /map — kept for frontend compatibility."""
+    return await save_map(layout)
+
+
+  

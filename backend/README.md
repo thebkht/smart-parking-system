@@ -1,17 +1,26 @@
 # Backend Layer
 
-The backend is a minimal persistence layer for the v3 edge payload. It does not add frontend concerns or legacy summary fields.
+The backend is a FastAPI persistence and coordination layer for the Smart Parking System edge pipeline. It stores occupancy updates, serves the parking lot layout to edge nodes at startup, and supports the Find My Car feature.
+
+## Running the Backend
+
+```bash
+source .venv/bin/activate
+uvicorn backend.main:app --reload
+```
+
+API docs available at: `http://127.0.0.1:8000/docs`
+
+---
 
 ## Endpoints
 
-- `POST /update` accepts the v3 payload and stores it as-is
-- `GET /status` returns the latest stored payload as-is
-- `GET /history` returns stored payloads in a stable wrapper with `recorded_at`
-- `GET /health` returns a basic health response
-- `GET /stream` returns the latest annotated edge frame as an MJPEG stream
+### Occupancy
 
-## Payload Contract
+#### `POST /update`
+Receives an occupancy payload from the edge node and persists it to the `log` table. Also writes a row per spot into `park_sessions`.
 
+**Request body:**
 ```json
 {
   "spots": {
@@ -26,30 +35,46 @@ The backend is a minimal persistence layer for the v3 edge payload. It does not 
 }
 ```
 
-## Live Stream
-
-`GET /stream` serves `logs/latest_frame.jpg` as a multipart MJPEG response for browser or VLC clients.
-The edge runtime writes to the same path by default.
-
-Example:
-
-```html
-<img src="http://127.0.0.1:8000/stream" alt="Parking stream">
+**Response:**
+```json
+{ "status": "ok" }
 ```
 
-## History Shape
+---
 
+#### `GET /status`
+Returns the latest occupancy snapshot. Frontend should read `response.spots` for occupancy data.
+
+**Response shape (final, confirmed):**
+```json
+{
+  "spots": {
+    "spot_1": "free",
+    "spot_2": "occupied"
+  },
+  "confidence": {
+    "spot_1": 0.91,
+    "spot_2": 0.84
+  },
+  "timestamp": "2026-04-21T00:00:00Z"
+}
+```
+
+> **Frontend note (@mirzayv):** Read occupancy as `response.spots`, confidence as `response.confidence`. This shape is final and will not change.
+
+---
+
+#### `GET /history?limit=100`
+Returns recent occupancy snapshots in reverse chronological order.
+
+**Response:**
 ```json
 {
   "items": [
     {
       "payload": {
-        "spots": {
-          "spot_1": "free"
-        },
-        "confidence": {
-          "spot_1": 0.91
-        },
+        "spots": { "spot_1": "free" },
+        "confidence": { "spot_1": 0.91 },
         "timestamp": "2026-04-21T00:00:00Z"
       },
       "recorded_at": "2026-04-21T00:00:01Z"
@@ -57,3 +82,164 @@ Example:
   ]
 }
 ```
+
+---
+
+### Parking Lot Layout
+
+> **Canonical route is `/map`**. The `/layout` route is an alias kept for frontend compatibility — both routes accept the same payload and return the same response.
+
+#### `POST /map` (alias: `POST /layout`)
+Saves the parking lot layout. Accepts spot polygons using either `points` or `corners` field — both are supported.
+
+**Request body:**
+```json
+{
+  "spots": [
+    {
+      "spot_id": "spot_1",
+      "points": [[x1,y1],[x2,y2],[x3,y3],[x4,y4]],
+      "label": "occupied"
+    }
+  ],
+  "image_width": 1920,
+  "image_height": 1080
+}
+```
+
+> **Note:** `corners` field is accepted as an alias for `points` (used by ML pipeline output).
+
+**Response:**
+```json
+{ "status": "ok", "spots_saved": 15 }
+```
+
+---
+
+#### `GET /map` (alias: `GET /layout`)
+Returns the latest parking lot layout. Called by `edge/detect.py` at startup to load spot polygons.
+
+**Response:**
+```json
+{
+  "spots": [
+    {
+      "spot_id": "spot_1",
+      "points": [[x1,y1],[x2,y2],[x3,y3],[x4,y4]],
+      "label": "occupied"
+    }
+  ],
+  "image_width": 1920,
+  "image_height": 1080,
+  "updated_at": "2026-04-21T00:00:00Z"
+}
+```
+
+> Returns `404` if no layout has been posted yet.
+
+---
+
+### Parking Sessions
+
+#### `GET /sessions?spot_id=spot_1&limit=100`
+Returns recent parking session records. Optionally filter by `spot_id`.
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "spot_id": "spot_1",
+      "status": "occupied",
+      "confidence": 0.91,
+      "recorded_at": "2026-04-21T00:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+---
+
+### Find My Car
+
+#### `POST /park`
+Accepts a driver photo, runs SIFT feature matching against stored reference images in `samples/localization_refs/`, inserts a row into `park_sessions`, and returns a `session_id` for later lookup.
+
+**Request:** `multipart/form-data` with field `photo` (image file).
+
+**Response:**
+```json
+{
+  "session_id": 42,
+  "spot_id": "spot_7",
+  "similarity_score": 14.031,
+  "elapsed_ms": 312.5,
+  "localized": true
+}
+```
+
+> `localized: false` if SIFT matching failed to find a confident match.
+
+---
+
+#### `GET /find/{session_id}`
+Looks up a parking session by ID and returns the spot location with corner coordinates for map display.
+
+**Response:**
+```json
+{
+  "session_id": 42,
+  "spot_id": "spot_7",
+  "corners": [[x1,y1],[x2,y2],[x3,y3],[x4,y4]],
+  "similarity_score": 14.031,
+  "recorded_at": "2026-04-21T00:00:00Z"
+}
+```
+
+> Returns `404` if session not found.
+
+---
+
+### Utilities
+
+#### `GET /health`
+Service health check.
+
+```json
+{ "status": "ok" }
+```
+
+#### `GET /stream`
+Serves `logs/latest_frame.jpg` as a multipart MJPEG stream for browser or VLC clients.
+
+```html
+<img src="http://127.0.0.1:8000/stream" alt="Parking stream">
+```
+
+---
+
+## Database Schema
+
+SQLite database at `parking.db` with four tables:
+
+| Table | Purpose |
+|---|---|
+| `log` | Full occupancy payload snapshots from edge |
+| `layout` | Parking lot layout snapshots (quad polygons) |
+| `spot_references` | Per-spot polygon coordinates |
+| `park_sessions` | Per-spot occupancy history + Find My Car sessions |
+
+---
+
+## Bandwidth
+
+The edge node POSTs compact JSON (~280 bytes) every 2 seconds instead of streaming raw video.
+
+| Method | Bandwidth |
+|---|---|
+| JSON POST (this system) | 0.3 KB/s |
+| H.264 720p stream | 200 KB/s |
+| H.264 1080p stream | 500 KB/s |
+
+**Result: 99.9% bandwidth reduction vs raw video streaming.**
