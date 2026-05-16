@@ -15,6 +15,23 @@ import {
   UpdateIcon,
 } from "@radix-ui/react-icons";
 
+const PREVIEW_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+function isPreviewableImage(file) {
+  return Boolean(file?.type && PREVIEW_MIME_TYPES.has(file.type));
+}
+
+function generateSessionId() {
+  const bytes = new Uint8Array(6);
+  window.crypto.getRandomValues(bytes);
+  return `sess_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
 // ---------------------------------------------------------------------------
 // PropTypes shapes
 // ---------------------------------------------------------------------------
@@ -561,38 +578,75 @@ function FindMyCar({ layout }) {
   const [foundSpot, setFoundSpot] = useState(null);
   const [confidence, setConfidence] = useState(null);
   const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null); // eslint-disable-line no-unused-vars
   const fileRef = useRef();
-  const previewUrlRef = useRef(null);
+  const previewCanvasRef = useRef(null);
+  const previewContainerRef = useRef(null);
 
   useEffect(() => {
-    return () => {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
+    if (!file || !previewCanvasRef.current || !previewContainerRef.current) {
+      const canvas = previewCanvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        ctx?.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const drawPreview = async () => {
+      try {
+        const bitmap = await createImageBitmap(file);
+        if (cancelled || !previewCanvasRef.current || !previewContainerRef.current) {
+          bitmap.close();
+          return;
+        }
+
+        const container = previewContainerRef.current;
+        const canvas = previewCanvasRef.current;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          bitmap.close();
+          return;
+        }
+
+        const width = Math.max(1, Math.round(container.clientWidth));
+        const height = Math.max(1, Math.round(container.clientHeight));
+        canvas.width = width;
+        canvas.height = height;
+
+        const scale = Math.max(width / bitmap.width, height / bitmap.height);
+        const drawWidth = bitmap.width * scale;
+        const drawHeight = bitmap.height * scale;
+        const offsetX = (width - drawWidth) / 2;
+        const offsetY = (height - drawHeight) / 2;
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(bitmap, offsetX, offsetY, drawWidth, drawHeight);
+        bitmap.close();
+      } catch {
+        if (!cancelled) {
+          setError("Unable to render preview for this image.");
+        }
       }
     };
-  }, []);
+
+    drawPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [file]);
 
   const handleFile = (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    if (!f.type.startsWith("image/")) {
-      setError("Please upload an image file.");
+    if (!isPreviewableImage(f)) {
+      setError("Please upload a PNG, JPEG, WebP, or GIF image.");
       setFile(null);
-      setPreview(null);
       setStep("idle");
       return;
     }
-
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current);
-    }
-
-    const nextPreviewUrl = URL.createObjectURL(f);
-    previewUrlRef.current = nextPreviewUrl;
     setFile(f);
-    setPreview(nextPreviewUrl);
     setStep("ready");
     setFoundSpot(null);
     setSessionId(null);
@@ -604,9 +658,7 @@ function FindMyCar({ layout }) {
     setError(null);
     await new Promise((r) => setTimeout(r, 1800));
     const result = await apiPost("/park", { filename: file?.name });
-    setSessionId(
-      result?.session_id ?? "sess_" + Math.random().toString(36).slice(2, 8),
-    );
+    setSessionId(result?.session_id ?? generateSessionId());
     setStep("parked");
   };
 
@@ -627,15 +679,10 @@ function FindMyCar({ layout }) {
   };
 
   const reset = () => {
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current);
-      previewUrlRef.current = null;
-    }
     setStep("idle");
     setSessionId(null);
     setFoundSpot(null);
     setFile(null);
-    setPreview(null);
     setError(null);
     setConfidence(null);
   };
@@ -658,15 +705,16 @@ function FindMyCar({ layout }) {
 
         {/* Photo input */}
         <div
+          ref={previewContainerRef}
           className="border-2 border-dashed border-stone-300 rounded-2xl overflow-hidden cursor-pointer
                      min-h-48 relative bg-stone-50 hover:border-stone-400 transition-colors"
           onClick={() => !foundSpot && fileRef.current?.click()}
         >
-          {preview ? (
-            <img
-              src={preview}
-              alt="Your photo"
-              className="w-full h-full object-cover block"
+          {file ? (
+            <canvas
+              ref={previewCanvasRef}
+              aria-label="Your photo preview"
+              className="w-full h-full block"
             />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
