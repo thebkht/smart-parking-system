@@ -71,6 +71,11 @@ def parse_args() -> argparse.Namespace:
         help="Evaluate Stage 2 weather subdirs if the dataset root exposes sunny/cloudy/rainy.",
     )
     parser.add_argument(
+        "--weather-labels",
+        default="sunny,cloudy,rainy",
+        help="Comma-separated weather split names used with --per-weather.",
+    )
+    parser.add_argument(
         "--confidence-threshold",
         type=float,
         default=0.5,
@@ -463,13 +468,16 @@ def evaluate_per_weather(args: argparse.Namespace) -> None:
     if not args.weights:
         raise SystemExit("--weights is required for per-weather evaluation.")
     root = stage2_root(args.data)
+    weather_names = tuple(label.strip() for label in str(args.weather_labels).split(",") if label.strip())
+    if not weather_names:
+        raise SystemExit("--weather-labels must include at least one split name.")
     rows = []
-    for weather in WEATHER_NAMES:
+    for weather in weather_names:
         weather_dir = root / weather
         if not weather_dir.exists():
             raise SystemExit(
                 "Per-weather evaluation requested but weather labels are not exposed in "
-                f"{root}. Expected <root>/<weather>/<class>/*.jpg for {', '.join(WEATHER_NAMES)}."
+                f"{root}. Expected <root>/<weather>/<class>/*.jpg for {', '.join(weather_names)}."
             )
         rows.append(evaluate_stage2(args.weights, weather_dir, args, weather))
     print_rows(rows, "Stage 2 Per-Weather Evaluation")
