@@ -173,7 +173,16 @@ There are two supported Stage 1 handoff modes in the repo:
 - known-layout mode: load fixed quadrilaterals from ACPDS-derived config or backend `/map`
 - generalized mode: run the Stage 1 detector, convert each predicted box to a degenerate four-corner polygon, and pass it through the same Stage 2 warp path
 
-This unified geometry contract is important. ACPDS training patches are perspective-corrected with `order_corners() -> getPerspectiveTransform() -> warpPerspective(128 x 128)`, and Week 7 aligns live inference with that same contract. The optional ACPDS paper comparison between quadrilateral pooling and bounding-square pooling is partially implemented in the extraction tooling through a new `--pooling {quad,square}` flag, but the square-pooling retrain was deferred because the core submission path depended more directly on inference consistency and evaluation depth.
+This unified geometry contract is important. ACPDS training patches are perspective-corrected with `order_corners() -> getPerspectiveTransform() -> warpPerspective(128 x 128)`, and Week 7 aligns live inference with that same contract. The same extraction tooling also supports a coarse ACPDS-style pooling comparison through `--pooling {quad,square}` so the project can quantify what is lost when the quadrilateral geometry is replaced by a simpler square crop.
+
+Week 7 now includes that coarse pooling comparison as a non-promoted side run. A parallel `datasets/acpds_stage2_square/` dataset was extracted with `square_patch()` instead of `warp_patch()`, then a separate `yolov8n-cls` checkpoint was trained only for comparison. The saved result in `logs/week7/pooling_comparison.json` shows that quadrilateral pooling remains better on the ACPDS test split:
+
+| Pooling | Test accuracy | Precision | Recall | F1 |
+| --- | ---: | ---: | ---: | ---: |
+| Quad warp | 0.9772 | 0.9864 | 0.9570 | 0.9715 |
+| Bounding square | 0.9638 | 0.9451 | 0.9669 | 0.9559 |
+
+The accuracy delta is `-1.34` percentage points for bounding-square pooling. Square crops recover slightly more occupied spots, but they do so by introducing many more false occupied predictions, which is consistent with neighbor bleed and border contamination when the quadrilateral geometry is not respected.
 
 ## 6. Stage 2 Evaluation Results
 
@@ -246,7 +255,11 @@ Using the promoted `yolov8n-cls` checkpoint at threshold `0.5`, the ACPDS weathe
 
 The ordering is intuitive: the brightest scenes are easiest, while low-light scenes show the weakest recall. The more important point is methodological rather than absolute. These are proxy labels derived from luminance, not official ACPDS metadata, so the result should be interpreted as a robustness slice over illumination rather than a claim about meteorological weather categories. Even with that caveat, the low-light recall drop reinforces the broader Week 7 conclusion that occupancy misses are driven more by difficult patch conditions than by lack of classifier capacity.
 
-### 6.5 End-to-end stability
+### 6.5 Pooling comparison
+
+The same comparison is useful from an architectural perspective because it validates the design choice in §5.3. On identical ACPDS train/validation/test splits and the same YOLOv8n classifier family, quadrilateral pooling outperforms square pooling by `1.34` percentage points on test accuracy and by `1.56` points on F1. The square-crop run improves recall slightly (`0.9669` versus `0.9570`), but that gain comes from a large precision drop (`0.9451` versus `0.9864`), which is the wrong tradeoff for this application because it produces more false occupied alarms. In other words, the production warp is not only a train/serve consistency fix; it is also the stronger pooling method on this dataset.
+
+### 6.6 End-to-end stability
 
 The checked-in stability run used:
 
@@ -294,7 +307,7 @@ This section also connects to the Find My Car path. The same BEV map and spot ge
 
 ## 8. Runtime Benchmark and Bandwidth Results
 
-### 7.1 Export artifacts
+### 8.1 Export artifacts
 
 The Week 6 export workflow for the promoted `yolov8n-cls` checkpoint generated:
 
@@ -332,7 +345,7 @@ The project achieved its main system goal: a working two-stage edge pipeline tha
 
 The main limitations are also clear.
 
-First, the Stage 2 classifier still did not exceed the original 98% target on the checked-in test split. The best saved result is the promoted `yolov8n-cls` checkpoint at 0.9772 test accuracy, which is close but still below that goal. Second, the small spread across `n`, `s`, and `m`, combined with `n` leading both accuracy and artifact size, implies that increasing model capacity is not the main lever. The more likely limiting factor is patch quality: partial vehicles, border-heavy crops, low-light conditions, and some label ambiguity. Third, the Week 7 runtime fix shows that evaluation and deployment must share the same geometry contract; otherwise, even a strong classifier is penalized by mismatched pooling at inference time. Fourth, the saved stability test is still short, so a longer 30-minute or multi-hour soak test would provide stronger reliability evidence.
+First, the Stage 2 classifier still did not exceed the original 98% target on the checked-in test split. The best saved result is the promoted `yolov8n-cls` checkpoint at 0.9772 test accuracy, which is close but still below that goal. Second, the small spread across `n`, `s`, and `m`, combined with `n` leading both accuracy and artifact size, implies that increasing model capacity is not the main lever. The more likely limiting factor is patch quality: partial vehicles, border-heavy crops, low-light conditions, and some label ambiguity. Third, the Week 7 pooling comparison strengthens the geometry argument: quadrilateral pooling beats bounding-square pooling by 1.34 percentage points on test accuracy, so respecting spot shape is beneficial even before considering train/serve consistency. Fourth, the Week 7 runtime fix shows that evaluation and deployment must share the same geometry contract; otherwise, even a strong classifier is penalized by mismatched pooling at inference time. Fifth, the saved stability test is still short, so a longer 30-minute or multi-hour soak test would provide stronger reliability evidence.
 
 ## 10. Conclusion
 
