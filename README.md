@@ -300,7 +300,7 @@ make test
 
 ## Week 5 Process
 
-Use this sequence for `[@thebkht](https://github.com/thebkht)`'s ACPDS milestone.
+Use this sequence for [`@thebkht`](https://github.com/thebkht)'s ACPDS milestone.
 
 1. Extract ACPDS patches into `datasets/acpds_stage2/`.
 2. Review 20 validation samples and mark the validation report as `passed`.
