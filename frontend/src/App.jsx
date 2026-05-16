@@ -564,12 +564,35 @@ function FindMyCar({ layout }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null); // eslint-disable-line no-unused-vars
   const fileRef = useRef();
+  const previewUrlRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
 
   const handleFile = (e) => {
     const f = e.target.files[0];
     if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setError("Please upload an image file.");
+      setFile(null);
+      setPreview(null);
+      setStep("idle");
+      return;
+    }
+
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(f);
+    previewUrlRef.current = nextPreviewUrl;
     setFile(f);
-    setPreview(URL.createObjectURL(f));
+    setPreview(nextPreviewUrl);
     setStep("ready");
     setFoundSpot(null);
     setSessionId(null);
@@ -604,6 +627,10 @@ function FindMyCar({ layout }) {
   };
 
   const reset = () => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
     setStep("idle");
     setSessionId(null);
     setFoundSpot(null);
