@@ -129,14 +129,14 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 **Week 7**
 
-- [ ] **Add `POST /park` endpoint** — accept a driver photo, call `ml/localize.py` SIFT matching against stored `spot_references`, insert a row into `park_sessions` table with `spot_id` + `similarity_score`, return `session_id`
-- [ ] **Add `GET /find/{session_id}` endpoint** — look up session in `park_sessions`, return `spot_id` + corner coordinates from the `layout` table; return 404 if session not found
-- [ ] **Resolve `POST /layout` vs `POST /map` naming** — pick one canonical name, update the route in `backend/main.py`, notify @mirzayv so frontend fetch path matches, document final contract in `backend/README.md`
-- [ ] **Fix `GET /status` response shape** — currently returns `{ spots, confidence, timestamp }`; confirm this is the final shape and document it in `backend/README.md` so @mirzayv can update the frontend parser to read `response.spots`
-- [ ] Final FPS + latency table (all backends: MPS / CPU / ONNX FP32 / ONNX INT8)
-- [ ] Bandwidth savings analysis — expected >99% vs raw H.264; use the measurement script from PRD §8.3 and include actual measured numbers
-- [ ] System stability test — 30-minute continuous run with no crashes; log CPU usage, memory, and FPS stability; save output to `logs/stability_test.json`
-- [ ] Write Edge Benchmarks section of technical report
+- [x] **Add `POST /park` endpoint** — accept a driver photo, call `ml/localize.py` SIFT matching against stored `spot_references`, insert a row into `park_sessions` table with `spot_id` + `similarity_score`, return `session_id`
+- [x] **Add `GET /find/{session_id}` endpoint** — look up session in `park_sessions`, return `spot_id` + corner coordinates from the `layout` table; return 404 if session not found
+- [x] **Resolve `POST /layout` vs `POST /map` naming** — pick one canonical name, update the route in `backend/main.py`, notify @mirzayv so frontend fetch path matches, document final contract in `backend/README.md`
+- [x] **Fix `GET /status` response shape** — currently returns `{ spots, confidence, timestamp }`; confirm this is the final shape and document it in `backend/README.md` so @mirzayv can update the frontend parser to read `response.spots`
+- [x] Final FPS + latency table (all backends: MPS / CPU / ONNX FP32 / ONNX INT8)
+- [x] Bandwidth savings analysis — expected >99% vs raw H.264; use the measurement script from PRD §8.3 and include actual measured numbers
+- [x] System stability test — 30-minute continuous run with no crashes; log CPU usage, memory, and FPS stability; save output to `logs/stability_test.json`
+- [x] Write Edge Benchmarks section of technical report
 
 **Week 8**
 
