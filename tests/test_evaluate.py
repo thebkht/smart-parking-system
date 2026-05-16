@@ -161,3 +161,35 @@ def test_stage2_probabilities_forces_classify_task(tmp_path, monkeypatch):
     )
 
     assert FakeYOLO.init_calls[0]["task"] == "classify"
+
+
+def test_per_weather_uses_custom_weather_labels(tmp_path, monkeypatch):
+    for weather in ("sunny", "overcast", "low_light"):
+        make_image(tmp_path / weather / "free" / f"{weather}_free.jpg")
+        make_image(tmp_path / weather / "occupied" / f"{weather}_occ.jpg")
+
+    monkeypatch.setattr(evaluate, "YOLO", FakeYOLO)
+    args = SimpleNamespace(
+        weights="fake.pt",
+        data=str(tmp_path),
+        device="cpu",
+        imgsz=128,
+        confidence_threshold=0.5,
+        batch=16,
+        log_dir=str(tmp_path),
+        output_json=str(tmp_path / "weather.json"),
+        weather_labels="sunny,overcast,low_light",
+    )
+
+    FakeYOLO.probs_by_name = {
+        "sunny_free.jpg": 0.2,
+        "sunny_occ.jpg": 0.8,
+        "overcast_free.jpg": 0.2,
+        "overcast_occ.jpg": 0.8,
+        "low_light_free.jpg": 0.2,
+        "low_light_occ.jpg": 0.8,
+    }
+    evaluate.evaluate_per_weather(args)
+
+    payload = json.loads((tmp_path / "weather.json").read_text(encoding="utf-8"))
+    assert [row["dataset"] for row in payload["rows"]] == ["sunny", "overcast", "low_light"]

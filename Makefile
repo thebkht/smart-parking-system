@@ -45,6 +45,7 @@ EXPORT_STAGE2_ARGS ?=
 EXPORT_EVAL_DEVICE ?= cpu
 LOCALIZE_ARGS ?=
 WEEK6_LOG_DIR ?= logs/week6
+WEEK7_LOG_DIR ?= logs/week7
 STABILITY_DURATION ?= 1800
 STABILITY_ARGS ?=
 
@@ -53,7 +54,7 @@ STABILITY_ARGS ?=
 	train-stage1 train-stage2 train-stage2-all \
 	evaluate-stage1 evaluate-stage2 compare-stage2 sweep-stage2 \
 	export-stage2 benchmark-stage2 bandwidth stability test lint finalize \
-	localize-car week6-stage2 week6-export \
+	localize-car week6-stage2 week6-export week7-eval \
 	backend edge predict
 
 check-python:
@@ -135,6 +136,14 @@ week6-export:
 	$(VENV_PYTHON) ml/export.py --weights acpds_cls/weights/best.pt --imgsz 128 --summary-json artifacts/models/export_summary.json $(EXPORT_STAGE2_ARGS)
 	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split val --device $(EXPORT_EVAL_DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_export_onnx_val.json $(EVALUATE_STAGE2_ARGS)
 	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split test --device $(EXPORT_EVAL_DEVICE) --output-json $(WEEK6_LOG_DIR)/stage2_export_onnx_test.json $(EVALUATE_STAGE2_ARGS)
+
+week7-eval:
+	$(VENV_PYTHON) ml/analyze_generalization.py --output $(WEEK7_LOG_DIR)/val_test_gap.json
+	$(VENV_PYTHON) ml/bucket_acpds_weather.py --summary-json $(WEEK7_LOG_DIR)/acpds_weather_buckets.json
+	$(VENV_PYTHON) ml/evaluate.py --stage2 --weights acpds_cls/weights/best.pt \
+		--data datasets/acpds_stage2_weather --per-weather \
+		--weather-labels sunny,overcast,low_light \
+		--device $(DEVICE) --output-json $(WEEK7_LOG_DIR)/stage2_acpds_weather.json
 
 benchmark-stage2:
 	$(VENV_PYTHON) edge/benchmark.py \

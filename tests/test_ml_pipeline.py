@@ -500,6 +500,12 @@ def test_warp_patch_emits_fixed_size_image():
     assert warped.shape == (128, 128, 3)
 
 
+def test_square_patch_emits_fixed_size_image():
+    image = np.zeros((40, 60, 3), dtype=np.uint8)
+    squared = extract_patches.square_patch(image, [[5, 5], [35, 5], [30, 25], [8, 25]], size=128)
+    assert squared.shape == (128, 128, 3)
+
+
 def test_normalize_manifest_item_preserves_split_and_label(tmp_path):
     dataset_root = tmp_path / "acpds"
     dataset_root.mkdir()
@@ -532,8 +538,12 @@ def test_extract_dataset_writes_acpds_outputs(tmp_path):
     dataset_root = tmp_path / "acpds"
     images_dir = dataset_root / "images"
     images_dir.mkdir(parents=True)
-    for name, color in (("frame_a.jpg", 90), ("frame_b.jpg", 140), ("frame_c.jpg", 180)):
-        make_image(images_dir / name, color)
+    for index, name in enumerate(("frame_a.jpg", "frame_b.jpg", "frame_c.jpg"), start=1):
+        image = np.zeros((24, 32, 3), dtype=np.uint8)
+        image[:, :, 0] = np.arange(32, dtype=np.uint8)
+        image[:, :, 1] = (np.arange(24, dtype=np.uint8)[:, None] * index) % 255
+        image[:, :, 2] = 80 * index
+        cv2.imwrite(str(images_dir / name), image)
     manifest = {
         "samples": [
             {
@@ -597,6 +607,42 @@ def test_extract_dataset_writes_acpds_outputs(tmp_path):
     assert (output_dir / "dataset_report.json").exists()
     assert (output_dir / "validation_report.json").exists()
     assert (output_dir / "map_sample.json").exists()
+
+
+def test_extract_dataset_records_square_pooling(tmp_path):
+    dataset_root = tmp_path / "acpds"
+    images_dir = dataset_root / "images"
+    images_dir.mkdir(parents=True)
+    make_image(images_dir / "frame_a.jpg", 90)
+    manifest_path = dataset_root / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "samples": [
+                    {
+                        "image": "images/frame_a.jpg",
+                        "split": "train",
+                        "spot_id": "spot_1",
+                        "corners": [[2, 2], [14, 2], [13, 12], [3, 12]],
+                        "occupancy": False,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "acpds_stage2_square"
+
+    _patch_index, report = extract_patches.extract_dataset(
+        dataset_root,
+        manifest_path,
+        output_dir,
+        size=128,
+        seed=7,
+        pooling="square",
+    )
+
+    assert report["pooling"] == "square"
 
 
 def test_ensure_stage2_validation_passed_requires_passed_status(tmp_path):

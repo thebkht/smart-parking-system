@@ -52,3 +52,5 @@ datasets/*
 !datasets/acpds_stage2/validation_samples/**
 !datasets/acpds_stage2/validation_report.json
 !datasets/acpds_stage2/map_sample.json
+
+.cursor

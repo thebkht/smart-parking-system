@@ -14,6 +14,9 @@ from edge.detect import (
     box_area,
     build_payload,
     classify_patch,
+    dump_warp_samples,
+    fetch_rois_from_backend,
+    geometry_to_box,
     handoff_to_builtin_camera,
     crop_patch,
     filter_stage1_box,
@@ -25,6 +28,7 @@ from edge.detect import (
     resolve_camera_source,
     roi_bounds,
     load_rois,
+    load_spot_geometries,
     normalize_rois,
     load_perspective_transform,
     resolve_settings,
@@ -107,6 +111,39 @@ def test_load_rois_reads_config(tmp_path):
     config = tmp_path / "config.yaml"
     config.write_text("rois:\n  a: [1, 2, 3, 4]\n", encoding="utf-8")
     assert load_rois(config) == {"a": (1, 2, 3, 4)}
+
+
+def test_load_spot_geometries_reads_config_boxes_as_quads(tmp_path):
+    config = tmp_path / "config.yaml"
+    config.write_text("rois:\n  a: [1, 2, 5, 6]\n", encoding="utf-8")
+
+    geometries = load_spot_geometries(config)
+
+    assert np.array_equal(geometries["a"], np.array([[1, 2], [5, 2], [5, 6], [1, 6]], dtype=np.float32))
+
+
+def test_fetch_rois_from_backend_preserves_quad(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "spots": [
+                    {
+                        "spot_id": "spot_1",
+                        "points": [[10, 10], [30, 8], [35, 28], [8, 24]],
+                    }
+                ]
+            }
+
+    monkeypatch.setattr("edge.detect.requests.get", lambda *args, **kwargs: FakeResponse())
+
+    rois = fetch_rois_from_backend("http://127.0.0.1:8000")
+
+    assert rois["spot_1"].shape == (4, 2)
+    assert geometry_to_box(rois["spot_1"]) == (8, 8, 35, 28)
+    assert not np.array_equal(rois["spot_1"], np.array([[8, 8], [35, 8], [35, 28], [8, 28]], dtype=np.float32))
 
 
 def test_load_perspective_transform_builds_output_size_from_config():
@@ -316,19 +353,40 @@ def test_crop_patch_returns_none_for_invalid_box():
 def test_classify_patch_thresholds_occupied_predictions():
     frame = np.ones((50, 50, 3), dtype=np.uint8)
     model = FakeYOLO([("occupied", 0.49), ("occupied", 0.82)])
+    corners = np.array([[0, 0], [20, 0], [20, 20], [0, 20]], dtype=np.float32)
 
-    first_status, first_conf = classify_patch(frame, (0, 0, 20, 20), model, "cpu", 0.5)
-    second_status, second_conf = classify_patch(frame, (0, 0, 20, 20), model, "cpu", 0.5)
+    first_status, first_conf = classify_patch(frame, corners, model, "cpu", 0.5)
+    second_status, second_conf = classify_patch(frame, corners, model, "cpu", 0.5)
 
     assert (first_status, round(first_conf, 2)) == ("free", 0.49)
     assert (second_status, round(second_conf, 2)) == ("occupied", 0.82)
 
 
-def test_classify_patch_invalid_crop_falls_back_to_free():
+def test_classify_patch_warps_to_128_for_model_input():
+    frame = np.ones((40, 40, 3), dtype=np.uint8)
+    seen = []
+
+    class RecordingYOLO(FakeYOLO):
+        def __call__(self, patch, **kwargs):
+            seen.append(patch.shape)
+            return super().__call__(patch, **kwargs)
+
+    classify_patch(
+        frame,
+        np.array([[2, 3], [24, 1], [26, 25], [1, 24]], dtype=np.float32),
+        RecordingYOLO([("occupied", 0.9)]),
+        "cpu",
+        0.5,
+    )
+
+    assert seen == [(128, 128, 3)]
+
+
+def test_classify_patch_invalid_quad_falls_back_to_free():
     frame = np.ones((40, 40, 3), dtype=np.uint8)
     status, confidence = classify_patch(
         frame,
-        (100, 100, 120, 120),
+        np.array([[100, 100], [100, 100], [120, 120], [120, 120]], dtype=np.float32),
         FakeYOLO([("occupied", 0.9)]),
         "cpu",
         0.5,
@@ -497,21 +555,41 @@ def test_run_pipeline_uses_shared_postprocess_path():
             "stage1_overlap": 0.2,
             "stage1_min_box_area": 1500,
             "stage1_filter_mode": "bounds",
+            "stage1_postprocess_type": "nmm",
+            "stage1_match_threshold": 0.3,
         },
     )()
 
-    payload, spot_boxes = run_pipeline(
+    payload, spot_geometries = run_pipeline(
         frame=frame,
-        fixed_rois={"spot_1": (0, 0, 20, 20), "spot_2": (20, 0, 40, 20)},
+        fixed_geometries={
+            "spot_1": np.array([[0, 0], [20, 0], [20, 20], [0, 20]], dtype=np.float32),
+            "spot_2": np.array([[20, 0], [40, 0], [40, 20], [20, 20]], dtype=np.float32),
+        },
         stage1_model=None,
         stage2_model=FakeYOLO([("occupied", 0.9), ("free", 0.7)]),
         smooth_buf=SmoothingBuffer(window=1),
         args=args,
     )
 
-    assert spot_boxes["spot_1"] == (0, 0, 20, 20)
+    assert geometry_to_box(spot_geometries["spot_1"]) == (0, 0, 20, 20)
     assert payload["spots"] == {"spot_1": "occupied", "spot_2": "free"}
     assert payload["confidence"] == {"spot_1": 0.9, "spot_2": 0.7}
+
+
+def test_dump_warp_samples_writes_side_by_side_images(tmp_path):
+    frame = np.full((40, 40, 3), 200, dtype=np.uint8)
+    dumped = dump_warp_samples(
+        frame,
+        {"spot_1": np.array([[5, 5], [20, 4], [22, 20], [4, 22]], dtype=np.float32)},
+        tmp_path,
+        source_name="demo.jpg",
+        limit=3,
+    )
+
+    files = list(tmp_path.glob("*.jpg"))
+    assert dumped == 1
+    assert len(files) == 1
 
 
 def test_write_latest_frame_writes_jpeg_atomically(tmp_path):

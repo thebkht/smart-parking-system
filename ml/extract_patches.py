@@ -15,6 +15,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+from ml.patch_geometry import order_corners, square_patch, warp_patch
+
 VALID_SPLITS = ("train", "val", "test")
 VALID_CLASSES = ("free", "occupied")
 DEFAULT_OUTPUT = "datasets/acpds_stage2"
@@ -31,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
     parser.add_argument("--size", type=int, default=128)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--pooling", choices=["quad", "square"], default="quad")
     parser.add_argument("--validation-samples", type=int, default=20)
     parser.add_argument("--run-validation", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
@@ -47,58 +50,11 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def order_corners(corners: Any) -> np.ndarray:
-    try:
-        pts = np.asarray(corners, dtype=np.float32)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("corners must be numeric [x, y] pairs") from exc
-    if pts.shape != (4, 2):
-        raise ValueError("corners must contain exactly four [x, y] points")
-
-    unique = np.unique(pts, axis=0)
-    if len(unique) != 4:
-        raise ValueError("corners must not contain duplicate points")
-
-    hull = cv2.convexHull(pts).reshape(-1, 2)
-    if hull.shape != (4, 2):
-        raise ValueError("corners must form a convex quadrilateral")
-
-    center = hull.mean(axis=0)
-    angles = np.arctan2(hull[:, 1] - center[1], hull[:, 0] - center[0])
-    ordered = hull[np.argsort(angles)]
-    start = int(np.argmin(ordered.sum(axis=1)))
-    ordered = np.roll(ordered, -start, axis=0).astype(np.float32)
-
-    if _has_self_intersection(ordered):
-        raise ValueError("corners produce a self-crossing quadrilateral")
-    area = cv2.contourArea(ordered)
-    if not np.isfinite(area) or area <= 1.0:
-        raise ValueError("corners must span a visible quadrilateral area")
-    return ordered
-
-
-def _has_self_intersection(points: np.ndarray) -> bool:
-    return _segments_intersect(points[0], points[1], points[2], points[3]) or _segments_intersect(
-        points[1], points[2], points[3], points[0]
-    )
-
-
-def _segments_intersect(a: np.ndarray, b: np.ndarray, c: np.ndarray, d: np.ndarray) -> bool:
-    def orient(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
-        return float((p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0]))
-
-    o1 = orient(a, b, c)
-    o2 = orient(a, b, d)
-    o3 = orient(c, d, a)
-    o4 = orient(c, d, b)
-    return (o1 * o2 < 0) and (o3 * o4 < 0)
-
-
-def warp_patch(image: np.ndarray, corners: Any, size: int = 128) -> np.ndarray:
-    ordered = order_corners(corners)
-    dst = np.array([[0, 0], [size - 1, 0], [size - 1, size - 1], [0, size - 1]], dtype=np.float32)
-    matrix = cv2.getPerspectiveTransform(ordered, dst)
-    return cv2.warpPerspective(image, matrix, (size, size))
+def is_uniform_patch(patch: np.ndarray) -> bool:
+    if patch.size == 0:
+        return True
+    flattened = patch.reshape(-1, patch.shape[-1]) if patch.ndim == 3 else patch.reshape(-1, 1)
+    return bool(np.all(flattened == flattened[0]))
 
 
 def is_uniform_patch(patch: np.ndarray) -> bool:
@@ -196,6 +152,7 @@ def extract_dataset(
     *,
     size: int,
     seed: int,
+    pooling: str = "quad",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     del seed
     entries = load_manifest(dataset_root, manifest_path)
@@ -220,7 +177,10 @@ def extract_dataset(
             continue
 
         try:
-            patch = warp_patch(frame, entry["corners"], size=size)
+            if pooling == "square":
+                patch = square_patch(frame, entry["corners"], size=size)
+            else:
+                patch = warp_patch(frame, entry["corners"], size=size)
         except ValueError as exc:
             invalid_polygons.append({"image": entry["image"], "spot_id": entry["spot_id"], "error": str(exc)})
             continue
@@ -265,6 +225,7 @@ def extract_dataset(
         "missing_images": sorted(set(missing_images)),
         "unique_source_images": {split: len(paths) for split, paths in source_images.items()},
         "patch_size": {"width": size, "height": size},
+        "pooling": pooling,
         "generated_at": utc_now_iso(),
     }
     write_json(output_dir / DEFAULT_INDEX, patch_index)
@@ -407,6 +368,7 @@ def main() -> None:
             output_dir,
             size=args.size,
             seed=args.seed,
+            pooling=args.pooling,
         )
         print(f"[ACPDS] patches written to {output_dir}")
         print(f"[ACPDS] counts: {report['counts']}")
