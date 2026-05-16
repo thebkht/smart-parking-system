@@ -57,6 +57,13 @@ def is_uniform_patch(patch: np.ndarray) -> bool:
     return bool(np.all(flattened == flattened[0]))
 
 
+def is_uniform_patch(patch: np.ndarray) -> bool:
+    if patch.size == 0:
+        return True
+    flattened = patch.reshape(-1, patch.shape[-1]) if patch.ndim == 3 else patch.reshape(-1, 1)
+    return bool(np.all(flattened == flattened[0]))
+
+
 def _resolve_manifest_path(dataset_root: Path, manifest: str | None) -> Path:
     path = Path(manifest) if manifest else dataset_root / "manifest.json"
     if not path.exists():
