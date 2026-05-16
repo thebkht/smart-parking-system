@@ -15,6 +15,7 @@ from edge.detect import (
     build_payload,
     classify_patch,
     dump_warp_samples,
+    maybe_dump_warp_samples,
     fetch_rois_from_backend,
     geometry_to_box,
     handoff_to_builtin_camera,
@@ -144,6 +145,33 @@ def test_fetch_rois_from_backend_preserves_quad(monkeypatch):
     assert rois["spot_1"].shape == (4, 2)
     assert geometry_to_box(rois["spot_1"]) == (8, 8, 35, 28)
     assert not np.array_equal(rois["spot_1"], np.array([[8, 8], [35, 8], [35, 28], [8, 28]], dtype=np.float32))
+
+
+def test_fetch_rois_from_backend_skips_malformed_spots(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "spots": [
+                    {
+                        "spot_id": "spot_bad",
+                        "points": [[10], [30, 8], [35, 28], [8, 24]],
+                    },
+                    {
+                        "spot_id": "spot_good",
+                        "points": [[40, 10], [60, 10], [60, 30], [40, 30]],
+                    },
+                ]
+            }
+
+    monkeypatch.setattr("edge.detect.requests.get", lambda *args, **kwargs: FakeResponse())
+
+    rois = fetch_rois_from_backend("http://127.0.0.1:8000")
+
+    assert "spot_bad" not in rois
+    assert geometry_to_box(rois["spot_good"]) == (40, 10, 60, 30)
 
 
 def test_load_perspective_transform_builds_output_size_from_config():
@@ -590,6 +618,21 @@ def test_dump_warp_samples_writes_side_by_side_images(tmp_path):
     files = list(tmp_path.glob("*.jpg"))
     assert dumped == 1
     assert len(files) == 1
+
+
+def test_maybe_dump_warp_samples_returns_false_when_nothing_written(tmp_path):
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+
+    dumped = maybe_dump_warp_samples(
+        frame,
+        {"spot_1": np.array([[0, 0], [0, 0], [0, 0], [0, 0]], dtype=np.float32)},
+        tmp_path,
+        source_name="demo.jpg",
+        limit=3,
+    )
+
+    assert dumped is False
+    assert list(tmp_path.glob("*.jpg")) == []
 
 
 def test_write_latest_frame_writes_jpeg_atomically(tmp_path):

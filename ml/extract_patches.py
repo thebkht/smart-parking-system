@@ -15,7 +15,11 @@ from typing import Any
 import cv2
 import numpy as np
 
-from ml.patch_geometry import order_corners, square_patch, warp_patch
+try:
+    from ml.patch_geometry import order_corners, square_patch, warp_patch
+except ModuleNotFoundError:
+    # Support `python ml/extract_patches.py`, where the repo root is not on sys.path.
+    from patch_geometry import order_corners, square_patch, warp_patch
 
 VALID_SPLITS = ("train", "val", "test")
 VALID_CLASSES = ("free", "occupied")

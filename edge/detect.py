@@ -392,11 +392,14 @@ def fetch_rois_from_backend(
         data = response.json()
         rois: SpotGeometries = {}
         for spot in data.get("spots", []):
-            spot_id = spot["spot_id"]
+            spot_id = str(spot["spot_id"])
             points = spot.get("points") or spot.get("corners")
             if not points:
                 continue
-            rois[str(spot_id)] = order_corners(points)
+            try:
+                rois[spot_id] = order_corners(points)
+            except Exception as exc:
+                print(f"Skipping malformed backend ROI for {spot_id}: {exc}")
         if rois:
             print(f"Loaded {len(rois)} spot geometries from backend /map.")
             return rois
@@ -1039,6 +1042,23 @@ def dump_warp_samples(
     return dumped
 
 
+def maybe_dump_warp_samples(
+    frame: np.ndarray,
+    spot_geometries: SpotGeometries,
+    output_dir: Path,
+    *,
+    source_name: str,
+    limit: int = 5,
+) -> bool:
+    return dump_warp_samples(
+        frame,
+        spot_geometries,
+        output_dir,
+        source_name=source_name,
+        limit=limit,
+    ) > 0
+
+
 def log_result(payload: Dict[str, Any], log_dir: Path, log_format: str) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"parking_log_{datetime.now().strftime('%Y-%m-%d')}.{log_format}"
@@ -1613,14 +1633,13 @@ def run_camera(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> in
             )
             annotated = annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"])
             if args.dump_warp_samples and not warp_dumped:
-                dump_warp_samples(
+                warp_dumped = maybe_dump_warp_samples(
                     frame,
                     spot_geometries,
                     Path(args.dump_warp_samples),
                     source_name="camera_frame",
                     limit=args.dump_warp_limit,
                 )
-                warp_dumped = True
             if getattr(args, "display", False):
                 cv2.imshow("Smart Parking — live", annotated)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -1729,14 +1748,13 @@ def run_video(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int
             )
             annotated = annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"])
             if args.dump_warp_samples and not warp_dumped:
-                dump_warp_samples(
+                warp_dumped = maybe_dump_warp_samples(
                     frame,
                     spot_geometries,
                     Path(args.dump_warp_samples),
                     source_name=video_path.name,
                     limit=args.dump_warp_limit,
                 )
-                warp_dumped = True
             if getattr(args, "display", False):
                 cv2.imshow("Smart Parking — live", annotated)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
