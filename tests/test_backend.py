@@ -103,3 +103,39 @@ def test_generate_mjpeg_stream_wraps_latest_frame(tmp_path):
 
     assert chunk.startswith(b"--frame\r\nContent-Type: image/jpeg\r\n\r\n")
     assert chunk.endswith(frame_bytes + b"\r\n")
+
+
+def test_save_map_rejects_non_quad_points():
+    client = TestClient(app)
+    response = client.post(
+        "/map",
+        json={
+            "spots": [
+                {
+                    "spot_id": "spot_1",
+                    "points": [[0, 0], [10, 0], [10, 10]],
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 422
+    assert "exactly 4 [x, y] points" in response.json()["detail"]
+
+
+def test_save_map_rejects_non_pair_points():
+    client = TestClient(app)
+    response = client.post(
+        "/map",
+        json={
+            "spots": [
+                {
+                    "spot_id": "spot_1",
+                    "corners": [[0, 0], [10, 0], [10], [0, 10]],
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 422
+    assert "entries must be [x, y] pairs" in response.json()["detail"]

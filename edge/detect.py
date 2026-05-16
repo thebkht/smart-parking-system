@@ -392,11 +392,14 @@ def fetch_rois_from_backend(
         data = response.json()
         rois: SpotGeometries = {}
         for spot in data.get("spots", []):
-            spot_id = spot["spot_id"]
+            spot_id = str(spot["spot_id"])
             points = spot.get("points") or spot.get("corners")
             if not points:
                 continue
-            rois[str(spot_id)] = order_corners(points)
+            try:
+                rois[spot_id] = order_corners(points)
+            except Exception as exc:
+                print(f"Skipping malformed backend ROI for {spot_id}: {exc}")
         if rois:
             print(f"Loaded {len(rois)} spot geometries from backend /map.")
             return rois

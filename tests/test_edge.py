@@ -147,6 +147,33 @@ def test_fetch_rois_from_backend_preserves_quad(monkeypatch):
 
 
 def test_load_perspective_transform_builds_output_size_from_config():
+def test_fetch_rois_from_backend_skips_malformed_spots(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "spots": [
+                    {
+                        "spot_id": "spot_bad",
+                        "points": [[10], [30, 8], [35, 28], [8, 24]],
+                    },
+                    {
+                        "spot_id": "spot_good",
+                        "points": [[40, 10], [60, 10], [60, 30], [40, 30]],
+                    },
+                ]
+            }
+
+    monkeypatch.setattr("edge.detect.requests.get", lambda *args, **kwargs: FakeResponse())
+
+    rois = fetch_rois_from_backend("http://127.0.0.1:8000")
+
+    assert "spot_bad" not in rois
+    assert geometry_to_box(rois["spot_good"]) == (40, 10, 60, 30)
+
+
     transform = load_perspective_transform(
         {
             "preprocess": {
