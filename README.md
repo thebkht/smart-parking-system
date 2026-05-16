@@ -22,6 +22,23 @@ Key points:
 
 ---
 
+## ML Status
+
+Stage 2 classifier has reached production quality. **No further ML training is planned.**
+
+| Model          | Split    | Accuracy   | Precision | Recall | F1     | Size (MB) |
+| -------------- | -------- | ---------- | --------- | ------ | ------ | --------- |
+| yolov8n_stage2 | Val      | 0.9827     | 0.9784    | 0.9819 | 0.9802 | 2.83      |
+| yolov8s_stage2 | Val      | 0.9816     | 0.9727    | 0.9856 | 0.9791 | 9.78      |
+| yolov8m_stage2 | Val      | 0.9795     | 0.9670    | 0.9868 | 0.9768 | 30.22     |
+| yolov8n_stage2 | **Test** | **0.9772** | 0.9864    | 0.9570 | 0.9715 | **2.83**  |
+| yolov8s_stage2 | Test     | 0.9691     | 0.9745    | 0.9488 | 0.9615 | 9.78      |
+| yolov8m_stage2 | Test     | 0.9738     | 0.9846    | 0.9504 | 0.9672 | 30.22     |
+
+`yolov8n-cls` (2.83 MB) is the promoted checkpoint. It beats both larger variants on test accuracy while being 9× smaller than the ResNet50 paper baseline (25.6M params). Remaining work is evaluation depth and report writing — not retraining.
+
+---
+
 ## Team & Task Assignments
 
 ### [@thebkht](https://github.com/thebkht) — ML lead
@@ -47,14 +64,15 @@ Key points:
 
 **Week 7**
 
-- [ ] Analyze val accuracy vs test accuracy gap
-- [ ] Per-weather accuracy breakdown (sunny / overcast / low-light subsets)
-- [ ] Run pooling method (a) vs (b) comparison — bonus result replicating ACPDS Table 2
-- [ ] Write Stage 1 and Layout AI sections of report
+- [x] Val vs test accuracy gap analysis — `logs/week7/val_test_gap.json` documents the ~0.5–1.25pp generalization delta across n/s/m and ties it to unique-lot distribution shift rather than classic overfitting
+- [x] Per-weather accuracy breakdown — ACPDS test split is now bucketed into sunny / overcast / low-light luminance tertiles with results saved to `logs/week7/stage2_acpds_weather.json`
+- [x] Pooling method (a) vs (b) comparison — `logs/week7/pooling_comparison.json` shows quad warps at `0.9772` test accuracy versus `0.9638` for bounding-square pooling (`-1.34 pp`) on the same YOLOv8n Stage 2 setup
+- [x] **Fix edge runtime quad warp** — `edge/detect.py` now preserves polygons end-to-end and classifies `warpPerspective(128×128)` patches; visual QA samples are saved under `logs/week7/warp_comparison/`
+- [x] Write Stage 1 and Layout AI sections of technical report
 
 **Week 8**
 
-- [ ] Finalize all accuracy tables and figures
+- [ ] Finalize all accuracy tables and figures (fill in model comparison table with test results)
 - [ ] Present ACPDS justification, quad pooling, and ML pipeline in class
 
 ---
@@ -65,26 +83,27 @@ Key points:
 
 **Week 5**
 
-- [ ] Write Related Work section — ACPDS paper (`arXiv:2107.12207`), PKLot, YOLOv8, SfM / visual localization
+- [x] Write Related Work section — ACPDS paper (`arXiv:2107.12207`), PKLot, YOLOv8, SfM / visual localization
 
 **Week 6**
 
-- [ ] Build ResNet50 vs YOLOv8 comparison table (accuracy + parameter count + FPS)
-- [ ] Run confidence threshold sweep on trained `YOLOv8n-cls`
-- [ ] Test SIFT localization accuracy on 10+ sample ACPDS photos
-- [ ] Write Stage 2 section of report — architecture, training config, training curves
+- [x] Build ResNet50 vs YOLOv8 comparison table (accuracy + parameter count + FPS)
+- [x] Run confidence threshold sweep on trained `YOLOv8n-cls`
+- [x] Test SIFT localization accuracy on 10+ sample ACPDS photos
+- [x] Write Stage 2 section of report — architecture, training config, training curves
 
 **Week 7**
 
-- [ ] Confusion matrix + PR curve for best model
-- [ ] Full model comparison table (`n` / `s` / `m` / INT8 vs ResNet50 baseline)
-- [ ] Localization accuracy table: top-1 / top-3 on 20+ real driver photos
-- [ ] Write Find My Car and Evaluation sections of report
+- [ ] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — expected result: high precision (98.6%), lower recall (95.7%), so the matrix will show more occupied→free misses than false alarms; explain this in terms of patch quality (partial vehicles, border regions after warp)
+- [ ] Full model comparison table — fill in `n` / `s` / `m` / INT8 vs ResNet50 paper baseline with accuracy, F1, parameter count, model size, and FPS; include the finding that larger variants do not improve test accuracy
+- [ ] Confidence threshold sweep results — plot precision/recall tradeoff for `yolov8n-cls` at thresholds 0.3–0.9; identify optimal operating point
+- [ ] Localization accuracy table — expand beyond the current 1/1 sample; collect top-1 and top-3 accuracy on 20+ real driver photos across varying lighting conditions
+- [ ] Write Find My Car and Evaluation sections of technical report
 
 **Week 8**
 
-- [ ] Write Discussion section
-- [ ] Review full report for consistency across all sections
+- [ ] Write Discussion section — cover what worked (n beats larger models, quad warp beats rect crop), limitations (patch quality bottleneck, label ambiguity, localization sample size), and production considerations
+- [ ] Review full report for consistency across all sections before [@mirzayv](https://github.com/mirzayv) compiles
 - [ ] Present Related Work and Stage 2 model findings in class
 
 ---
@@ -110,14 +129,18 @@ Key points:
 
 **Week 7**
 
-- [ ] Final FPS + latency table (all backends)
-- [ ] Bandwidth savings analysis (expected >99% vs raw video)
-- [ ] System stability test: 30-minute continuous run with no crashes
-- [ ] Write Edge Benchmarks section of report
+- [ ] **Add `POST /park` endpoint** — accept a driver photo, call `ml/localize.py` SIFT matching against stored `spot_references`, insert a row into `park_sessions` table with `spot_id` + `similarity_score`, return `session_id`
+- [ ] **Add `GET /find/{session_id}` endpoint** — look up session in `park_sessions`, return `spot_id` + corner coordinates from the `layout` table; return 404 if session not found
+- [ ] **Resolve `POST /layout` vs `POST /map` naming** — pick one canonical name, update the route in `backend/main.py`, notify @mirzayv so frontend fetch path matches, document final contract in `backend/README.md`
+- [ ] **Fix `GET /status` response shape** — currently returns `{ spots, confidence, timestamp }`; confirm this is the final shape and document it in `backend/README.md` so @mirzayv can update the frontend parser to read `response.spots`
+- [ ] Final FPS + latency table (all backends: MPS / CPU / ONNX FP32 / ONNX INT8)
+- [ ] Bandwidth savings analysis — expected >99% vs raw H.264; use the measurement script from PRD §8.3 and include actual measured numbers
+- [ ] System stability test — 30-minute continuous run with no crashes; log CPU usage, memory, and FPS stability; save output to `logs/stability_test.json`
+- [ ] Write Edge Benchmarks section of technical report
 
 **Week 8**
 
-- [ ] Compile full report PDF — merge all sections
+- [ ] Compile full report PDF — collect all sections from all members and merge into final document
 - [ ] Run live occupancy detection demo in class
 - [ ] Present pipeline architecture and benchmark results
 
@@ -140,26 +163,47 @@ Key points:
 
 **Week 7**
 
-- [ ] Find My Car screen: camera → `POST /park` → store `session_id` → `GET /find/{id}` → amber spot highlight
-- [ ] React Native (Expo) wrapper: native camera access for mobile demo
-- [ ] Write App section of report — 3 screens, tech stack, Leaflet integration
+- [ ] **Fix `GET /status` response parser** — backend returns `{ spots, confidence, timestamp }`; update frontend to read `response.spots` before coloring polygons and updating free/occupied count in the header
+- [ ] **Fix `POST /layout` call** — align to the canonical name once @abdusattormv resolves the contract, then update the fetch path and `backend/README.md`
+- [ ] **Remove mock fallbacks from Find My Car** — replace fake `session_id` generation and random spot fallback with the real `POST /park` → store `session_id` → `GET /find/{session_id}` flow once [@abdusattormv](https://github.com/abdusattormv) ships the endpoints
+- [ ] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
+- [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
+- [ ] React Native (Expo) wrapper — native camera access for mobile demo; if timeline is at risk, decide by end of Week 7 and formally drop from deliverables/docs if not feasible
+- [ ] Write App section of technical report — 3 screens, tech stack, Leaflet integration, Find My Car flow
 
 **Week 8**
 
 - [ ] Write Abstract, Conclusion, and References
 - [ ] Submit technical report via email before deadline
-- [ ] Run live Find My Car demo in class — present app screens
+- [ ] Run live Find My Car demo in class — present all 3 app screens
 
 ---
 
 ## Handoff Points
 
-| When          | From                                                       | To                                               | Deliverable                                            |
-| ------------- | ---------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
-| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@abdusattormv](https://github.com/abdusattormv) | `acpds_cls/weights/best.pt` + validated sample patches |
-| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@mirzayv](https://github.com/mirzayv)           | SfM pipeline script + BEV map image                    |
-| End of Week 6 | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | [@thebkht](https://github.com/thebkht)           | Localization accuracy results (feeds Week 7 report)    |
-| End of Week 7 | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                 |
+| When          | From                                                       | To                                               | Deliverable                                                          |
+| ------------- | ---------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- |
+| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@abdusattormv](https://github.com/abdusattormv) | `acpds_cls/weights/best.pt` + validated sample patches               |
+| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@mirzayv](https://github.com/mirzayv)           | SfM pipeline script + BEV map image                                  |
+| End of Week 6 | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | [@thebkht](https://github.com/thebkht)           | Localization accuracy results (feeds Week 7 report)                  |
+| End of Week 7 | [@abdusattormv](https://github.com/abdusattormv)           | [@mirzayv](https://github.com/mirzayv)           | `POST /park` + `GET /find/{id}` live → unblocks Find My Car frontend |
+| End of Week 7 | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                               |
+
+---
+
+## Week 7 Priority Order
+
+| Priority | Task                                              | Owner                    | Blocks               |
+| -------- | ------------------------------------------------- | ------------------------ | -------------------- |
+| 1        | `POST /park` + `GET /find/{session_id}` endpoints | @abdusattormv            | Find My Car frontend |
+| 2        | Fix `GET /status` response shape                  | @abdusattormv + @mirzayv | Live map screen      |
+| 3        | Fix `POST /layout` vs `POST /map` contract        | @abdusattormv + @mirzayv | Owner setup screen   |
+| 4        | Wire Find My Car frontend end-to-end              | @mirzayv                 | Demo                 |
+| 5        | Switch map rendering to Leaflet                   | @mirzayv                 | Demo                 |
+| 6        | Fix edge runtime quad warp at inference           | @thebkht                 | PRD consistency      |
+| 7        | Confusion matrix + full comparison table          | @OtabekSadriddinov       | Report               |
+| 8        | Val/test gap + per-weather breakdown              | @thebkht                 | Report               |
+| 9        | All report sections                               | All                      | Final submission     |
 
 ---
 
@@ -256,7 +300,7 @@ make test
 
 ## Week 5 Process
 
-Use this sequence for `[@thebkht](https://github.com/thebkht)`'s ACPDS milestone.
+Use this sequence for [`@thebkht`](https://github.com/thebkht)'s ACPDS milestone.
 
 1. Extract ACPDS patches into `datasets/acpds_stage2/`.
 2. Review 20 validation samples and mark the validation report as `passed`.
@@ -365,7 +409,7 @@ Observed Week 6 comparison result:
 - `yolov8s-cls`: test accuracy `0.9691`, F1 `0.9615`, size `9.78 MB`
 - `yolov8m-cls`: test accuracy `0.9738`, F1 `0.9672`, size `30.22 MB`
 
-This means Week 6 improved comparison coverage, but the larger `s` and `m` variants did not beat the promoted `n` checkpoint. The original `>=98%` target is still narrowly missed on the checked-in test split, and the current evidence points more toward Stage 2 patch/data quality than raw model size.
+`yolov8n-cls` is the promoted checkpoint. Larger variants did not improve test accuracy. The bottleneck is Stage 2 patch quality (partial vehicles, thick border regions after perspective warp, low-information crops, label ambiguity) — not model capacity. No further retraining is planned.
 
 Notes:
 

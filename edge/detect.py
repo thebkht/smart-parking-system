@@ -17,6 +17,7 @@ import json
 import os
 import platform
 import subprocess
+import sys
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -28,6 +29,10 @@ import numpy as np
 import requests
 import yaml
 from ultralytics import YOLO
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from ml.patch_geometry import box_to_corners, order_corners, warp_patch
 
 STAGE2_MODEL_DEFAULT = "acpds_cls/weights/best.pt"
 DEFAULT_STAGE1_LOCAL_CHECKPOINT = "runs/stage1_det/yolov8s_stage1/weights/best.pt"
@@ -67,6 +72,9 @@ DEFAULT_ROIS: Dict[str, Tuple[int, int, int, int]] = {
 }
 
 PerspectiveTransform = Tuple[np.ndarray, Tuple[int, int]]
+SpotBox = Tuple[int, int, int, int]
+SpotGeometry = np.ndarray
+SpotGeometries = Dict[str, SpotGeometry]
 
 
 def load_config(config_path: Path) -> dict:
@@ -250,6 +258,17 @@ def parse_args() -> argparse.Namespace:
         help="Stage 1 spatial filtering mode: none, lot bounds, or ROI-center gating.",
     )
     parser.add_argument(
+        "--dump-warp-samples",
+        default=None,
+        help="Optional directory to save side-by-side rectangular crops vs 128x128 quad warps for visual QA.",
+    )
+    parser.add_argument(
+        "--dump-warp-limit",
+        type=int,
+        default=5,
+        help="Maximum number of warped spot samples to save per input source.",
+    )
+    parser.add_argument(
         "--camera-read-retry-limit",
         type=int,
         default=DEFAULT_CAMERA_READ_RETRY_LIMIT,
@@ -365,25 +384,24 @@ def normalize_rois(raw_rois: dict | None) -> Dict[str, Tuple[int, int, int, int]
 def fetch_rois_from_backend(
     backend_url: str = "http://127.0.0.1:8000",
     timeout: float = 3.0,
-) -> Dict[str, Tuple[int, int, int, int]]:
-    """Fetch quad polygon ROIs from GET /map and convert to bounding boxes."""
+) -> SpotGeometries:
+    """Fetch spot polygons from GET /map without collapsing them to rectangles."""
     try:
         response = requests.get(f"{backend_url}/map", timeout=timeout)
         response.raise_for_status()
         data = response.json()
-        rois: Dict[str, Tuple[int, int, int, int]] = {}
+        rois: SpotGeometries = {}
         for spot in data.get("spots", []):
-            spot_id = spot["spot_id"]
+            spot_id = str(spot["spot_id"])
             points = spot.get("points") or spot.get("corners")
             if not points:
-                continue  # skip spots with no usable geometry # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
-            xs = [p[0] for p in points]
-            ys = [p[1] for p in points]
-            x1, y1 = int(min(xs)), int(min(ys))
-            x2, y2 = int(max(xs)), int(max(ys))
-            rois[spot_id] = (x1, y1, x2, y2)
+                continue
+            try:
+                rois[spot_id] = order_corners(points)
+            except Exception as exc:
+                print(f"Skipping malformed backend ROI for {spot_id}: {exc}")
         if rois:
-            print(f"Loaded {len(rois)} ROIs from backend /map.")
+            print(f"Loaded {len(rois)} spot geometries from backend /map.")
             return rois
         print("Backend /map returned no spots, falling back to config ROIs.")
     except Exception as exc:
@@ -391,13 +409,38 @@ def fetch_rois_from_backend(
     return {}
 
 
-def load_rois(config_path: Path, backend_url: str = "http://127.0.0.1:8000") -> Dict[str, Tuple[int, int, int, int]]:
-    """Load ROIs: try backend /map first, fall back to config file."""
+def normalize_spot_geometries(raw_rois: dict | None) -> SpotGeometries:
+    normalized_boxes = normalize_rois(raw_rois)
+    return {spot_id: box_to_corners(box) for spot_id, box in normalized_boxes.items()}
+
+
+def geometry_to_box(corners: np.ndarray) -> SpotBox:
+    ordered = order_corners(corners)
+    xs = ordered[:, 0]
+    ys = ordered[:, 1]
+    return (
+        int(np.floor(float(xs.min()))),
+        int(np.floor(float(ys.min()))),
+        int(np.ceil(float(xs.max()))),
+        int(np.ceil(float(ys.max()))),
+    )
+
+
+def geometries_to_boxes(geometries: SpotGeometries) -> Dict[str, SpotBox]:
+    return {spot_id: geometry_to_box(corners) for spot_id, corners in geometries.items()}
+
+
+def load_spot_geometries(config_path: Path, backend_url: str = "http://127.0.0.1:8000") -> SpotGeometries:
     rois = fetch_rois_from_backend(backend_url)
     if rois:
         return rois
     cfg = load_config(config_path)
-    return normalize_rois(cfg.get("rois"))
+    return normalize_spot_geometries(cfg.get("rois"))
+
+
+def load_rois(config_path: Path, backend_url: str = "http://127.0.0.1:8000") -> Dict[str, Tuple[int, int, int, int]]:
+    """Legacy box view over spot geometries for tests and ROI-only code paths."""
+    return geometries_to_boxes(load_spot_geometries(config_path, backend_url=backend_url))
 
 
 def _normalize_points(raw_points: Any, label: str) -> np.ndarray:
@@ -899,20 +942,21 @@ def _result_label_confidence(result: Any) -> Tuple[str, float]:
 
 def classify_patch(
     frame: np.ndarray,
-    box: Tuple[int, int, int, int],
+    corners: np.ndarray,
     model: Union[YOLO, Any],
     device: str,
     threshold: float,
 ) -> Tuple[str, float]:
-    patch = crop_patch(frame, box)
-    if patch is None:
+    try:
+        patch = warp_patch(frame, corners, size=128)
+    except ValueError:
         return "free", 0.0
 
     # Core ML path — model is a ct.models.MLModel, not a YOLO instance
     if device == "coreml":
-        return _classify_coreml(model, patch, imgsz=640, threshold=threshold, class_names={})
+        return _classify_coreml(model, patch, imgsz=128, threshold=threshold, class_names={})
 
-    # PyTorch / ONNX path via ultralytics — let YOLO handle resizing internally
+    # Stage 2 was trained on 128x128 warped patches; pass the aligned patch directly.
     result = model(patch, device=device, verbose=False)[0]
     label, confidence = _result_label_confidence(result)
     status = "occupied" if label == "occupied" and confidence >= threshold else "free"
@@ -933,19 +977,23 @@ def build_payload(
 def annotate_frame(
     frame: np.ndarray,
     statuses: Dict[str, str],
-    spot_boxes: Dict[str, Tuple[int, int, int, int]],
+    spot_geometries: SpotGeometries,
     confidences: Dict[str, float],
 ) -> np.ndarray:
     annotated = frame.copy()
     for spot_id, status in statuses.items():
-        box = clip_box(frame.shape, spot_boxes.get(spot_id, (0, 0, 0, 0)))
+        corners = spot_geometries.get(spot_id)
+        if corners is None:
+            continue
+        box = clip_box(frame.shape, geometry_to_box(corners))
         if box is None:
             continue
         x1, y1, x2, y2 = box
         color = (255, 0, 255) if status == "occupied" else (47, 255, 173)
         text_color = (255, 255, 255) if status == "occupied" else (0, 0, 0)
         confidence = confidences.get(spot_id, 0.0)
-        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 1)
+        polygon = np.round(order_corners(corners)).astype(np.int32).reshape((-1, 1, 2))
+        cv2.polylines(annotated, [polygon], isClosed=True, color=color, thickness=1)
         label = f"{int(confidence * 100)}%"
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.38
@@ -955,6 +1003,60 @@ def annotate_frame(
         cv2.rectangle(annotated, (tx - 1, ty - th - 1), (tx + tw + 1, ty + baseline), color, -1)
         cv2.putText(annotated, label, (tx, ty), font, font_scale, text_color, thickness, cv2.LINE_AA)
     return annotated
+
+
+def dump_warp_samples(
+    frame: np.ndarray,
+    spot_geometries: SpotGeometries,
+    output_dir: Path,
+    *,
+    source_name: str,
+    limit: int = 5,
+) -> int:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dumped = 0
+    for spot_id, corners in sorted(spot_geometries.items()):
+        if dumped >= max(1, int(limit)):
+            break
+        box = clip_box(frame.shape, geometry_to_box(corners))
+        if box is None:
+            continue
+        rect_crop = crop_patch(frame, box)
+        if rect_crop is None:
+            continue
+        try:
+            quad_warp = warp_patch(frame, corners, size=128)
+        except ValueError:
+            continue
+
+        rect_vis = cv2.resize(rect_crop, (128, 128), interpolation=cv2.INTER_LINEAR)
+        canvas = np.zeros((128, 256, 3), dtype=np.uint8)
+        canvas[:, :128] = rect_vis
+        canvas[:, 128:] = quad_warp
+        cv2.putText(canvas, "rect", (6, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "warp", (134, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+
+        filename = f"{Path(source_name).stem}__{spot_id}.jpg"
+        cv2.imwrite(str(output_dir / filename), canvas)
+        dumped += 1
+    return dumped
+
+
+def maybe_dump_warp_samples(
+    frame: np.ndarray,
+    spot_geometries: SpotGeometries,
+    output_dir: Path,
+    *,
+    source_name: str,
+    limit: int = 5,
+) -> bool:
+    return dump_warp_samples(
+        frame,
+        spot_geometries,
+        output_dir,
+        source_name=source_name,
+        limit=limit,
+    ) > 0
 
 
 def log_result(payload: Dict[str, Any], log_dir: Path, log_format: str) -> None:
@@ -1183,16 +1285,17 @@ def get_spot_boxes_with_scores(
 
 def run_pipeline(
     frame: np.ndarray,
-    fixed_rois: Dict[str, Tuple[int, int, int, int]],
+    fixed_geometries: SpotGeometries,
     stage1_model: Optional[YOLO],
     stage2_model: Union[YOLO, Any],
     smooth_buf: SmoothingBuffer,
     args: argparse.Namespace,
     last_confidences: Optional[Dict[str, float]] = None,  # ← add this
-) -> Tuple[Dict[str, Any], Dict[str, Tuple[int, int, int, int]]]:
+) -> Tuple[Dict[str, Any], SpotGeometries]:
     stage1_only = getattr(args, "stage1_only", False)
     stage1_postprocess_type = getattr(args, "stage1_postprocess_type", DEFAULT_STAGE1_POSTPROCESS_TYPE)
     stage1_match_threshold = getattr(args, "stage1_match_threshold", DEFAULT_STAGE1_MATCH_THRESHOLD)
+    fixed_rois = geometries_to_boxes(fixed_geometries)
 
     if stage1_only and args.stage1_detector and stage1_model is not None:
         # Skip stage2: treat every stage1 detection as "occupied"
@@ -1211,33 +1314,38 @@ def run_pipeline(
             fixed_rois=fixed_rois,
         )
         raw_statuses: Dict[str, str] = {
-    sid: ("occupied" if spot_scores.get(sid, 0) >= STAGE1_OCCUPY_THRESHOLD else "free")
-    for sid in spot_boxes
-}
+            sid: ("occupied" if spot_scores.get(sid, 0) >= STAGE1_OCCUPY_THRESHOLD else "free")
+            for sid in spot_boxes
+        }
         confidences: Dict[str, float] = spot_scores
+        spot_geometries = {spot_id: box_to_corners(box) for spot_id, box in spot_boxes.items()}
     else:
-        spot_boxes = get_spot_boxes(
-            frame=frame,
-            fixed_rois=fixed_rois,
-            stage1_model=stage1_model,
-            device=args.device,
-            use_stage1_detector=args.stage1_detector,
-            use_sahi=args.stage1_sahi,
-            stage1_imgsz=args.stage1_imgsz,
-            slice_size=args.stage1_slice_size,
-            overlap=args.stage1_overlap,
-            min_box_area=args.stage1_min_box_area,
-            filter_mode=args.stage1_filter_mode,
-            postprocess_type=stage1_postprocess_type,
-            match_threshold=stage1_match_threshold,
-        )
+        if args.stage1_detector:
+            spot_boxes = get_spot_boxes(
+                frame=frame,
+                fixed_rois=fixed_rois,
+                stage1_model=stage1_model,
+                device=args.device,
+                use_stage1_detector=args.stage1_detector,
+                use_sahi=args.stage1_sahi,
+                stage1_imgsz=args.stage1_imgsz,
+                slice_size=args.stage1_slice_size,
+                overlap=args.stage1_overlap,
+                min_box_area=args.stage1_min_box_area,
+                filter_mode=args.stage1_filter_mode,
+                postprocess_type=stage1_postprocess_type,
+                match_threshold=stage1_match_threshold,
+            )
+            spot_geometries = {spot_id: box_to_corners(box) for spot_id, box in spot_boxes.items()}
+        else:
+            spot_geometries = fixed_geometries
 
         raw_statuses: Dict[str, str] = {}
         confidences: Dict[str, float] = {}
-        for spot_id, box in sorted(spot_boxes.items()):
+        for spot_id, corners in sorted(spot_geometries.items()):
             status, confidence = classify_patch(
                 frame=frame,
-                box=box,
+                corners=corners,
                 model=stage2_model,
                 device=args.device,
                 threshold=args.stage2_threshold,
@@ -1253,7 +1361,7 @@ def run_pipeline(
         confidences = merged
 
     payload = build_payload(smooth_buf.get_status(), confidences)
-    return payload, spot_boxes
+    return payload, spot_geometries
 
 
 def create_models(args: argparse.Namespace) -> Tuple[Optional[YOLO], Union[YOLO, Any]]:
@@ -1401,7 +1509,7 @@ def handoff_to_builtin_camera(index: Optional[int], backend: Optional[int]) -> N
         capture.release()
 
 
-def run_inference(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, int, int]]) -> int:
+def run_inference(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int:
     import glob
 
     input_path = Path(args.image)
@@ -1438,7 +1546,7 @@ def run_inference(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int
         if len(image_paths) > 1:
             smooth_buf.reset()
 
-        payload, spot_boxes = run_pipeline(frame, fixed_rois, stage1_model, stage2_model, smooth_buf, args)
+        payload, spot_geometries = run_pipeline(frame, fixed_geometries, stage1_model, stage2_model, smooth_buf, args)
 
         print(f"\n--- {image_path.name} ---")
         print(json.dumps(payload, indent=2))
@@ -1455,9 +1563,18 @@ def run_inference(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int
                 out_file = save_dir if save_dir.suffix else save_dir / image_path.name
             cv2.imwrite(
                 str(out_file),
-                annotate_frame(frame, payload["spots"], spot_boxes, payload["confidence"]),
+                annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"]),
             )
             print(f"Annotated image saved to: {out_file}")
+        if args.dump_warp_samples:
+            dumped = dump_warp_samples(
+                frame,
+                spot_geometries,
+                Path(args.dump_warp_samples),
+                source_name=image_path.name,
+                limit=args.dump_warp_limit,
+            )
+            print(f"Warp QA samples saved: {dumped}")
 
         if args.post:
             try:
@@ -1470,7 +1587,7 @@ def run_inference(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int
 import threading
 import queue
 
-def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, int, int]]) -> int:
+def run_camera(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int:
     stage1_model, stage2_model = create_models(args)
     smooth_buf = SmoothingBuffer(window=args.smooth_n)
     latest_frame_path = Path(args.latest_frame_path)
@@ -1488,6 +1605,7 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
     backend_retry_after = 0.0
     last_confidences: Dict[str, float] = {}
     consecutive_failures = 0
+    warp_dumped = False
 
     if getattr(args, "display", False):
         cv2.namedWindow("Smart Parking — live", cv2.WINDOW_NORMAL)
@@ -1510,10 +1628,18 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
             frame = apply_perspective_transform(frame, getattr(args, "perspective_transform", None))
 
             started_at = time.perf_counter()
-            payload, spot_boxes = run_pipeline(
-                frame, fixed_rois, stage1_model, stage2_model, smooth_buf, args, last_confidences
+            payload, spot_geometries = run_pipeline(
+                frame, fixed_geometries, stage1_model, stage2_model, smooth_buf, args, last_confidences
             )
-            annotated = annotate_frame(frame, payload["spots"], spot_boxes, payload["confidence"])
+            annotated = annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"])
+            if args.dump_warp_samples and not warp_dumped:
+                warp_dumped = maybe_dump_warp_samples(
+                    frame,
+                    spot_geometries,
+                    Path(args.dump_warp_samples),
+                    source_name="camera_frame",
+                    limit=args.dump_warp_limit,
+                )
             if getattr(args, "display", False):
                 cv2.imshow("Smart Parking — live", annotated)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -1574,7 +1700,7 @@ def run_camera(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, i
     return 0
 
 
-def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, int, int]]) -> int:
+def run_video(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int:
     video_path = Path(str(args.video))
     if not video_path.exists():
         raise FileNotFoundError(f"Video path not found: {video_path}")
@@ -1598,6 +1724,7 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
     last_post = time.perf_counter() - args.post_interval
     backend_retry_after = 0.0
     last_confidences: Dict[str, float] = {}
+    warp_dumped = False
 
     if getattr(args, "display", False):
         cv2.namedWindow("Smart Parking — live", cv2.WINDOW_NORMAL)
@@ -1616,10 +1743,18 @@ def run_video(args: argparse.Namespace, fixed_rois: Dict[str, Tuple[int, int, in
             frame = apply_perspective_transform(frame, getattr(args, "perspective_transform", None))
 
             started_at = time.perf_counter()
-            payload, spot_boxes = run_pipeline(
-                frame, fixed_rois, stage1_model, stage2_model, smooth_buf, args, last_confidences
+            payload, spot_geometries = run_pipeline(
+                frame, fixed_geometries, stage1_model, stage2_model, smooth_buf, args, last_confidences
             )
-            annotated = annotate_frame(frame, payload["spots"], spot_boxes, payload["confidence"])
+            annotated = annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"])
+            if args.dump_warp_samples and not warp_dumped:
+                warp_dumped = maybe_dump_warp_samples(
+                    frame,
+                    spot_geometries,
+                    Path(args.dump_warp_samples),
+                    source_name=video_path.name,
+                    limit=args.dump_warp_limit,
+                )
             if getattr(args, "display", False):
                 cv2.imshow("Smart Parking — live", annotated)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -1678,9 +1813,9 @@ def main() -> None:
     cfg = load_config(Path(args.config))
     args = resolve_settings(args, cfg)
     backend_base = args.backend_url.rsplit("/", 1)[0] if args.backend_url.endswith("/update") else args.backend_url
-    fixed_rois = load_rois(Path(args.config), backend_url=backend_base)
-    if not fixed_rois:
-        fixed_rois = normalize_rois(cfg.get("rois"))
+    fixed_geometries = load_spot_geometries(Path(args.config), backend_url=backend_base)
+    if not fixed_geometries:
+        fixed_geometries = normalize_spot_geometries(cfg.get("rois"))
     args.perspective_transform = load_perspective_transform(cfg)
 
     if args.camera is not None:
@@ -1700,10 +1835,10 @@ def main() -> None:
             print(
                 f"Built-in camera fallback is ready on index {args.fallback_camera}."
             )
-        raise SystemExit(run_camera(args, fixed_rois))
+        raise SystemExit(run_camera(args, fixed_geometries))
     if args.video is not None:
-        raise SystemExit(run_video(args, fixed_rois))
-    raise SystemExit(run_inference(args, fixed_rois))
+        raise SystemExit(run_video(args, fixed_geometries))
+    raise SystemExit(run_inference(args, fixed_geometries))
 
 
 if __name__ == "__main__":

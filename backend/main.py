@@ -45,9 +45,9 @@ class SpotPolygon(BaseModel):
     def get_points(self) -> List[List[float]]:
         """Return points regardless of whether corners or points was used."""
         if self.points is not None:
-            return self.points
+            return validate_quad_points(self.points, self.spot_id)
         if self.corners is not None:
-            return self.corners
+            return validate_quad_points(self.corners, self.spot_id)
         raise ValueError(f"Spot {self.spot_id!r} has neither points nor corners.")
 
 
@@ -62,6 +62,19 @@ class ParkSession(BaseModel):
     status: Literal["occupied", "free"]
     timestamp: str
     confidence: Optional[float] = None
+
+
+def validate_quad_points(raw_points: List[List[float]], spot_id: str) -> List[List[float]]:
+    if not isinstance(raw_points, list) or len(raw_points) != 4:
+        raise ValueError(f"Spot {spot_id!r} must contain exactly 4 [x, y] points.")
+
+    normalized: List[List[float]] = []
+    for point in raw_points:
+        if not isinstance(point, list) or len(point) != 2:
+            raise ValueError(f"Spot {spot_id!r} entries must be [x, y] pairs.")
+        x, y = point
+        normalized.append([float(x), float(y)])
+    return normalized
 
 
 # ---------------------------------------------------------------------------
