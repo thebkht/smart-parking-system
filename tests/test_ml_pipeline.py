@@ -1,4 +1,5 @@
 import json
+import runpy
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -261,6 +262,26 @@ def test_extract_patches_warp_patch_preserves_non_uniform_roi():
     assert patch.shape == (128, 128, 3)
     assert not extract_patches.is_uniform_patch(patch)
     assert len(np.unique(patch.reshape(-1, 3), axis=0)) > 100
+
+
+def test_extract_patches_script_mode_imports_patch_geometry(monkeypatch):
+    script_path = Path(extract_patches.__file__)
+    module_dir = script_path.parent
+    repo_root = module_dir.parent
+    script_mode_path = [
+        str(module_dir),
+        *[entry for entry in sys.path if Path(entry or ".").resolve() != repo_root.resolve()],
+    ]
+
+    monkeypatch.setattr(sys, "path", script_mode_path)
+    monkeypatch.setattr(sys, "argv", [str(script_path), "--help"])
+    monkeypatch.delitem(sys.modules, "ml", raising=False)
+    monkeypatch.delitem(sys.modules, "ml.patch_geometry", raising=False)
+
+    with pytest.raises(SystemExit) as exc:
+        runpy.run_path(str(script_path), run_name="__main__")
+
+    assert exc.value.code == 0
 
 
 def test_collect_roboflow_patches_uses_polygon_boxes(tmp_path):
