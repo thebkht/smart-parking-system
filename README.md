@@ -131,8 +131,8 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 - [x] **Add `POST /park` endpoint** — accept a driver photo, call `ml/localize.py` SIFT matching against stored `spot_references`, insert a row into `park_sessions` table with `spot_id` + `similarity_score`, return `session_id`
 - [x] **Add `GET /find/{session_id}` endpoint** — look up session in `park_sessions`, return `spot_id` + corner coordinates from the `layout` table; return 404 if session not found
-- [x] **Resolve `POST /layout` vs `POST /map` naming** — pick one canonical name, update the route in `backend/main.py`, notify @mirzayv so frontend fetch path matches, document final contract in `backend/README.md`
-- [x] **Fix `GET /status` response shape** — currently returns `{ spots, confidence, timestamp }`; confirm this is the final shape and document it in `backend/README.md` so @mirzayv can update the frontend parser to read `response.spots`
+- [x] **Resolve `POST /layout` vs `POST /map` naming** — pick one canonical name, update the route in `backend/main.py`, notify [@mirzayv](https://github.com/mirzayv) so frontend fetch path matches, document final contract in `backend/README.md`
+- [x] **Fix `GET /status` response shape** — currently returns `{ spots, confidence, timestamp }`; confirm this is the final shape and document it in `backend/README.md` so [@mirzayv](https://github.com/mirzayv) can update the frontend parser to read `response.spots`
 - [x] Final FPS + latency table (all backends: MPS / CPU / ONNX FP32 / ONNX INT8)
 - [x] Bandwidth savings analysis — expected >99% vs raw H.264; use the measurement script from PRD §8.3 and include actual measured numbers
 - [x] System stability test — 30-minute continuous run with no crashes; log CPU usage, memory, and FPS stability; save output to `logs/stability_test.json`
@@ -164,7 +164,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 **Week 7**
 
 - [ ] **Fix `GET /status` response parser** — backend returns `{ spots, confidence, timestamp }`; update frontend to read `response.spots` before coloring polygons and updating free/occupied count in the header
-- [ ] **Fix `POST /layout` call** — align to the canonical name once @abdusattormv resolves the contract, then update the fetch path and `backend/README.md`
+- [ ] **Fix `POST /layout` call** — align to the canonical name once [@abdusattormv](https://github.com/abdusattormv) resolves the contract, then update the fetch path and `backend/README.md`
 - [ ] **Remove mock fallbacks from Find My Car** — replace fake `session_id` generation and random spot fallback with the real `POST /park` → store `session_id` → `GET /find/{session_id}` flow once [@abdusattormv](https://github.com/abdusattormv) ships the endpoints
 - [ ] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
 - [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
@@ -193,17 +193,17 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 ## Week 7 Priority Order
 
-| Priority | Task                                              | Owner                    | Blocks               |
-| -------- | ------------------------------------------------- | ------------------------ | -------------------- |
-| 1        | `POST /park` + `GET /find/{session_id}` endpoints | @abdusattormv            | Find My Car frontend |
-| 2        | Fix `GET /status` response shape                  | @abdusattormv + @mirzayv | Live map screen      |
-| 3        | Fix `POST /layout` vs `POST /map` contract        | @abdusattormv + @mirzayv | Owner setup screen   |
-| 4        | Wire Find My Car frontend end-to-end              | @mirzayv                 | Demo                 |
-| 5        | Switch map rendering to Leaflet                   | @mirzayv                 | Demo                 |
-| 6        | Fix edge runtime quad warp at inference           | @thebkht                 | PRD consistency      |
-| 7        | Confusion matrix + full comparison table          | @OtabekSadriddinov       | Report               |
-| 8        | Val/test gap + per-weather breakdown              | @thebkht                 | Report               |
-| 9        | All report sections                               | All                      | Final submission     |
+| Priority | Task                                              | Owner                                                                                     | Blocks               |
+| -------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------- |
+| 1        | `POST /park` + `GET /find/{session_id}` endpoints | [@abdusattormv](https://github.com/abdusattormv)                                          | Find My Car frontend |
+| 2        | Fix `GET /status` response shape                  | [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv) | Live map screen      |
+| 3        | Fix `POST /layout` vs `POST /map` contract        | [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv) | Owner setup screen   |
+| 4        | Wire Find My Car frontend end-to-end              | [@mirzayv](https://github.com/mirzayv)                                                    | Demo                 |
+| 5        | Switch map rendering to Leaflet                   | [@mirzayv](https://github.com/mirzayv)                                                    | Demo                 |
+| 6        | Fix edge runtime quad warp at inference           | [@thebkht](https://github.com/thebkht)                                                    | PRD consistency      |
+| 7        | Confusion matrix + full comparison table          | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)                                | Report               |
+| 8        | Val/test gap + per-weather breakdown              | [@thebkht](https://github.com/thebkht)                                                    | Report               |
+| 9        | All report sections                               | All                                                                                       | Final submission     |
 
 ---
 
