@@ -64,11 +64,11 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 **Week 7**
 
-- [ ] Val vs test accuracy gap analysis — document the ~0.5–1pp generalization delta across n/s/m and explain it as distribution shift (unseen lots), not overfitting
-- [ ] Per-weather accuracy breakdown — evaluate on sunny / overcast / low-light subsets of the ACPDS test split separately; report accuracy per condition
+- [x] Val vs test accuracy gap analysis — `logs/week7/val_test_gap.json` documents the ~0.5–1.25pp generalization delta across n/s/m and ties it to unique-lot distribution shift rather than classic overfitting
+- [x] Per-weather accuracy breakdown — ACPDS test split is now bucketed into sunny / overcast / low-light luminance tertiles with results saved to `logs/week7/stage2_acpds_weather.json`
 - [ ] Pooling method (a) vs (b) comparison — train a parallel run using bounding-square crops instead of quad warps on the same model; report accuracy gap (bonus result replicating ACPDS Table 2)
-- [ ] **Fix edge runtime quad warp** — `edge/detect.py` currently converts polygon corners to axis-aligned bounding boxes and crops rectangles at inference time; update it to call `order_corners()` + `warpPerspective(128×128)` matching the patch extraction path; confirm with a side-by-side visual check
-- [ ] Write Stage 1 and Layout AI sections of technical report
+- [x] **Fix edge runtime quad warp** — `edge/detect.py` now preserves polygons end-to-end and classifies `warpPerspective(128×128)` patches; visual QA samples are saved under `logs/week7/warp_comparison/`
+- [x] Write Stage 1 and Layout AI sections of technical report
 
 **Week 8**
 
