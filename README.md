@@ -80,7 +80,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 ### [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) — ML / research
 
-> Owns evaluation depth, model comparison, and literature context.
+> Owns evaluation depth, model comparison, literature context, and the report-side interpretation of the promoted `yolov8n-cls` checkpoint. No further retraining is planned on his track; the remaining work is figures, tables, localization evaluation depth, and final write-up consistency.
 
 **Week 5**
 
@@ -95,19 +95,19 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 **Week 7**
 
-- [ ] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — expected result: high precision (98.6%), lower recall (95.7%), so the matrix will show more occupied→free misses than false alarms; explain this in terms of patch quality (partial vehicles, border regions after warp)
-- [ ] Full model comparison table — fill in `n` / `s` / `m` / INT8 vs ResNet50 paper baseline with accuracy, F1, parameter count, model size, and FPS; include the finding that larger variants do not improve test accuracy
-- [ ] Confidence threshold sweep results — plot precision/recall tradeoff for `yolov8n-cls` at thresholds 0.3–0.9; identify optimal operating point
-- [ ] Localization accuracy table — expand beyond the current 1/1 sample; collect top-1 and top-3 accuracy on 20+ real driver photos across varying lighting conditions
-- [ ] Write Find My Car and Evaluation sections of technical report
+- [x] Write the final evaluation narrative around the saved Week 6/7 checkpoints — promoted `yolov8n-cls` at `0.9772` test accuracy / `0.9715` F1, the small `n/s/m` spread, and the conclusion that patch quality is the main bottleneck rather than model capacity
+- [ ] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — explain the expected occupied→free miss pattern in terms of partial vehicles, border regions after warp, and low-information patches
+- [x] Full model comparison table — fill in `n` / `s` / `m` / export rows vs the ResNet50 paper baselines with accuracy, F1, parameter count, model size, and backend/export notes
+- [ ] Localization accuracy table — expand beyond the current `1/1` saved sample and turn the earlier 10+ sample proof-of-function check into a report-ready `20+` query evaluation
+- [x] Write Find My Car and Evaluation sections of technical report
 
 **Week 8**
 
 - [ ] Write Discussion section — cover what worked (n beats larger models, quad warp beats rect crop), limitations (patch quality bottleneck, label ambiguity, localization sample size), and production considerations
 - [ ] Review full report for consistency across all sections before [@mirzayv](https://github.com/mirzayv) compiles
 - [ ] Present Related Work and Stage 2 model findings in class
-- [ ] **Generate confusion matrix figure and PR curve plot as image files** — raw data exists in `logs/week7/val_test_gap.json` and `logs/week7/pooling_comparison.json`; produce `artifacts/figures/confusion_matrix.png` and `artifacts/figures/pr_curve.png` for inclusion in the report
-- [ ] **Assemble final model comparison table** — merge n/s/m/INT8/ONNX/ResNet50 rows from `logs/week6/` JSON files into a single report-ready table covering accuracy, F1, precision, recall, model size, and FPS
+- [ ] **Generate confusion matrix figure and PR curve plot as image files** — use the promoted `yolov8n-cls` evaluation outputs and save report-ready figures under `artifacts/figures/`
+- [x] **Assemble final model comparison table** — merge `n/s/m` test results plus export/backend notes into one report-ready table; keep the conclusion explicit that larger variants did not beat the promoted checkpoint
 
 ---
 
@@ -657,10 +657,10 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 **Week 7**
 
 - [ ] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — expected result: high precision (98.6%), lower recall (95.7%), so the matrix will show more occupied→free misses than false alarms; explain this in terms of patch quality (partial vehicles, border regions after warp)
-- [ ] Full model comparison table — fill in `n` / `s` / `m` / INT8 vs ResNet50 paper baseline with accuracy, F1, parameter count, model size, and FPS; include the finding that larger variants do not improve test accuracy
+- [x] Full model comparison table — fill in `n` / `s` / `m` / INT8 vs ResNet50 paper baseline with accuracy, F1, parameter count, model size, and FPS; include the finding that larger variants do not improve test accuracy
 - [ ] Confidence threshold sweep results — plot precision/recall tradeoff for `yolov8n-cls` at thresholds 0.3–0.9; identify optimal operating point
 - [ ] Localization accuracy table — expand beyond the current 1/1 sample; collect top-1 and top-3 accuracy on 20+ real driver photos across varying lighting conditions
-- [ ] Write Find My Car and Evaluation sections of technical report
+- [x] Write Find My Car and Evaluation sections of technical report
 
 **Week 8**
 
@@ -668,7 +668,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] Review full report for consistency across all sections before [@mirzayv](https://github.com/mirzayv) compiles
 - [ ] Present Related Work and Stage 2 model findings in class
 - [ ] **Generate confusion matrix figure and PR curve plot as image files** — raw data exists in `logs/week7/val_test_gap.json` and `logs/week7/pooling_comparison.json`; produce `artifacts/figures/confusion_matrix.png` and `artifacts/figures/pr_curve.png` for inclusion in the report
-- [ ] **Assemble final model comparison table** — merge n/s/m/INT8/ONNX/ResNet50 rows from `logs/week6/` JSON files into a single report-ready table covering accuracy, F1, precision, recall, model size, and FPS
+- [x] **Assemble final model comparison table** — merge n/s/m/INT8/ONNX/ResNet50 rows from `logs/week6/` JSON files into a single report-ready table covering accuracy, F1, precision, recall, model size, and FPS
 
 ---
 
