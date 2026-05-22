@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -337,13 +337,6 @@ async def get_sessions(spot_id: Optional[str] = None, limit: int = 100) -> dict:
 # ---------------------------------------------------------------------------
 # Find My Car endpoints
 # ---------------------------------------------------------------------------
-
-@app.post("/park")
-async def park(photo: bytes = None) -> dict:
-    """Accept a driver photo, localize to a spot via SIFT, save session."""
-    from fastapi import UploadFile, File
-    raise HTTPException(status_code=501, detail="Use multipart/form-data. See /park docs.")
-
 
 from fastapi import UploadFile, File
 
