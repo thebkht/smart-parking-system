@@ -74,7 +74,7 @@ export default function LeafletMap({
   useEffect(() => {
     if (!layout || !containerRef.current) return;
 
-    const { width, height } = layout.canvas;
+    const { width = 600, height = 400 } = layout.canvas ?? {};
 
     // Destroy previous instance if layout changes
     if (mapRef.current) {
@@ -203,7 +203,7 @@ export default function LeafletMap({
   // -------------------------------------------------------------------------
   if (!layout) return null;
 
-  const { width, height } = layout.canvas;
+  const { width = 600, height = 400 } = layout.canvas ?? {};
   // Match the SVG's aspect ratio so the container sizes itself correctly
   const paddingBottom = `${(height / width) * 100}%`;
 

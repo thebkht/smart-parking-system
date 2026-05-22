@@ -1,6 +1,7 @@
 import LeafletMap from "./LeafletMap";
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
+import axios from "axios";
 import {
   CameraIcon,
   GearIcon,
@@ -24,12 +25,6 @@ const PREVIEW_MIME_TYPES = new Set([
 
 function isPreviewableImage(file) {
   return Boolean(file?.type && PREVIEW_MIME_TYPES.has(file.type));
-}
-
-function generateSessionId() {
-  const bytes = new Uint8Array(6);
-  window.crypto.getRandomValues(bytes);
-  return `sess_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,33 +182,14 @@ const MOCK_STATUS = {
 };
 
 // ---------------------------------------------------------------------------
-// API helpers
+// Axios instance — all requests go through here
 // ---------------------------------------------------------------------------
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://172.16.32.43:8000";
 
-async function apiGet(path) {
-  try {
-    const r = await fetch(API_BASE + path);
-    if (!r.ok) throw new Error(r.status);
-    return await r.json();
-  } catch {
-    return null;
-  }
-}
-
-async function apiPost(path, body) {
-  try {
-    const r = await fetch(API_BASE + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error(r.status);
-    return await r.json();
-  } catch {
-    return null;
-  }
-}
+const api = axios.create({
+  baseURL: API_BASE,
+  timeout: 30000,
+});
 
 // ---------------------------------------------------------------------------
 // StatusDot
@@ -262,19 +238,33 @@ function OwnerSetup({ layout, setLayout }) {
   };
 
   const submit = async () => {
-    if (files.length < 4) {
-      setError("Upload at least 4 photos for reliable SfM.");
-      return;
-    }
-    setStep("processing");
-    setError(null);
-    await new Promise((r) => setTimeout(r, 2200));
-    const result = await apiPost("/layout", {
-      images: files.map((f) => f.name),
+  if (files.length < 4) {
+    setError("Upload at least 4 photos for reliable SfM.");
+    return;
+  }
+  setStep("processing");
+  setError(null);
+
+  const form = new FormData();
+  files.forEach((f) => form.append("images", f));
+
+  try {
+    // POST /layout returns stored map if SfM not wired yet
+    const { data } = await api.post("/layout", form, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
-    setLayout(result ?? MOCK_LAYOUT);
-    setStep("done");
-  };
+    setLayout(data);
+  } catch {
+    // Backend has no stored layout — try GET /map as fallback
+    try {
+      const { data } = await api.get("/map");
+      setLayout(data);
+    } catch {
+      setLayout(MOCK_LAYOUT);
+    }
+  }
+  setStep("done");
+};
 
   const reset = () => {
     setFiles([]);
@@ -388,8 +378,10 @@ function OwnerSetup({ layout, setLayout }) {
               Re-upload
             </button>
             <span className="text-sm text-stone-500">
-              Canvas {layout.canvas.width}×{layout.canvas.height} ·{" "}
-              {layout.source_images.length} source images
+              {layout.canvas && (
+  <>Canvas {layout.canvas.width}×{layout.canvas.height} · </>
+)}
+{layout.source_images?.length ?? 0} source images
             </span>
           </div>
         </div>
@@ -415,10 +407,14 @@ function OccupancyMap({ layout }) {
 
   const poll = useCallback(async () => {
     setPollState("polling");
-    const data = await apiGet("/status");
-    if (data) {
-      setStatus(data);
-    } else {
+    try {
+      const { data } = await api.get("/status");
+      // Backend returns { spots, confidence, timestamp } — extract spots map
+      setStatus(data.spots ?? data);
+      setLastUpdated(new Date());
+      setPollState("connected");
+    } catch {
+      // No backend — use / keep mock data so the map still renders
       setStatus((prev) => {
         if (prev) return prev;
         const toggled = {};
@@ -427,9 +423,9 @@ function OccupancyMap({ layout }) {
         });
         return toggled;
       });
+      setLastUpdated(new Date());
+      setPollState("idle");
     }
-    setLastUpdated(new Date());
-    setPollState("connected");
   }, []);
 
   const startPolling = () => {
@@ -549,7 +545,11 @@ function OccupancyMap({ layout }) {
         >
           <span className="font-mono text-base">{selectedSpot}</span>
           <span
-            className={`text-sm font-medium ${status[selectedSpot] === "free" ? "text-green-700" : "text-red-700"}`}
+            className={`text-sm font-medium ${
+              status[selectedSpot] === "free"
+                ? "text-green-700"
+                : "text-red-700"
+            }`}
           >
             {status[selectedSpot] ?? "unknown"}
           </span>
@@ -578,60 +578,49 @@ function FindMyCar({ layout }) {
   const [foundSpot, setFoundSpot] = useState(null);
   const [confidence, setConfidence] = useState(null);
   const [file, setFile] = useState(null);
-  const [error, setError] = useState(null); // eslint-disable-line no-unused-vars
+  const [error, setError] = useState(null);
   const fileRef = useRef();
   const previewCanvasRef = useRef(null);
   const previewContainerRef = useRef(null);
 
+  // Draw image preview onto canvas
   useEffect(() => {
-    if (!file || !previewCanvasRef.current || !previewContainerRef.current) {
-      const canvas = previewCanvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext("2d");
-        ctx?.clearRect(0, 0, canvas.width, canvas.height);
-      }
+    const canvas = previewCanvasRef.current;
+    if (!file) {
+      if (canvas)
+        canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       return;
     }
+    if (!canvas || !previewContainerRef.current) return;
 
     let cancelled = false;
-    const drawPreview = async () => {
+    (async () => {
       try {
         const bitmap = await createImageBitmap(file);
-        if (cancelled || !previewCanvasRef.current || !previewContainerRef.current) {
+        if (cancelled) {
           bitmap.close();
           return;
         }
-
         const container = previewContainerRef.current;
-        const canvas = previewCanvasRef.current;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           bitmap.close();
           return;
         }
-
-        const width = Math.max(1, Math.round(container.clientWidth));
-        const height = Math.max(1, Math.round(container.clientHeight));
-        canvas.width = width;
-        canvas.height = height;
-
-        const scale = Math.max(width / bitmap.width, height / bitmap.height);
-        const drawWidth = bitmap.width * scale;
-        const drawHeight = bitmap.height * scale;
-        const offsetX = (width - drawWidth) / 2;
-        const offsetY = (height - drawHeight) / 2;
-
-        ctx.clearRect(0, 0, width, height);
-        ctx.drawImage(bitmap, offsetX, offsetY, drawWidth, drawHeight);
+        const w = Math.max(1, Math.round(container.clientWidth));
+        const h = Math.max(1, Math.round(container.clientHeight));
+        canvas.width = w;
+        canvas.height = h;
+        const scale = Math.max(w / bitmap.width, h / bitmap.height);
+        const dw = bitmap.width * scale;
+        const dh = bitmap.height * scale;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(bitmap, (w - dw) / 2, (h - dh) / 2, dw, dh);
         bitmap.close();
       } catch {
-        if (!cancelled) {
-          setError("Unable to render preview for this image.");
-        }
+        if (!cancelled) setError("Unable to render preview for this image.");
       }
-    };
-
-    drawPreview();
+    })();
     return () => {
       cancelled = true;
     };
@@ -656,26 +645,37 @@ function FindMyCar({ layout }) {
   const park = async () => {
     setStep("matching");
     setError(null);
-    await new Promise((r) => setTimeout(r, 1800));
-    const result = await apiPost("/park", { filename: file?.name });
-    setSessionId(result?.session_id ?? generateSessionId());
-    setStep("parked");
+
+    // multipart/form-data — field name must match FastAPI param: photo
+    const form = new FormData();
+    form.append("photo", file);
+
+    try {
+      const { data } = await api.post("/park", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setSessionId(data.session_id);
+      setStep("parked");
+    } catch (err) {
+      const detail = err?.response?.data?.detail ?? "Could not reach backend.";
+      setError(detail);
+      setStep("ready");
+    }
   };
 
   const find = async () => {
     setStep("locating");
-    await new Promise((r) => setTimeout(r, 1200));
-    const result = await apiGet(`/find/${sessionId}`);
-    if (result?.spot_id) {
-      setFoundSpot(result.spot_id);
-      setConfidence(result.confidence ?? 0.91);
-    } else {
-      const spots = layout?.spots ?? [];
-      const pick = spots[Math.floor(Math.random() * spots.length)];
-      setFoundSpot(pick?.spot_id ?? "spot_3");
-      setConfidence(0.89 + Math.random() * 0.09);
+    try {
+      const { data } = await api.get(`/find/${sessionId}`);
+      setFoundSpot(data.spot_id);
+      setConfidence(data.similarity_score ?? data.confidence ?? 0.91);
+      setStep("found");
+    } catch (err) {
+      const detail =
+        err?.response?.data?.detail ?? "Could not locate your car.";
+      setError(detail);
+      setStep("parked");
     }
-    setStep("found");
   };
 
   const reset = () => {
@@ -703,7 +703,7 @@ function FindMyCar({ layout }) {
           identify your spot.
         </p>
 
-        {/* Photo input */}
+        {/* Photo drop zone */}
         <div
           ref={previewContainerRef}
           className="border-2 border-dashed border-stone-300 rounded-2xl overflow-hidden cursor-pointer
@@ -733,6 +733,14 @@ function FindMyCar({ layout }) {
             className="hidden"
           />
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <p className="text-sm text-red-600 mt-2 flex items-center gap-1.5">
+            <Cross2Icon className="w-3.5 h-3.5 shrink-0" />
+            {error}
+          </p>
+        )}
 
         {/* Step buttons */}
         <div className="mt-4 flex flex-col gap-3">
