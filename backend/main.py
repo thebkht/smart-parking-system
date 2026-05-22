@@ -10,11 +10,39 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 app = FastAPI()
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print("VALIDATION ERROR:", exc.errors())
+    errors = []
+    for error in exc.errors():
+        clean = {}
+        for k, v in error.items():
+            try:
+                json.dumps(v)
+                clean[k] = v
+            except (TypeError, UnicodeDecodeError):
+                clean[k] = "<non-serializable>"
+        errors.append(clean)
+    return JSONResponse(status_code=422, content={"detail": errors})
+
+
 DB = Path("parking.db")
 LATEST_FRAME_PATH = Path("logs/latest_frame.jpg")
 _conn: sqlite3.Connection | None = None
@@ -297,6 +325,7 @@ async def save_map(layout: LayoutPayload) -> dict:
     conn.commit()
     return {"status": "ok", "spots_saved": len(layout.spots)}
 
+
 @app.get("/map")
 async def get_map() -> dict:
     """Return the latest parking lot layout with quad polygons."""
@@ -428,11 +457,42 @@ async def find_car(session_id: int) -> dict:
     }
 
 
-# Canonical name is /map — add /layout as alias for frontend compatibility
+# ---------------------------------------------------------------------------
+# /layout alias — frontend compatibility
+# ---------------------------------------------------------------------------
 @app.post("/layout")
-async def save_layout_alias(layout: LayoutPayload) -> dict:
-    """Alias for POST /map — kept for frontend compatibility."""
+async def save_layout_alias(request: Request) -> dict:
+    """
+    Frontend sends raw image files here during owner setup.
+    SfM is not wired server-side yet — return the stored map if one exists,
+    otherwise 404 so the frontend fallback to MOCK_LAYOUT triggers.
+    """
+    content_type = request.headers.get("content-type", "")
+
+    if "multipart/" in content_type:
+        conn = get_conn()
+        row = conn.execute(
+            "SELECT data, updated_at FROM layout ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if row:
+            data = json.loads(row[0])
+            data["updated_at"] = row[1]
+            return data
+        raise HTTPException(
+            status_code=404,
+            detail="No layout stored yet. Load sample handoff or POST /map with a LayoutPayload.",
+        )
+
+    try:
+        body = await request.json()
+        layout = LayoutPayload.model_validate(body)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid layout payload: {exc}") from exc
+
     return await save_map(layout)
 
 
-  
+@app.get("/layout")
+async def get_layout_alias() -> dict:
+    """Alias for GET /map."""
+    return await get_map()
