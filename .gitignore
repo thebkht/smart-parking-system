@@ -54,3 +54,4 @@ datasets/*
 !datasets/acpds_stage2/map_sample.json
 
 .cursor
+.codegraph
