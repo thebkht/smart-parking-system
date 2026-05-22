@@ -65,7 +65,7 @@ def evaluate_queries(args: argparse.Namespace) -> dict[str, Any]:
         top_k_spot_ids = [
             str(candidate.get("spot_id"))
             for candidate in result.get("candidates", [])
-            if candidate.get("spot_id")
+            if candidate.get("spot_id") and candidate.get("passed")
         ]
         rows.append(
             {
