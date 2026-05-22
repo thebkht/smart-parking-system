@@ -62,12 +62,19 @@ def evaluate_queries(args: argparse.Namespace) -> dict[str, Any]:
             ransac_threshold=args.ransac_threshold,
             top_k=args.top_k,
         )
+        top_k_spot_ids = [
+            str(candidate.get("spot_id"))
+            for candidate in result.get("candidates", [])
+            if candidate.get("spot_id") and candidate.get("passed")
+        ]
         rows.append(
             {
                 "image": item["image"],
                 "expected_spot_id": item["expected_spot_id"],
                 "predicted_spot_id": result["spot_id"],
                 "correct": result["spot_id"] == item["expected_spot_id"],
+                "top_k_correct": item["expected_spot_id"] in top_k_spot_ids,
+                "top_k_spot_ids": top_k_spot_ids,
                 "score": result["score"],
                 "match_count": result["match_count"],
                 "inlier_count": result["inlier_count"],
@@ -77,10 +84,15 @@ def evaluate_queries(args: argparse.Namespace) -> dict[str, Any]:
         )
 
     correct = sum(1 for row in rows if row["correct"])
+    top_k_correct = sum(1 for row in rows if row["top_k_correct"])
+    elapsed_values = [float(row["elapsed_ms"]) for row in rows]
     summary = {
         "query_count": len(rows),
         "correct_count": correct,
         "accuracy": round(correct / len(rows), 4) if rows else 0.0,
+        "top_k_correct_count": top_k_correct,
+        "top_k_accuracy": round(top_k_correct / len(rows), 4) if rows else 0.0,
+        "avg_elapsed_ms": round(sum(elapsed_values) / len(elapsed_values), 2) if elapsed_values else 0.0,
         "rows": rows,
     }
     return summary

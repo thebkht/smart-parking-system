@@ -34,8 +34,30 @@ def test_evaluate_queries_scores_predictions(tmp_path, monkeypatch):
 
     results = iter(
         [
-            {"spot_id": "spot_1", "score": 10.0, "match_count": 12, "inlier_count": 9, "elapsed_ms": 1.0, "failure_reason": None},
-            {"spot_id": "spot_3", "score": 3.0, "match_count": 5, "inlier_count": 4, "elapsed_ms": 2.0, "failure_reason": None},
+            {
+                "spot_id": "spot_1",
+                "score": 10.0,
+                "match_count": 12,
+                "inlier_count": 9,
+                "elapsed_ms": 1.0,
+                "failure_reason": None,
+                "candidates": [
+                    {"spot_id": "spot_1", "passed": True},
+                    {"spot_id": "spot_2", "passed": False},
+                ],
+            },
+            {
+                "spot_id": "spot_3",
+                "score": 3.0,
+                "match_count": 5,
+                "inlier_count": 4,
+                "elapsed_ms": 2.0,
+                "failure_reason": None,
+                "candidates": [
+                    {"spot_id": "spot_3", "passed": True},
+                    {"spot_id": "spot_2", "passed": False},
+                ],
+            },
         ]
     )
     monkeypatch.setattr(evaluate_localization, "localize_query", lambda *args, **kwargs: next(results))
@@ -54,5 +76,10 @@ def test_evaluate_queries_scores_predictions(tmp_path, monkeypatch):
     assert summary["query_count"] == 2
     assert summary["correct_count"] == 1
     assert summary["accuracy"] == 0.5
+    assert summary["top_k_correct_count"] == 1
+    assert summary["top_k_accuracy"] == 0.5
+    assert summary["avg_elapsed_ms"] == 1.5
     assert summary["rows"][0]["correct"] is True
     assert summary["rows"][1]["correct"] is False
+    assert summary["rows"][0]["top_k_correct"] is True
+    assert summary["rows"][1]["top_k_correct"] is False

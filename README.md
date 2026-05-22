@@ -96,9 +96,9 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 **Week 7**
 
 - [x] Write the final evaluation narrative around the saved Week 6/7 checkpoints — promoted `yolov8n-cls` at `0.9772` test accuracy / `0.9715` F1, the small `n/s/m` spread, and the conclusion that patch quality is the main bottleneck rather than model capacity
-- [ ] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — explain the expected occupied→free miss pattern in terms of partial vehicles, border regions after warp, and low-information patches
+- [x] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — explain the expected occupied→free miss pattern in terms of partial vehicles, border regions after warp, and low-information patches
 - [x] Full model comparison table — fill in `n` / `s` / `m` / export rows vs the ResNet50 paper baselines with accuracy, F1, parameter count, model size, and backend/export notes
-- [ ] Localization accuracy table — expand beyond the current `1/1` saved sample and turn the earlier 10+ sample proof-of-function check into a report-ready `20+` query evaluation
+- [x] Localization accuracy table — `samples/localization_refs/query_set.night_overhead.json` now evaluates `21` labeled same-lot night queries, including three reference-frame sanity checks, with `1.000` top-1 / `1.000` top-3 accuracy; tracked summary in `samples/localization_refs/localize_eval.night_overhead.md`
 - [x] Write Find My Car and Evaluation sections of technical report
 
 **Week 8**
@@ -213,7 +213,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 | 5        | Generate confusion matrix + PR curve figures                            | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report figures                     |
 | 6        | Assemble final model comparison table                                   | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report table                       |
 | 7        | Write Discussion section                                                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report                             |
-| 8        | Localization accuracy (20+ photos)                                      | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report — currently 1/1 sample only |
+| 8        | Localization accuracy (21 labeled night-overhead photos)                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Complete — see `samples/localization_refs/localize_eval.night_overhead.md` |
 | 9        | Update `docs/final-artifact-summary.md` + `docs/final-runbook.md` to v6 | [@thebkht](https://github.com/thebkht)                     | Report consistency                 |
 | 10       | Write Abstract, Conclusion, References, App section                     | [@mirzayv](https://github.com/mirzayv)                     | Report                             |
 | 11       | Finalize accuracy tables + figures for presentation                     | [@thebkht](https://github.com/thebkht)                     | Presentation                       |
@@ -481,7 +481,7 @@ make localize-car LOCALIZE_ARGS="--query samples/query.jpg --references samples/
 Evaluate multiple labeled localization queries:
 
 ```bash
-python ml/evaluate_localization.py --queries samples/localization_refs/query_set.sample.json --references samples/localization_refs/labeled --output-json logs/localize_eval.json --output-csv logs/localize_eval.csv
+python ml/evaluate_localization.py --queries samples/localization_refs/query_set.night_overhead.json --references samples/localization_refs/labeled --output-json logs/localize_eval.json --output-csv logs/localize_eval.csv
 ```
 
 Supported reference layouts:
@@ -504,7 +504,7 @@ or:
 }
 ```
 
-Starter sample references are available under [samples/localization_refs](/Users/thebkht/Projects/smart-parking-system/samples/localization_refs). The current starter set is meant for proof-of-function only. In the current sample evaluation run, `ml/evaluate_localization.py` matched `1/1` labeled queries correctly: `photo_2026-04-23_21.29.43.jpeg` was assigned to `spot_2` with 861 inliers and about 603 ms runtime.
+Starter sample references are available under [samples/localization_refs](samples/localization_refs). The current checked-in evaluation set is [query_set.night_overhead.json](samples/localization_refs/query_set.night_overhead.json): `21` labeled same-lot night-overhead queries, including the three labeled reference timestamps as sanity-check queries, scored `21/21` top-1 correct and `21/21` top-3 correct, with average runtime `536.18 ms`, summarized in [localize_eval.night_overhead.md](samples/localization_refs/localize_eval.night_overhead.md). Regenerated machine outputs are still written to `logs/localize_eval.json` and `logs/localize_eval.csv`.
 
 ---
 
@@ -560,4 +560,3 @@ Model publishing guidance is in [`MODEL_LICENSE.md`](MODEL_LICENSE.md).
 - [`backend/README.md`](backend/README.md)
 
 ---
-
