@@ -62,7 +62,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] Implement SIFT car localization (`cv2.SIFT_create()` + FLANN matcher)
 - [x] Write Dataset section of report
 
-**Week 7**
+**Next week: process show**
 
 - [x] Val vs test accuracy gap analysis — `logs/week7/val_test_gap.json` documents the ~0.5–1.25pp generalization delta across n/s/m and ties it to unique-lot distribution shift rather than classic overfitting
 - [x] Per-weather accuracy breakdown — ACPDS test split is now bucketed into sunny / overcast / low-light luminance tertiles with results saved to `logs/week7/stage2_acpds_weather.json`
@@ -70,7 +70,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] **Fix edge runtime quad warp** — `edge/detect.py` now preserves polygons end-to-end and classifies `warpPerspective(128×128)` patches; visual QA samples are saved under `logs/week7/warp_comparison/`
 - [x] Write Stage 1 and Layout AI sections of technical report
 
-**Week 8**
+**Two weeks later: final submission**
 
 - [ ] Finalize all accuracy tables and figures (fill in model comparison table with test results)
 - [ ] Present ACPDS justification, quad pooling, and ML pipeline in class
@@ -93,7 +93,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] Test SIFT localization accuracy on 10+ sample ACPDS photos
 - [x] Write Stage 2 section of report — architecture, training config, training curves
 
-**Week 7**
+**Next week: process show**
 
 - [x] Write the final evaluation narrative around the saved Week 6/7 checkpoints — promoted `yolov8n-cls` at `0.9772` test accuracy / `0.9715` F1, the small `n/s/m` spread, and the conclusion that patch quality is the main bottleneck rather than model capacity
 - [x] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — explain the expected occupied→free miss pattern in terms of partial vehicles, border regions after warp, and low-information patches
@@ -101,7 +101,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] Localization accuracy table — `samples/localization_refs/query_set.night_overhead.json` now evaluates `21` labeled same-lot night queries, including three reference-frame sanity checks, with `1.000` top-1 / `1.000` top-3 accuracy; tracked summary in `samples/localization_refs/localize_eval.night_overhead.md`
 - [x] Write Find My Car and Evaluation sections of technical report
 
-**Week 8**
+**Two weeks later: final submission**
 
 - [ ] Write Discussion section — cover what worked (n beats larger models, quad warp beats rect crop), limitations (patch quality bottleneck, label ambiguity, localization sample size), and production considerations
 - [ ] Review full report for consistency across all sections before [@mirzayv](https://github.com/mirzayv) compiles
@@ -130,7 +130,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] Bandwidth measurement and comparison vs H.264 streaming
 - [x] Write System Architecture and Inference Pipeline sections of report
 
-**Week 7**
+**Next week: process show**
 
 - [x] **Add `POST /park` endpoint** — accept a driver photo, call `ml/localize.py` SIFT matching against stored `spot_references`, insert a row into `park_sessions` table with `spot_id` + `similarity_score`, return `session_id`
 - [x] **Add `GET /find/{session_id}` endpoint** — look up session in `park_sessions`, return `spot_id` + corner coordinates from the `layout` table; return 404 if session not found
@@ -141,9 +141,16 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] System stability test — 30-minute continuous run with no crashes; log CPU usage, memory, and FPS stability; save output to `logs/stability_test.json`
 - [x] Write Edge Benchmarks section of technical report
 
-**Week 8**
+**Two weeks later: final submission**
 
 - [x] **Fix duplicate `POST /park` handler** — there are two handlers for the same path in `backend/main.py`; the first returns `501` and sits before the real multipart handler, blocking the Find My Car flow end-to-end; remove the stub and confirm the multipart handler is the only route for that path
+- [ ] **Wire real owner setup into `POST /layout`** — PRD says owner setup is `4-5 photos -> SfM -> store map + spot polygons`; current backend only aliases `/layout` to `/map` and stores precomputed layout JSON instead of invoking the SfM flow
+- [ ] **Add owner-setup fallback path** — if SfM fails, support the PRD fallback where the app can continue with manual polygon submission/correction instead of a hard failure
+- [ ] **Align `edge/stability_test.py` with the live quad-geometry path** — it still uses fixed ROI boxes while the runtime path loads quadrilaterals from `/map`; update the soak test so the 30-minute stability claim matches production behavior
+- [ ] **Add backend happy-path tests for PRD endpoints** — cover `/map`, `/sessions`, `/park`, and `/find/{session_id}` in `tests/test_backend.py`, not just invalid-shape `/map` inputs
+- [ ] **Fix backend test/runtime dependency for multipart uploads** — `tests/test_backend.py` currently fails at import because `python-multipart` is missing for the `/park` `UploadFile` route; add the dependency and verify backend tests run green
+- [ ] **Document or implement the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or correct the docs so frontend/backend contracts are unambiguous
+- [ ] **Decide whether to keep SIFT-only Find My Car or add the MobileNetV3 upgrade path** — PRD marks MobileNetV3 embeddings as the optional upgrade; record the final backend-side decision in docs/report and implement it only if it stays in scope
 - [ ] Compile full report PDF — collect all sections from all members and merge into final document
 - [ ] Run live occupancy detection demo in class
 - [ ] Present pipeline architecture and benchmark results
@@ -165,28 +172,28 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] Live occupancy map screen: poll `GET /status` every 2–5 s → color spots green / red in real time
 - [x] Integrate BEV map image from [@thebkht](https://github.com/thebkht) into the owner setup flow
 
-**Week 7**
+**Next week: process show**
 
 - [ ] **Fix `GET /status` response parser** — backend returns `{ spots, confidence, timestamp }`; update frontend to read `response.spots` before coloring polygons and updating free/occupied count in the header
 - [ ] **Fix `POST /layout` call** — align to the canonical name once [@abdusattormv](https://github.com/abdusattormv) resolves the contract, then update the fetch path and `backend/README.md`
 - [ ] **Remove mock fallbacks from Find My Car** — replace fake `session_id` generation and random spot fallback with the real `POST /park` → store `session_id` → `GET /find/{session_id}` flow once [@abdusattormv](https://github.com/abdusattormv) ships the endpoints
 - [ ] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
 - [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
-- [ ] React Native (Expo) wrapper — native camera access for mobile demo; if timeline is at risk, decide by end of Week 7 and formally drop from deliverables/docs if not feasible
+- [ ] React Native (Expo) wrapper — native camera access for mobile demo; if timeline is at risk, decide before the process show and formally drop from deliverables/docs if not feasible
 - [ ] Write App section of technical report — 3 screens, tech stack, Leaflet integration, Find My Car flow
 
-**Week 8**
+**Two weeks later: final submission**
 
 - [ ] Write Abstract, Conclusion, and References
 - [ ] Submit technical report via email before deadline
 - [ ] Run live Find My Car demo in class — present all 3 app screens
 - [ ] **Decide React Native in/out and update docs accordingly** — if Expo wrapper is not being built, remove it from the deliverables table in `docs/prd.md` and the report outline so the submission does not reference an unbuilt feature
-- [ ] **Fix `GET /status` parser and Find My Car frontend** (carry-over from Week 7 if not done) — live map and Find My Car demo both depend on these; they must be working before the class presentation
+- [ ] **Fix `GET /status` parser and Find My Car frontend** (carry-over from the process show tasks if not done) — live map and Find My Car demo both depend on these; they must be working before the class presentation
 - [ ] **Verify `POST /layout` fetch path** matches the canonical backend route once [@abdusattormv](https://github.com/abdusattormv) confirms the name — owner setup screen is currently broken without this
 
 ---
 
-## Week 7 Priority Order
+## Next Week: Process Show Priority Order
 
 | Priority | Task                                              | Owner                                                                                     | Blocks               |
 | -------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------- |
@@ -202,7 +209,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 ---
 
-## Week 8 Priority Order
+## Two Weeks Later: Final Submission Priority Order
 
 | Priority | Task                                                                    | Owner                                                      | Blocks                             |
 | -------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------- |
@@ -221,21 +228,69 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 ---
 
+## What’s Left According to the PRD
+
+The core system exists in the repo, but the PRD is still not fully satisfied. The biggest remaining gaps are integration and product completeness rather than model training.
+
+- **Owner setup is still a prototype path** — the PRD expects `4-5 photos -> SfM -> store map + spot polygons`, but the backend currently accepts precomputed layout JSON rather than running the SfM flow end-to-end — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- **Owner correction/fallback flow is incomplete** — the PRD expects polygon correction plus a fallback when SfM fails; the current app mostly previews the result and does not expose a full correction workflow — owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
+- **Live map frontend is not yet aligned with the backend contract** — `/status` returns `{ spots, confidence, timestamp }`, but the frontend still treats the whole response as the occupancy map — owner: [@mirzayv](https://github.com/mirzayv)
+- **Find My Car frontend is not yet using the real backend path** — backend `/park` and `/find/{id}` exist, but the frontend still falls back to generated session IDs and random spot selection — owner: [@mirzayv](https://github.com/mirzayv)
+- **Reference-photo management is not productized** — localization currently reads from a fixed sample folder instead of a real per-spot reference management flow — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- **Stability verification does not yet match the live runtime path** — the checked-in stability harness still uses fixed ROI boxes instead of the `/map`-driven quadrilateral geometry contract used by `edge/detect.py` — owner: [@abdusattormv](https://github.com/abdusattormv)
+- **Backend happy-path coverage is still missing** — `/map`, `/sessions`, `/park`, and `/find/{session_id}` success cases are not fully tested — owner: [@abdusattormv](https://github.com/abdusattormv)
+- **Backend multipart dependency is still missing** — `/park` needs `python-multipart`, and backend tests do not currently run clean without it — owner: [@abdusattormv](https://github.com/abdusattormv)
+- **Docs are not fully normalized to the final contract** — route naming and architecture notes still disagree in places, especially around `/layout` vs `/map` — owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
+- **React Native/mobile scope is still undecided** — the web app exists, but the PRD still mentions a mobile app that is not clearly either completed or formally dropped — owner: [@mirzayv](https://github.com/mirzayv)
+
+### Short Priority View
+
+**Before the process show**
+
+1. Fix frontend `/status` parsing.
+Owner: [@mirzayv](https://github.com/mirzayv)
+2. Replace Find My Car frontend mock fallbacks with the real backend flow.
+Owner: [@mirzayv](https://github.com/mirzayv)
+3. Add backend happy-path tests and install `python-multipart`.
+Owner: [@abdusattormv](https://github.com/abdusattormv)
+4. Align the stability test with the quadrilateral `/map` path.
+Owner: [@abdusattormv](https://github.com/abdusattormv)
+5. Decide whether owner setup will be shown as a real integrated flow or as a documented prototype.
+Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht) + [@mirzayv](https://github.com/mirzayv)
+
+**Before final submission**
+
+1. Wire the real owner setup flow into `/layout`, or explicitly narrow the documented scope.
+Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+2. Add owner fallback/correction behavior.
+Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
+3. Resolve route/doc mismatches and normalize report-facing docs.
+Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
+4. Decide SIFT-only vs MobileNetV3 upgrade scope for Find My Car.
+Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
+5. Decide React Native in/out and update all deliverables/docs consistently.
+Owner: [@mirzayv](https://github.com/mirzayv)
+
+---
+
 ## Remaining Gap Checklist
 
 ### 🔴 Must fix before demo
 
-- [ ] **Fix duplicate `POST /park` handler** (`backend/main.py`) — stub returning `501` sits before the real multipart handler; blocks Find My Car end-to-end — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Fix `GET /status` response parser** (`frontend/src/App.jsx`) — frontend reads the whole object as spot states instead of `response.spots`; live map is broken — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Wire Find My Car frontend end-to-end** — replace fake session IDs and random-spot fallback with real `POST /park` → `GET /find/{session_id}` flow — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Fix `POST /layout` fetch path** — align frontend call to whichever canonical name [@abdusattormv](https://github.com/abdusattormv) confirms; owner setup screen is currently broken — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Add backend integration tests for new endpoints** — `/park`, `/find/{session_id}`, `/sessions`, `/map` happy paths are not covered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Add backend happy-path tests for PRD endpoints** — `/park`, `/find/{session_id}`, `/sessions`, and `/map` success paths are still uncovered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Fix backend multipart dependency and run tests green** — backend test collection currently fails because `/park` uses `UploadFile` but `python-multipart` is not installed; add the dependency and verify `.venv/bin/python -m pytest tests/test_backend.py tests/test_edge.py` passes — [@abdusattormv](https://github.com/abdusattormv)
 
 ### 🟡 Should fix for PRD compliance
 
+- [ ] **Wire real owner setup into `POST /layout`** — PRD says owner setup is `4-5 photos -> SfM -> store map + spot polygons`; current backend aliases `/layout` to `/map` and stores precomputed layout JSON instead of invoking the SfM flow — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- [ ] **Add owner-setup fallback path** — if SfM fails, support the PRD fallback where the app can continue with manual polygon submission/correction instead of hard-failing the flow — [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
 - [ ] **Owner setup: polygon label-correction step** — PRD owner flow requires editing/relabelling spot polygons after layout generation; `frontend/src/App.jsx:347` only previews the map with no edit workflow — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Wire SfM into backend** — `ml/sfm_layout.py` exists but nothing in `backend/main.py` invokes it on uploaded owner photos; `POST /layout` currently stores a layout payload directly rather than running SfM — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- [ ] **Align `edge/stability_test.py` with the live quad-geometry path** — the checked-in stability harness still builds fixed ROI boxes, while the production runtime loads quadrilaterals from `/map`; the soak test should exercise the same geometry contract as `edge/detect.py` — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Reference-photo management for Find My Car** — PRD implies per-spot stored references; backend currently reads a fixed local sample folder rather than persisting uploaded references per spot in the DB — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Resolve the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or fix the docs so frontend/backend contracts are unambiguous — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Decide whether Find My Car stays SIFT-only** — PRD marks MobileNetV3 embeddings as the optional upgrade path; record the final decision in docs/report and implement it only if it remains in scope — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 - [ ] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Resolve doc inconsistencies on canonical routes and architecture** — `docs/final-artifact-summary.md`, `docs/final-runbook.md`, and `backend/README.md` still disagree in places; normalise to v6 before report submission — [@thebkht](https://github.com/thebkht)
 - [ ] **Add frontend tests for three PRD screens and API contracts** — no frontend tests exist for owner setup, live map, or Find My Car flows — [@mirzayv](https://github.com/mirzayv)
@@ -246,7 +301,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] **End-to-end smoke-test script** — a single runnable script that proves the full PRD path works: owner setup → map persistence → edge updates → live map → park/find flow; currently no such script exists
 - [ ] **React Native / Expo wrapper** — native camera access for mobile demo; deprioritised given timeline but would complete the PRD mobile deliverable — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Auth and session ownership model** — no auth, multi-user handling, or session ownership is present; acceptable for a class demo but absent from a fuller product interpretation
-- [ ] **Verify full runtime with installed deps** — runtime could not be verified because the environment lacks `fastapi` and `pytest`; a confirmed green `make test` + `make backend` + `make edge` run would close this gap
+- [ ] **Run one full green local verification pass** — after fixing the multipart dependency, confirm `make test`, `make backend`, and one representative `make edge ...` path all work in the checked-in environment
 
 ---
 
@@ -256,9 +311,9 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 | ------------- | ---------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- |
 | End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@abdusattormv](https://github.com/abdusattormv) | `acpds_cls/weights/best.pt` + validated sample patches               |
 | End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@mirzayv](https://github.com/mirzayv)           | SfM pipeline script + BEV map image                                  |
-| End of Week 6 | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | [@thebkht](https://github.com/thebkht)           | Localization accuracy results (feeds Week 7 report)                  |
-| End of Week 7 | [@abdusattormv](https://github.com/abdusattormv)           | [@mirzayv](https://github.com/mirzayv)           | `POST /park` + `GET /find/{id}` live → unblocks Find My Car frontend |
-| End of Week 7 | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                               |
+| Before the process show | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | [@thebkht](https://github.com/thebkht)           | Localization accuracy results (feeds the process-show narrative and evaluation section) |
+| End of next week | [@abdusattormv](https://github.com/abdusattormv)           | [@mirzayv](https://github.com/mirzayv)           | `POST /park` + `GET /find/{id}` live → unblocks Find My Car frontend |
+| Before final submission | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                               |
 
 ---
 
