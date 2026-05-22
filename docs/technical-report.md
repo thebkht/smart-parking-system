@@ -343,7 +343,7 @@ The project achieved its main system goal: a working two-stage edge pipeline tha
 
 - very strong Stage 1 scene-held-out localization performance
 - a reproducible `n` / `s` / `m` Stage 2 comparison
-- a working SIFT + FLANN localization prototype with a sample `1/1` correct query evaluation
+- a working SIFT + FLANN localization path with a checked-in `21/21` correct night-overhead query evaluation
 - compact ONNX and Core ML export artifacts for the promoted Week 5 checkpoint
 - strong bandwidth savings relative to continuous video streaming
 
@@ -353,7 +353,7 @@ First, the Stage 2 classifier still did not exceed the original 98% target on th
 
 ## 10. Conclusion
 
-This project demonstrates that a laptop-based edge parking system can combine full-frame parking-space localization and per-space occupancy classification into a practical two-stage inference pipeline. The checked-in Week 7 state uses a YOLO Stage 1 parking-space detector, a promoted `yolov8n-cls` checkpoint for the handoff path, and a runtime that now warps spot quadrilaterals to `128 x 128` exactly as the ACPDS training pipeline does. The system achieves strong Stage 1 localization performance, useful Stage 2 comparison coverage, a working proof-of-function SIFT localization path, a BEV layout-generation prototype, compact export artifacts, and bandwidth reduction of more than 99.9% compared with continuous video transmission.
+This project demonstrates that a laptop-based edge parking system can combine full-frame parking-space localization and per-space occupancy classification into a practical two-stage inference pipeline. The checked-in Week 7 state uses a YOLO Stage 1 parking-space detector, a promoted `yolov8n-cls` checkpoint for the handoff path, and a runtime that now warps spot quadrilaterals to `128 x 128` exactly as the ACPDS training pipeline does. The system achieves strong Stage 1 localization performance, useful Stage 2 comparison coverage, a checked-in `21/21` SIFT localization evaluation on the night-overhead sample set, a BEV layout-generation prototype, compact export artifacts, and bandwidth reduction of more than 99.9% compared with continuous video transmission.
 
 The final repo state is suitable for class demonstration and technical submission because it includes:
 

@@ -1,0 +1,86 @@
+[
+  {
+    "image": "../photo_2026-04-23 21.29.13.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.14.jpeg",
+    "expected_spot_id": "spot_1"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.15.jpeg",
+    "expected_spot_id": "spot_3"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.16.jpeg",
+    "expected_spot_id": "spot_3"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.17.jpeg",
+    "expected_spot_id": "spot_3"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.18.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.23.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.25.jpeg",
+    "expected_spot_id": "spot_1"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.30.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.31.jpeg",
+    "expected_spot_id": "spot_1"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.32.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.34.jpeg",
+    "expected_spot_id": "spot_1"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.37.jpeg",
+    "expected_spot_id": "spot_1"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.38.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.39.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.40.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.41.jpeg",
+    "expected_spot_id": "spot_3"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.43.jpeg",
+    "expected_spot_id": "spot_2"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.44.jpeg",
+    "expected_spot_id": "spot_3"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.45.jpeg",
+    "expected_spot_id": "spot_3"
+  },
+  {
+    "image": "../photo_2026-04-23 21.29.46.jpeg",
+    "expected_spot_id": "spot_3"
+  }
+]
