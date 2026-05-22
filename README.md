@@ -232,17 +232,20 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 ### 🔴 Must fix before demo
 
-- [ ] **Fix duplicate `POST /park` handler** (`backend/main.py`) — stub returning `501` sits before the real multipart handler; blocks Find My Car end-to-end — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Fix `GET /status` response parser** (`frontend/src/App.jsx`) — frontend reads the whole object as spot states instead of `response.spots`; live map is broken — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Wire Find My Car frontend end-to-end** — replace fake session IDs and random-spot fallback with real `POST /park` → `GET /find/{session_id}` flow — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Fix `POST /layout` fetch path** — align frontend call to whichever canonical name [@abdusattormv](https://github.com/abdusattormv) confirms; owner setup screen is currently broken — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Add backend integration tests for new endpoints** — `/park`, `/find/{session_id}`, `/sessions`, `/map` happy paths are not covered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Add backend happy-path tests for PRD endpoints** — `/park`, `/find/{session_id}`, `/sessions`, and `/map` success paths are still uncovered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Fix backend multipart dependency and run tests green** — backend test collection currently fails because `/park` uses `UploadFile` but `python-multipart` is not installed; add the dependency and verify `.venv/bin/python -m pytest tests/test_backend.py tests/test_edge.py` passes — [@abdusattormv](https://github.com/abdusattormv)
 
 ### 🟡 Should fix for PRD compliance
 
+- [ ] **Wire real owner setup into `POST /layout`** — PRD says owner setup is `4-5 photos -> SfM -> store map + spot polygons`; current backend aliases `/layout` to `/map` and stores precomputed layout JSON instead of invoking the SfM flow — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- [ ] **Add owner-setup fallback path** — if SfM fails, support the PRD fallback where the app can continue with manual polygon submission/correction instead of hard-failing the flow — [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
 - [ ] **Owner setup: polygon label-correction step** — PRD owner flow requires editing/relabelling spot polygons after layout generation; `frontend/src/App.jsx:347` only previews the map with no edit workflow — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Wire SfM into backend** — `ml/sfm_layout.py` exists but nothing in `backend/main.py` invokes it on uploaded owner photos; `POST /layout` currently stores a layout payload directly rather than running SfM — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- [ ] **Align `edge/stability_test.py` with the live quad-geometry path** — the checked-in stability harness still builds fixed ROI boxes, while the production runtime loads quadrilaterals from `/map`; the soak test should exercise the same geometry contract as `edge/detect.py` — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Reference-photo management for Find My Car** — PRD implies per-spot stored references; backend currently reads a fixed local sample folder rather than persisting uploaded references per spot in the DB — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Resolve the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or fix the docs so frontend/backend contracts are unambiguous — [@abdusattormv](https://github.com/abdusattormv)
+- [ ] **Decide whether Find My Car stays SIFT-only** — PRD marks MobileNetV3 embeddings as the optional upgrade path; record the final decision in docs/report and implement it only if it remains in scope — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 - [ ] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Resolve doc inconsistencies on canonical routes and architecture** — `docs/final-artifact-summary.md`, `docs/final-runbook.md`, and `backend/README.md` still disagree in places; normalise to v6 before report submission — [@thebkht](https://github.com/thebkht)
 - [ ] **Add frontend tests for three PRD screens and API contracts** — no frontend tests exist for owner setup, live map, or Find My Car flows — [@mirzayv](https://github.com/mirzayv)
@@ -253,7 +256,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] **End-to-end smoke-test script** — a single runnable script that proves the full PRD path works: owner setup → map persistence → edge updates → live map → park/find flow; currently no such script exists
 - [ ] **React Native / Expo wrapper** — native camera access for mobile demo; deprioritised given timeline but would complete the PRD mobile deliverable — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Auth and session ownership model** — no auth, multi-user handling, or session ownership is present; acceptable for a class demo but absent from a fuller product interpretation
-- [ ] **Verify full runtime with installed deps** — runtime could not be verified because the environment lacks `fastapi` and `pytest`; a confirmed green `make test` + `make backend` + `make edge` run would close this gap
+- [ ] **Run one full green local verification pass** — after fixing the multipart dependency, confirm `make test`, `make backend`, and one representative `make edge ...` path all work in the checked-in environment
 
 ---
 
