@@ -143,7 +143,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 **Week 8**
 
-- [ ] **Fix duplicate `POST /park` handler** — there are two handlers for the same path in `backend/main.py`; the first returns `501` and sits before the real multipart handler, blocking the Find My Car flow end-to-end; remove the stub and confirm the multipart handler is the only route for that path
+- [x] **Fix duplicate `POST /park` handler** — there are two handlers for the same path in `backend/main.py`; the first returns `501` and sits before the real multipart handler, blocking the Find My Car flow end-to-end; remove the stub and confirm the multipart handler is the only route for that path
 - [ ] Compile full report PDF — collect all sections from all members and merge into final document
 - [ ] Run live occupancy detection demo in class
 - [ ] Present pipeline architecture and benchmark results
