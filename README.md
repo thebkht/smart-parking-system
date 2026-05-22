@@ -174,10 +174,10 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 **Next week: process show**
 
-- [ ] **Fix `GET /status` response parser** — backend returns `{ spots, confidence, timestamp }`; update frontend to read `response.spots` before coloring polygons and updating free/occupied count in the header
-- [ ] **Fix `POST /layout` call** — align to the canonical name once [@abdusattormv](https://github.com/abdusattormv) resolves the contract, then update the fetch path and `backend/README.md`
-- [ ] **Remove mock fallbacks from Find My Car** — replace fake `session_id` generation and random spot fallback with the real `POST /park` → store `session_id` → `GET /find/{session_id}` flow once [@abdusattormv](https://github.com/abdusattormv) ships the endpoints
-- [ ] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
+- [x] **Fix `GET /status` response parser** — backend returns `{ spots, confidence, timestamp }`; update frontend to read `response.spots` before coloring polygons and updating free/occupied count in the header
+- [x] **Fix `POST /layout` call** — align to the canonical name once [@abdusattormv](https://github.com/abdusattormv) resolves the contract, then update the fetch path and `backend/README.md`
+- [x] **Remove mock fallbacks from Find My Car** — replace fake `session_id` generation and random spot fallback with the real `POST /park` → store `session_id` → `GET /find/{session_id}` flow once [@abdusattormv](https://github.com/abdusattormv) ships the endpoints
+- [x] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
 - [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
 - [ ] React Native (Expo) wrapper — native camera access for mobile demo; if timeline is at risk, decide before the process show and formally drop from deliverables/docs if not feasible
 - [ ] Write App section of technical report — 3 screens, tech stack, Leaflet integration, Find My Car flow
@@ -277,8 +277,8 @@ Owner: [@mirzayv](https://github.com/mirzayv)
 
 ### 🔴 Must fix before demo
 
-- [ ] **Fix `GET /status` response parser** (`frontend/src/App.jsx`) — frontend reads the whole object as spot states instead of `response.spots`; live map is broken — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Wire Find My Car frontend end-to-end** — replace fake session IDs and random-spot fallback with real `POST /park` → `GET /find/{session_id}` flow — [@mirzayv](https://github.com/mirzayv)
+- [x] **Fix `GET /status` response parser** (`frontend/src/App.jsx`) — frontend reads the whole object as spot states instead of `response.spots`; live map is broken — [@mirzayv](https://github.com/mirzayv)
+- [x] **Wire Find My Car frontend end-to-end** — replace fake session IDs and random-spot fallback with real `POST /park` → `GET /find/{session_id}` flow — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Add backend happy-path tests for PRD endpoints** — `/park`, `/find/{session_id}`, `/sessions`, and `/map` success paths are still uncovered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Fix backend multipart dependency and run tests green** — backend test collection currently fails because `/park` uses `UploadFile` but `python-multipart` is not installed; add the dependency and verify `.venv/bin/python -m pytest tests/test_backend.py tests/test_edge.py` passes — [@abdusattormv](https://github.com/abdusattormv)
 
