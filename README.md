@@ -211,20 +211,20 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 ## Two Weeks Later: Final Submission Priority Order
 
-| Priority | Task                                                                    | Owner                                                      | Blocks                             |
-| -------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------- |
-| 1        | Fix duplicate `POST /park` handler                                      | [@abdusattormv](https://github.com/abdusattormv)           | Find My Car frontend               |
-| 2        | Fix `GET /status` parser in frontend                                    | [@mirzayv](https://github.com/mirzayv)                     | Live map demo                      |
-| 3        | Wire Find My Car frontend end-to-end                                    | [@mirzayv](https://github.com/mirzayv)                     | Demo                               |
-| 4        | Decide React Native in/out — update PRD + report                        | [@mirzayv](https://github.com/mirzayv)                     | Report accuracy                    |
-| 5        | Generate confusion matrix + PR curve figures                            | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report figures                     |
-| 6        | Assemble final model comparison table                                   | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report table                       |
-| 7        | Write Discussion section                                                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report                             |
+| Priority | Task                                                                    | Owner                                                      | Blocks                                                                     |
+| -------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| 1        | Fix duplicate `POST /park` handler                                      | [@abdusattormv](https://github.com/abdusattormv)           | Find My Car frontend                                                       |
+| 2        | Fix `GET /status` parser in frontend                                    | [@mirzayv](https://github.com/mirzayv)                     | Live map demo                                                              |
+| 3        | Wire Find My Car frontend end-to-end                                    | [@mirzayv](https://github.com/mirzayv)                     | Demo                                                                       |
+| 4        | Decide React Native in/out — update PRD + report                        | [@mirzayv](https://github.com/mirzayv)                     | Report accuracy                                                            |
+| 5        | Generate confusion matrix + PR curve figures                            | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report figures                                                             |
+| 6        | Assemble final model comparison table                                   | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report table                                                               |
+| 7        | Write Discussion section                                                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report                                                                     |
 | 8        | Localization accuracy (21 labeled night-overhead photos)                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Complete — see `samples/localization_refs/localize_eval.night_overhead.md` |
-| 9        | Update `docs/final-artifact-summary.md` + `docs/final-runbook.md` to v6 | [@thebkht](https://github.com/thebkht)                     | Report consistency                 |
-| 10       | Write Abstract, Conclusion, References, App section                     | [@mirzayv](https://github.com/mirzayv)                     | Report                             |
-| 11       | Finalize accuracy tables + figures for presentation                     | [@thebkht](https://github.com/thebkht)                     | Presentation                       |
-| 12       | Compile full report PDF                                                 | [@abdusattormv](https://github.com/abdusattormv)           | Final submission                   |
+| 9        | Update `docs/final-artifact-summary.md` + `docs/final-runbook.md` to v6 | [@thebkht](https://github.com/thebkht)                     | Report consistency                                                         |
+| 10       | Write Abstract, Conclusion, References, App section                     | [@mirzayv](https://github.com/mirzayv)                     | Report                                                                     |
+| 11       | Finalize accuracy tables + figures for presentation                     | [@thebkht](https://github.com/thebkht)                     | Presentation                                                               |
+| 12       | Compile full report PDF                                                 | [@abdusattormv](https://github.com/abdusattormv)           | Final submission                                                           |
 
 ---
 
@@ -248,28 +248,28 @@ The core system exists in the repo, but the PRD is still not fully satisfied. Th
 **Before the process show**
 
 1. Fix frontend `/status` parsing.
-Owner: [@mirzayv](https://github.com/mirzayv)
+   Owner: [@mirzayv](https://github.com/mirzayv)
 2. Replace Find My Car frontend mock fallbacks with the real backend flow.
-Owner: [@mirzayv](https://github.com/mirzayv)
+   Owner: [@mirzayv](https://github.com/mirzayv)
 3. Add backend happy-path tests and install `python-multipart`.
-Owner: [@abdusattormv](https://github.com/abdusattormv)
+   Owner: [@abdusattormv](https://github.com/abdusattormv)
 4. Align the stability test with the quadrilateral `/map` path.
-Owner: [@abdusattormv](https://github.com/abdusattormv)
+   Owner: [@abdusattormv](https://github.com/abdusattormv)
 5. Decide whether owner setup will be shown as a real integrated flow or as a documented prototype.
-Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht) + [@mirzayv](https://github.com/mirzayv)
+   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht) + [@mirzayv](https://github.com/mirzayv)
 
 **Before final submission**
 
 1. Wire the real owner setup flow into `/layout`, or explicitly narrow the documented scope.
-Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 2. Add owner fallback/correction behavior.
-Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
+   Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
 3. Resolve route/doc mismatches and normalize report-facing docs.
-Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
+   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
 4. Decide SIFT-only vs MobileNetV3 upgrade scope for Find My Car.
-Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
+   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
 5. Decide React Native in/out and update all deliverables/docs consistently.
-Owner: [@mirzayv](https://github.com/mirzayv)
+   Owner: [@mirzayv](https://github.com/mirzayv)
 
 ---
 
@@ -291,7 +291,7 @@ Owner: [@mirzayv](https://github.com/mirzayv)
 - [ ] **Reference-photo management for Find My Car** — PRD implies per-spot stored references; backend currently reads a fixed local sample folder rather than persisting uploaded references per spot in the DB — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Resolve the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or fix the docs so frontend/backend contracts are unambiguous — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Decide whether Find My Car stays SIFT-only** — PRD marks MobileNetV3 embeddings as the optional upgrade path; record the final decision in docs/report and implement it only if it remains in scope — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- [ ] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
+- [x] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Resolve doc inconsistencies on canonical routes and architecture** — `docs/final-artifact-summary.md`, `docs/final-runbook.md`, and `backend/README.md` still disagree in places; normalise to v6 before report submission — [@thebkht](https://github.com/thebkht)
 - [ ] **Add frontend tests for three PRD screens and API contracts** — no frontend tests exist for owner setup, live map, or Find My Car flows — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Decide React Native in/out and update all docs** — if Expo wrapper is not being built, remove it from the PRD deliverables table, report outline, and README so the submission does not reference an unbuilt feature — [@mirzayv](https://github.com/mirzayv)
@@ -299,7 +299,7 @@ Owner: [@mirzayv](https://github.com/mirzayv)
 ### 🟢 Nice to have
 
 - [ ] **End-to-end smoke-test script** — a single runnable script that proves the full PRD path works: owner setup → map persistence → edge updates → live map → park/find flow; currently no such script exists
-- [ ] **React Native / Expo wrapper** — native camera access for mobile demo; deprioritised given timeline but would complete the PRD mobile deliverable — [@mirzayv](https://github.com/mirzayv)
+- [x] **React Native / Expo wrapper** — native camera access for mobile demo; deprioritised given timeline but would complete the PRD mobile deliverable — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Auth and session ownership model** — no auth, multi-user handling, or session ownership is present; acceptable for a class demo but absent from a fuller product interpretation
 - [ ] **Run one full green local verification pass** — after fixing the multipart dependency, confirm `make test`, `make backend`, and one representative `make edge ...` path all work in the checked-in environment
 
@@ -307,13 +307,13 @@ Owner: [@mirzayv](https://github.com/mirzayv)
 
 ## Handoff Points
 
-| When          | From                                                       | To                                               | Deliverable                                                          |
-| ------------- | ---------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- |
-| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@abdusattormv](https://github.com/abdusattormv) | `acpds_cls/weights/best.pt` + validated sample patches               |
-| End of Week 5 | [@thebkht](https://github.com/thebkht)                     | [@mirzayv](https://github.com/mirzayv)           | SfM pipeline script + BEV map image                                  |
+| When                    | From                                                       | To                                               | Deliverable                                                                             |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| End of Week 5           | [@thebkht](https://github.com/thebkht)                     | [@abdusattormv](https://github.com/abdusattormv) | `acpds_cls/weights/best.pt` + validated sample patches                                  |
+| End of Week 5           | [@thebkht](https://github.com/thebkht)                     | [@mirzayv](https://github.com/mirzayv)           | SfM pipeline script + BEV map image                                                     |
 | Before the process show | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | [@thebkht](https://github.com/thebkht)           | Localization accuracy results (feeds the process-show narrative and evaluation section) |
-| End of next week | [@abdusattormv](https://github.com/abdusattormv)           | [@mirzayv](https://github.com/mirzayv)           | `POST /park` + `GET /find/{id}` live → unblocks Find My Car frontend |
-| Before final submission | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                               |
+| End of next week        | [@abdusattormv](https://github.com/abdusattormv)           | [@mirzayv](https://github.com/mirzayv)           | `POST /park` + `GET /find/{id}` live → unblocks Find My Car frontend                    |
+| Before final submission | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                                                  |
 
 ---
 
