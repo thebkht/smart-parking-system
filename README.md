@@ -149,7 +149,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] **Align `edge/stability_test.py` with the live quad-geometry path** — it still uses fixed ROI boxes while the runtime path loads quadrilaterals from `/map`; update the soak test so the 30-minute stability claim matches production behavior
 - [x] **Add backend happy-path tests for PRD endpoints** — cover `/map`, `/sessions`, `/park`, and `/find/{session_id}` in `tests/test_backend.py`, not just invalid-shape `/map` inputs
 - [x] **Fix backend test/runtime dependency for multipart uploads** — `tests/test_backend.py` currently fails at import because `python-multipart` is missing for the `/park` `UploadFile` route; add the dependency and verify backend tests run green
-- [ ] **Document or implement the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or correct the docs so frontend/backend contracts are unambiguous
+- [x] **Document or implement the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or correct the docs so frontend/backend contracts are unambiguous
 - [ ] **Decide whether to keep SIFT-only Find My Car or add the MobileNetV3 upgrade path** — PRD marks MobileNetV3 embeddings as the optional upgrade; record the final backend-side decision in docs/report and implement it only if it stays in scope
 - [ ] Compile full report PDF — collect all sections from all members and merge into final document
 - [ ] Run live occupancy detection demo in class
