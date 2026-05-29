@@ -189,7 +189,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] Run live Find My Car demo in class — present all 3 app screens
 - [ ] **Decide React Native in/out and update docs accordingly** — if Expo wrapper is not being built, remove it from the deliverables table in `docs/prd.md` and the report outline so the submission does not reference an unbuilt feature
 - [ ] **Fix `GET /status` parser and Find My Car frontend** (carry-over from the process show tasks if not done) — live map and Find My Car demo both depend on these; they must be working before the class presentation
-- [ ] **Verify `POST /layout` fetch path** matches the canonical backend route once [@abdusattormv](https://github.com/abdusattormv) confirms the name — owner setup screen is currently broken without this
+- [x] **Verify `POST /layout` fetch path** matches the canonical backend route once [@abdusattormv](https://github.com/abdusattormv) confirms the name — owner setup screen is currently broken without this
 
 ---
 
@@ -280,7 +280,7 @@ Owner: [@mirzayv](https://github.com/mirzayv)
 - [x] **Fix `GET /status` response parser** (`frontend/src/App.jsx`) — frontend reads the whole object as spot states instead of `response.spots`; live map is broken — [@mirzayv](https://github.com/mirzayv)
 - [x] **Wire Find My Car frontend end-to-end** — replace fake session IDs and random-spot fallback with real `POST /park` → `GET /find/{session_id}` flow — [@mirzayv](https://github.com/mirzayv)
 - [x] **Add backend happy-path tests for PRD endpoints** — `/park`, `/find/{session_id}`, `/sessions`, and `/map` success paths are still uncovered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
-- [ ] **Fix backend multipart dependency and run tests green** — backend test collection currently fails because `/park` uses `UploadFile` but `python-multipart` is not installed; add the dependency and verify `.venv/bin/python -m pytest tests/test_backend.py tests/test_edge.py` passes — [@abdusattormv](https://github.com/abdusattormv)
+- [x] **Fix backend multipart dependency and run tests green** — backend test collection currently fails because `/park` uses `UploadFile` but `python-multipart` is not installed; add the dependency and verify `.venv/bin/python -m pytest tests/test_backend.py tests/test_edge.py` passes — [@abdusattormv](https://github.com/abdusattormv)
 
 ### 🟡 Should fix for PRD compliance
 
@@ -290,7 +290,7 @@ Owner: [@mirzayv](https://github.com/mirzayv)
 - [x] **Align `edge/stability_test.py` with the live quad-geometry path** — the checked-in stability harness still builds fixed ROI boxes, while the production runtime loads quadrilaterals from `/map`; the soak test should exercise the same geometry contract as `edge/detect.py` — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Reference-photo management for Find My Car** — PRD implies per-spot stored references; backend currently reads a fixed local sample folder rather than persisting uploaded references per spot in the DB — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Resolve the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or fix the docs so frontend/backend contracts are unambiguous — [@abdusattormv](https://github.com/abdusattormv)
-- [ ] **Decide whether Find My Car stays SIFT-only** — PRD marks MobileNetV3 embeddings as the optional upgrade path; record the final decision in docs/report and implement it only if it remains in scope — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- [x] **Decide whether Find My Car stays SIFT-only** — PRD marks MobileNetV3 embeddings as the optional upgrade path; record the final decision in docs/report and implement it only if it remains in scope — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 - [ ] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Resolve doc inconsistencies on canonical routes and architecture** — `docs/final-artifact-summary.md`, `docs/final-runbook.md`, and `backend/README.md` still disagree in places; normalise to v6 before report submission — [@thebkht](https://github.com/thebkht)
 - [ ] **Add frontend tests for three PRD screens and API contracts** — no frontend tests exist for owner setup, live map, or Find My Car flows — [@mirzayv](https://github.com/mirzayv)
