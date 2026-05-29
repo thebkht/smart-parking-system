@@ -147,8 +147,8 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] **Wire real owner setup into `POST /layout`** — PRD says owner setup is `4-5 photos -> SfM -> store map + spot polygons`; current backend only aliases `/layout` to `/map` and stores precomputed layout JSON instead of invoking the SfM flow
 - [ ] **Add owner-setup fallback path** — if SfM fails, support the PRD fallback where the app can continue with manual polygon submission/correction instead of a hard failure
 - [ ] **Align `edge/stability_test.py` with the live quad-geometry path** — it still uses fixed ROI boxes while the runtime path loads quadrilaterals from `/map`; update the soak test so the 30-minute stability claim matches production behavior
-- [ ] **Add backend happy-path tests for PRD endpoints** — cover `/map`, `/sessions`, `/park`, and `/find/{session_id}` in `tests/test_backend.py`, not just invalid-shape `/map` inputs
-- [ ] **Fix backend test/runtime dependency for multipart uploads** — `tests/test_backend.py` currently fails at import because `python-multipart` is missing for the `/park` `UploadFile` route; add the dependency and verify backend tests run green
+- [x] **Add backend happy-path tests for PRD endpoints** — cover `/map`, `/sessions`, `/park`, and `/find/{session_id}` in `tests/test_backend.py`, not just invalid-shape `/map` inputs
+- [x] **Fix backend test/runtime dependency for multipart uploads** — `tests/test_backend.py` currently fails at import because `python-multipart` is missing for the `/park` `UploadFile` route; add the dependency and verify backend tests run green
 - [ ] **Document or implement the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or correct the docs so frontend/backend contracts are unambiguous
 - [ ] **Decide whether to keep SIFT-only Find My Car or add the MobileNetV3 upgrade path** — PRD marks MobileNetV3 embeddings as the optional upgrade; record the final backend-side decision in docs/report and implement it only if it stays in scope
 - [ ] Compile full report PDF — collect all sections from all members and merge into final document
@@ -279,7 +279,7 @@ Owner: [@mirzayv](https://github.com/mirzayv)
 
 - [x] **Fix `GET /status` response parser** (`frontend/src/App.jsx`) — frontend reads the whole object as spot states instead of `response.spots`; live map is broken — [@mirzayv](https://github.com/mirzayv)
 - [x] **Wire Find My Car frontend end-to-end** — replace fake session IDs and random-spot fallback with real `POST /park` → `GET /find/{session_id}` flow — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Add backend happy-path tests for PRD endpoints** — `/park`, `/find/{session_id}`, `/sessions`, and `/map` success paths are still uncovered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
+- [x] **Add backend happy-path tests for PRD endpoints** — `/park`, `/find/{session_id}`, `/sessions`, and `/map` success paths are still uncovered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Fix backend multipart dependency and run tests green** — backend test collection currently fails because `/park` uses `UploadFile` but `python-multipart` is not installed; add the dependency and verify `.venv/bin/python -m pytest tests/test_backend.py tests/test_edge.py` passes — [@abdusattormv](https://github.com/abdusattormv)
 
 ### 🟡 Should fix for PRD compliance
