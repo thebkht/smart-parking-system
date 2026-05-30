@@ -31,9 +31,11 @@
 
 - Stage 1 `yolov8s`: present=True path=`runs/stage1_det/yolov8s_stage1/weights/best.pt`
 - Stage 1 `yolov8m`: present=False path=`runs/stage1_det/yolov8m_stage1/weights/best.pt`
-- Stage 2 `yolov8n-cls`: present=True path=`runs/stage2_cls/yolov8n_stage2/weights/best.pt`
-- Stage 2 `yolov8s-cls`: present=True path=`runs/stage2_cls/yolov8s_stage2/weights/best.pt`
-- Stage 2 `yolov8m-cls`: present=True path=`runs/stage2_cls/yolov8m_stage2/weights/best.pt`
+- Stage 2 promoted `yolov8n-cls`: present=True path=`acpds_cls/weights/best.pt`
+- Stage 2 comparison `yolov8n-cls`: present=True path=`runs/acpds_cls/yolov8n_stage2/weights/best.pt`
+- Stage 2 comparison `yolov8s-cls`: present=True path=`runs/acpds_cls/yolov8s_stage2/weights/best.pt`
+- Stage 2 comparison `yolov8m-cls`: present=True path=`runs/acpds_cls/yolov8m_stage2/weights/best.pt`
+- Exported ONNX/Core ML bundle: present=True path=`artifacts/models/`
 
 ## Acceptance Checks
 
@@ -50,6 +52,9 @@
 - benchmark_results: PASS
 - bandwidth_report: PASS
 - stability_summary: PASS
+- backend_route_contract: PASS (`/map`, `/layout`, `/status`, `/park`, `/find/{session_id}`)
+- web_frontend_contract: PASS (Owner Setup, Live Occupancy, Find My Car)
+- expo_mobile_contract: PASS (same 3 demo screens with native camera/photo picker)
 
 ## Latest Metrics Snapshot
 
@@ -59,3 +64,11 @@
 - Stage 2 threshold sweep: `{"confusion_matrix": "[[10120, 263], [1682, 11856]]", "dataset": "stage2_data/val", "f1": "0.9242", "model": "yolov8m_stage2", "precision": "0.9783", "recall": "0.8758", "sample_count": "23921", "support_free": "10383", "support_occupied": "13538", "threshold": "0.1", "top1_accuracy": "0.9187"}`
 - Stage 2 cross-dataset: `{"confusion_matrix": "[[9798, 51], [2358, 9539]]", "dataset": "cnrpark_test", "f1": "0.8879", "model": "yolov8m_stage2", "precision": "0.9947", "recall": "0.8018", "sample_count": "21746", "support_free": "9849", "support_occupied": "11897", "threshold": "0.5", "top1_accuracy": "0.8892"}`
 - Stage 2 per-weather: `{"confusion_matrix": "[[18849, 77], [3388, 15230]]", "dataset": "rainy", "f1": "0.8979", "model": "yolov8m_stage2", "precision": "0.995", "recall": "0.818", "sample_count": "37544", "support_free": "18926", "support_occupied": "18618", "threshold": "0.5", "top1_accuracy": "0.9077"}`
+
+## Final Demo Contract
+
+- Canonical inference story: ACPDS parking-space quadrilaterals are perspective-warped into `128x128` patches and classified by `YOLOv8n-cls`; the edge runtime posts compact occupancy JSON instead of raw video.
+- Canonical layout route: `GET /map` for edge/runtime consumers. `GET /layout` and `POST /layout` remain compatibility aliases for frontend owner setup.
+- Owner setup scope: Expo/web clients can upload 4+ photos to `POST /layout`; until server-side SfM is wired end-to-end, the backend returns the latest stored layout or lets the frontend fall back to `GET /map`.
+- Live occupancy scope: clients read `GET /status`, use `response.spots`, and scope counts to the active layout's spot IDs.
+- Find My Car scope: clients upload a driver photo to `POST /park`, store the returned `session_id`, then call `GET /find/{session_id}` for the highlighted spot polygon.

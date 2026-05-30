@@ -1,8 +1,132 @@
-# React + Vite
+# SmartParking — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Web app (Vite + React) and mobile app (Expo + React Native) for the SmartParking v6 system.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Structure
+
+```
+frontend/          — web app (Vite + React + Leaflet)
+frontend/mobile/   — mobile app (Expo + React Native)
+```
+
+---
+
+## Web App
+
+### Setup
+
+```bash
+cd frontend
+npm install
+```
+
+### Environment
+
+The API base URL is hardcoded in `src/App.jsx`:
+
+```js
+const API_BASE = "http://172.16.32.43:8000";
+```
+
+Change this to match your backend address before running.
+
+For local demos, start the backend with `make backend` from the repo root. The
+default backend bind address is `0.0.0.0:8000`, so browsers and phones on the
+same Wi-Fi can reach the Mac through its LAN IP.
+
+### Run
+
+```bash
+npm run dev
+```
+
+### Screens
+
+**Owner Setup** — upload 4–5 overlapping parking lot photos, submit to `POST /layout`, and preview the generated BEV map with spot polygon overlays. Falls back to `GET /map` if SfM is not wired end-to-end.
+
+**Live Occupancy Map** — polls `GET /status` every 3 seconds and colors each spot polygon green (free) or red (occupied) on a Leaflet map. Shows free/occupied/total counts in the header.
+
+**Find My Car** — take or upload a photo, POST to `/park` to run SIFT localization, store the returned `session_id`, then GET `/find/{session_id}` to highlight your spot in amber on the map.
+
+### Tech stack
+
+- Vite + React
+- Leaflet for polygon map rendering
+- Tailwind CSS v4 with custom stone/green/red/amber theme tokens
+- Radix UI icons
+- Axios for all API calls
+
+---
+
+## Mobile App
+
+### Setup
+
+```bash
+cd frontend/mobile
+npm install
+```
+
+### Environment
+
+The API base URL is in `frontend/mobile/api.js`:
+
+```js
+const API_BASE = "http://172.16.32.43:8000";
+```
+
+Change this to match your backend address.
+
+Use the Mac's LAN IP when running on a real phone through Expo Go. Do not use
+`127.0.0.1` or `localhost` for a physical device; those point at the phone
+itself. Example:
+
+```js
+const API_BASE = "http://172.16.32.43:8000";
+```
+
+The mobile Axios client logs every request, response, and failed request with
+the resolved URL, HTTP status, error code, and response body. Owner Setup also
+logs selected image metadata and whether `/layout` or the `/map` fallback
+loaded the layout.
+
+### Run
+
+```bash
+npx expo start
+```
+
+Scan the QR code with the Expo Go app on your phone, or press `a` for Android emulator.
+Keep the backend terminal open and confirm it says
+`Uvicorn running on http://0.0.0.0:8000` before testing from a phone.
+
+### Screens
+
+Same three screens as the web app — Owner Setup, Live Occupancy, Find My Car — built with native React Native components and bottom tab navigation.
+
+Live Occupancy counts only the currently loaded layout's spot IDs when showing
+Free / Occupied / Total. If `/status` contains stale or larger payloads from a
+previous layout, the grid and counters stay scoped to the active 12-spot layout.
+
+### Tech stack
+
+- Expo SDK 56
+- React Navigation (bottom tabs)
+- expo-camera + expo-image-picker for native camera access
+- Axios for API calls
+
+---
+
+## API Contract
+
+The frontend expects the backend at `http://172.16.32.43:8000` with these endpoints:
+
+| Method | Path                 | Used by                                                     |
+| ------ | -------------------- | ----------------------------------------------------------- |
+| `POST` | `/layout`            | Owner Setup                                                 |
+| `GET`  | `/map`               | Owner Setup fallback                                        |
+| `GET`  | `/status`            | Live Occupancy — returns `{ spots, confidence, timestamp }` |
+| `POST` | `/park`              | Find My Car                                                 |
+| `GET`  | `/find/{session_id}` | Find My Car                                                 |

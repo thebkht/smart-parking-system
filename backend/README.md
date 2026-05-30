@@ -6,10 +6,18 @@ The backend is a FastAPI persistence and coordination layer for the Smart Parkin
 
 ```bash
 source .venv/bin/activate
-uvicorn backend.main:app --reload
+make backend
 ```
 
 API docs available at: `http://127.0.0.1:8000/docs`
+
+`make backend` binds uvicorn to `0.0.0.0:8000` so Expo/mobile devices on the
+same Wi-Fi can reach the API through the Mac's LAN IP, for example
+`http://172.16.32.43:8000`. To run local-only, use:
+
+```bash
+make backend BACKEND_HOST=127.0.0.1
+```
 
 ---
 
