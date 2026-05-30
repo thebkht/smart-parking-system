@@ -1018,7 +1018,10 @@ def dump_warp_samples(
     for spot_id, corners in sorted(spot_geometries.items()):
         if dumped >= max(1, int(limit)):
             break
-        box = clip_box(frame.shape, geometry_to_box(corners))
+        try:
+            box = clip_box(frame.shape, geometry_to_box(corners))
+        except ValueError:
+            continue
         if box is None:
             continue
         rect_crop = crop_patch(frame, box)

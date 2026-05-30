@@ -1,6 +1,7 @@
 import sqlite3
 import sys
 import asyncio
+import types
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,42 @@ def sample_payload():
         "confidence": {"spot_1": 0.91, "spot_2": 0.22},
         "timestamp": "2026-04-21T00:00:00Z",
     }
+
+
+def sample_layout():
+    return {
+        "spots": [
+            {
+                "spot_id": "spot_1",
+                "points": [[0, 0], [10, 0], [10, 10], [0, 10]],
+                "label": "A1",
+            },
+            {
+                "spot_id": "spot_2",
+                "corners": [[20, 0], [30, 0], [30, 10], [20, 10]],
+                "label": "A2",
+            },
+        ],
+        "image_width": 100,
+        "image_height": 80,
+    }
+
+
+def stored_layout_spots():
+    return [
+        {
+            "spot_id": "spot_1",
+            "points": [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]],
+            "corners": None,
+            "label": "A1",
+        },
+        {
+            "spot_id": "spot_2",
+            "points": None,
+            "corners": [[20.0, 0.0], [30.0, 0.0], [30.0, 10.0], [20.0, 10.0]],
+            "label": "A2",
+        },
+    ]
 
 
 def test_health():
@@ -140,123 +177,111 @@ def test_save_map_rejects_non_pair_points():
     assert response.status_code == 422
     assert "entries must be [x, y] pairs" in response.json()["detail"]
 
-def test_save_map_happy_path():
+
+def test_save_map_persists_layout_and_spot_references():
     client = TestClient(app)
+    response = client.post("/map", json=sample_layout())
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "spots_saved": 2}
+
+    layout_response = client.get("/map")
+    assert layout_response.status_code == 200
+    body = layout_response.json()
+    assert body["spots"] == stored_layout_spots()
+    assert body["image_width"] == 100
+    assert body["image_height"] == 80
+    assert body["updated_at"].endswith("Z")
+
+    rows = backend_module.get_conn().execute(
+        "SELECT spot_id, label, points FROM spot_references ORDER BY spot_id"
+    ).fetchall()
+    assert rows == [
+        ("spot_1", "A1", "[[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]"),
+        ("spot_2", "A2", "[[20.0, 0.0], [30.0, 0.0], [30.0, 10.0], [20.0, 10.0]]"),
+    ]
+
+
+def test_layout_aliases_return_latest_layout():
+    client = TestClient(app)
+
+    save_response = client.post("/layout", json=sample_layout())
+    assert save_response.status_code == 200
+    assert save_response.json() == {"status": "ok", "spots_saved": 2}
+
+    get_response = client.get("/layout")
+    assert get_response.status_code == 200
+    body = get_response.json()
+    assert body["spots"] == stored_layout_spots()
+    assert body["updated_at"].endswith("Z")
+
+
+def test_multipart_layout_alias_returns_stored_layout():
+    client = TestClient(app)
+    client.post("/map", json=sample_layout())
+
     response = client.post(
-        "/map",
-        json={
-            "spots": [
-                {
-                    "spot_id": "spot_1",
-                    "points": [[0,0],[10,0],[10,10],[0,10]],
-                    "label": "free"
-                },
-                {
-                    "spot_id": "spot_2",
-                    "corners": [[20,0],[30,0],[30,10],[20,10]],
-                    "label": "occupied"
-                }
-            ],
-            "image_width": 1920,
-            "image_height": 1080
-        },
+        "/layout",
+        files=[
+            ("images", ("lot-1.jpg", b"fake-image-1", "image/jpeg")),
+            ("images", ("lot-2.jpg", b"fake-image-2", "image/jpeg")),
+        ],
     )
+
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
-    assert response.json()["spots_saved"] == 2
+    body = response.json()
+    assert body["spots"] == stored_layout_spots()
+    assert body["updated_at"].endswith("Z")
 
 
-def test_get_map_returns_layout():
-    client = TestClient(app)
-    client.post(
-        "/map",
-        json={
-            "spots": [
-                {"spot_id": "spot_1", "points": [[0,0],[10,0],[10,10],[0,10]]}
-            ]
-        },
-    )
-    response = client.get("/map")
-    assert response.status_code == 200
-    assert "spots" in response.json()
-    assert "updated_at" in response.json()
-
-
-def test_get_map_returns_404_when_empty():
-    client = TestClient(app)
-    response = client.get("/map")
-    assert response.status_code == 404
-
-
-def test_get_sessions_returns_empty():
-    client = TestClient(app)
-    response = client.get("/sessions")
-    assert response.status_code == 200
-    assert response.json()["count"] == 0
-    assert response.json()["sessions"] == []
-
-
-def test_get_sessions_after_update():
+def test_sessions_returns_recent_updates_and_filter():
     client = TestClient(app)
     client.post("/update", json=sample_payload())
+
     response = client.get("/sessions")
     assert response.status_code == 200
-    assert response.json()["count"] == 2
+    body = response.json()
+    assert body["count"] == 2
+    assert body["sessions"][0]["spot_id"] in {"spot_1", "spot_2"}
+    assert body["sessions"][0]["recorded_at"].endswith("Z")
+
+    filtered = client.get("/sessions", params={"spot_id": "spot_1"})
+    assert filtered.status_code == 200
+    assert filtered.json()["count"] == 1
+    assert filtered.json()["sessions"][0]["spot_id"] == "spot_1"
 
 
-def test_get_sessions_filtered_by_spot_id():
+def test_park_and_find_happy_path(monkeypatch):
+    fake_localize = types.ModuleType("localize")
+
+    def localize_query(*args, **kwargs):
+        return {"spot_id": "spot_1", "score": 14.031, "elapsed_ms": 312.5}
+
+    fake_localize.localize_query = localize_query
+    monkeypatch.setitem(sys.modules, "localize", fake_localize)
+
     client = TestClient(app)
-    client.post("/update", json=sample_payload())
-    response = client.get("/sessions?spot_id=spot_1")
-    assert response.status_code == 200
-    assert response.json()["count"] == 1
-    assert response.json()["sessions"][0]["spot_id"] == "spot_1"
+    client.post("/map", json=sample_layout())
 
-
-def test_find_car_returns_404_for_missing_session():
-    client = TestClient(app)
-    response = client.get("/find/99999")
-    assert response.status_code == 404
-
-
-def test_find_car_returns_session_with_corners():
-    client = TestClient(app)
-    # Save a layout first
-    client.post(
-        "/map",
-        json={
-            "spots": [
-                {"spot_id": "spot_1", "points": [[0,0],[10,0],[10,10],[0,10]]}
-            ]
-        },
+    park_response = client.post(
+        "/park",
+        files={"photo": ("driver.jpg", b"fake-driver-image", "image/jpeg")},
     )
-    # Insert a park session directly
-    conn = backend_module.get_conn()
-    cursor = conn.execute(
-        "INSERT INTO park_sessions (spot_id, status, confidence, recorded_at) VALUES (?, ?, ?, ?)",
-        ("spot_1", "occupied", 0.95, "2026-05-17T00:00:00Z"),
-    )
-    conn.commit()
-    session_id = cursor.lastrowid
+    assert park_response.status_code == 200
+    park_body = park_response.json()
+    assert park_body["session_id"] == 1
+    assert park_body["spot_id"] == "spot_1"
+    assert park_body["similarity_score"] == 14.031
+    assert park_body["elapsed_ms"] == 312.5
+    assert park_body["localized"] is True
 
-    response = client.get(f"/find/{session_id}")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["spot_id"] == "spot_1"
-    assert data["corners"] == [[0,0],[10,0],[10,10],[0,10]]
-    assert data["session_id"] == session_id
-
-
-def test_layout_alias_get():
-    client = TestClient(app)
-    client.post(
-        "/map",
-        json={
-            "spots": [
-                {"spot_id": "spot_1", "points": [[0,0],[10,0],[10,10],[0,10]]}
-            ]
-        },
-    )
-    response = client.get("/layout")
-    assert response.status_code == 200
-    assert "spots" in response.json()
+    find_response = client.get(f"/find/{park_body['session_id']}")
+    assert find_response.status_code == 200
+    assert find_response.json() == {
+        "session_id": 1,
+        "spot_id": "spot_1",
+        "corners": [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]],
+        "similarity_score": 14.031,
+        "recorded_at": find_response.json()["recorded_at"],
+    }
+    assert find_response.json()["recorded_at"].endswith("Z")

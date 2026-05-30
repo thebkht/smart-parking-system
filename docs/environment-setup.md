@@ -59,7 +59,7 @@ The `Makefile` calls the virtual environment's Python directly, so the same `mak
 
 - `opencv-python` is used instead of `opencv-python-headless` because the edge track needs webcam support
 - `onnxruntime` is included for optional ONNX inference paths
-- the backend is intentionally minimal and the frontend is out of scope
+- the FastAPI backend, Vite web app, and Expo mobile app are all part of the current demo path
 
 ## First Tasks After Install
 
@@ -80,3 +80,34 @@ Use the standalone prediction CLI when you want a quick model output without run
 ```bash
 make predict STAGE2_VARIANT=n PREDICT_SOURCE=samples/demo.jpg
 ```
+
+## Backend And Mobile Demo
+
+Start the backend from the repo root:
+
+```bash
+make backend
+```
+
+By default this binds uvicorn to `0.0.0.0:8000`. That is intentional for Expo
+testing: a physical phone must call the Mac's LAN IP, not `127.0.0.1`.
+
+Set the matching URL in `frontend/mobile/api.js`:
+
+```js
+const API_BASE = "http://<mac-lan-ip>:8000";
+```
+
+Then run Expo:
+
+```bash
+cd frontend/mobile
+npx expo start
+```
+
+If the mobile app shows `Network Error`, check:
+
+- backend log says `Uvicorn running on http://0.0.0.0:8000`
+- phone and Mac are on the same Wi-Fi
+- `frontend/mobile/api.js` uses the Mac LAN IP
+- macOS Firewall allows inbound connections to Python/uvicorn
