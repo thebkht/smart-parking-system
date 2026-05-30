@@ -32,6 +32,10 @@ const API_BASE = "http://172.16.32.43:8000";
 
 Change this to match your backend address before running.
 
+For local demos, start the backend with `make backend` from the repo root. The
+default backend bind address is `0.0.0.0:8000`, so browsers and phones on the
+same Wi-Fi can reach the Mac through its LAN IP.
+
 ### Run
 
 ```bash
@@ -75,6 +79,19 @@ const API_BASE = "http://172.16.32.43:8000";
 
 Change this to match your backend address.
 
+Use the Mac's LAN IP when running on a real phone through Expo Go. Do not use
+`127.0.0.1` or `localhost` for a physical device; those point at the phone
+itself. Example:
+
+```js
+const API_BASE = "http://172.16.32.43:8000";
+```
+
+The mobile Axios client logs every request, response, and failed request with
+the resolved URL, HTTP status, error code, and response body. Owner Setup also
+logs selected image metadata and whether `/layout` or the `/map` fallback
+loaded the layout.
+
 ### Run
 
 ```bash
@@ -82,10 +99,16 @@ npx expo start
 ```
 
 Scan the QR code with the Expo Go app on your phone, or press `a` for Android emulator.
+Keep the backend terminal open and confirm it says
+`Uvicorn running on http://0.0.0.0:8000` before testing from a phone.
 
 ### Screens
 
 Same three screens as the web app — Owner Setup, Live Occupancy, Find My Car — built with native React Native components and bottom tab navigation.
+
+Live Occupancy counts only the currently loaded layout's spot IDs when showing
+Free / Occupied / Total. If `/status` contains stale or larger payloads from a
+previous layout, the grid and counters stay scoped to the active 12-spot layout.
 
 ### Tech stack
 
