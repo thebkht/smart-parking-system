@@ -292,29 +292,29 @@ The core system exists in the repo, but the PRD is still not fully satisfied. Th
 
 **Before the process show**
 
-1. Fix frontend `/status` parsing.
-Owner: [@mirzayv](https://github.com/mirzayv)
-2. Replace Find My Car frontend mock fallbacks with the real backend flow.
-Owner: [@mirzayv](https://github.com/mirzayv)
-3. Add backend happy-path tests and install `python-multipart`.
-Owner: [@abdusattormv](https://github.com/abdusattormv)
+1. Fix frontend `/status` parsing. Complete.
+   Owner: [@mirzayv](https://github.com/mirzayv)
+2. Replace Find My Car frontend mock fallbacks with the real backend flow. Complete.
+   Owner: [@mirzayv](https://github.com/mirzayv)
+3. Add backend happy-path tests and install `python-multipart`. Complete.
+   Owner: [@abdusattormv](https://github.com/abdusattormv)
 4. Align the stability test with the quadrilateral `/map` path.
-Owner: [@abdusattormv](https://github.com/abdusattormv)
+   Owner: [@abdusattormv](https://github.com/abdusattormv)
 5. Decide whether owner setup will be shown as a real integrated flow or as a documented prototype.
-Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht) + [@mirzayv](https://github.com/mirzayv)
+   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht) + [@mirzayv](https://github.com/mirzayv)
 
 **Before final submission**
 
 1. Wire the real owner setup flow into `/layout`, or explicitly narrow the documented scope.
-Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 2. Add owner fallback/correction behavior.
-Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
-3. Resolve route/doc mismatches and normalize report-facing docs.
-Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
+   Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
+3. Keep report-facing docs aligned with the final `/map` + `/layout` compatibility contract if backend behavior changes again.
+   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
 4. Decide SIFT-only vs MobileNetV3 upgrade scope for Find My Car.
-Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
-5. Decide React Native in/out and update all deliverables/docs consistently.
-Owner: [@mirzayv](https://github.com/mirzayv)
+   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
+5. Run the Expo demo on a phone using the Mac LAN IP in `frontend/mobile/api.js`.
+   Owner: [@mirzayv](https://github.com/mirzayv)
 
 ---
 
