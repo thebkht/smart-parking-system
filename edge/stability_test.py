@@ -20,6 +20,7 @@ from edge.detect import (
     SmoothingBuffer,
     create_models,
     load_config,
+    load_rois,
     normalize_rois,
     post_payload,
     resolve_settings,
@@ -86,7 +87,12 @@ def main() -> None:
     args = parse_args()
     cfg = load_config(Path(args.config))
     args = resolve_settings(args, cfg)
-    fixed_rois = normalize_rois(cfg.get("rois"))
+
+    # Load ROIs from backend GET /map first; fall back to config.yaml ROIs
+    backend_base = args.backend_url.rsplit("/update", 1)[0]
+    fixed_rois = load_rois(Path(args.config), backend_url=backend_base)
+    if not fixed_rois:
+        fixed_rois = normalize_rois(cfg.get("rois"))
 
     stage1_model, stage2_model = create_models(args)
     smoothing = SmoothingBuffer(window=args.smooth_n)
