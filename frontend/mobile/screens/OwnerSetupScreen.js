@@ -86,6 +86,7 @@ export default function OwnerSetupScreen({ onLayoutReady }) {
       });
       setLayout(data);
       onLayoutReady(data);
+      setStep("done");
     } catch (layoutError) {
       console.warn("[OwnerSetup] /layout failed; trying /map fallback", {
         message: layoutError?.message,
@@ -101,16 +102,20 @@ export default function OwnerSetupScreen({ onLayoutReady }) {
         });
         setLayout(data);
         onLayoutReady(data);
+        setStep("done");
       } catch (mapError) {
         console.error("[OwnerSetup] /map fallback failed", {
           message: mapError?.message,
           status: mapError?.response?.status,
           response: mapError?.response?.data,
         });
-        Alert.alert("Backend unreachable", "Could not load layout from server.");
+        Alert.alert(
+          "Backend unreachable",
+          "Could not load layout from server. Check the backend and try again."
+        );
+        setStep("ready");
       }
     }
-    setStep("done");
   };
 
   const reset = () => {
