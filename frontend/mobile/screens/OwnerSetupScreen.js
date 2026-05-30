@@ -23,6 +23,10 @@ export default function OwnerSetupScreen({ onLayoutReady }) {
       allowsMultipleSelection: true,
       quality: 0.8,
     });
+    console.log("[OwnerSetup] image library result", {
+      canceled: result.canceled,
+      count: result.assets?.length ?? 0,
+    });
     if (!result.canceled) {
       setImages(result.assets);
       setStep("ready");
@@ -36,6 +40,10 @@ export default function OwnerSetupScreen({ onLayoutReady }) {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    console.log("[OwnerSetup] camera result", {
+      canceled: result.canceled,
+      count: result.assets?.length ?? 0,
+    });
     if (!result.canceled) {
       setImages((prev) => [...prev, result.assets[0]]);
       setStep("ready");
@@ -57,17 +65,48 @@ export default function OwnerSetupScreen({ onLayoutReady }) {
       });
     });
     try {
+      console.log("[OwnerSetup] uploading layout images", {
+        count: images.length,
+        images: images.map((img, i) => ({
+          index: i,
+          uri: img.uri,
+          width: img.width,
+          height: img.height,
+          fileSize: img.fileSize,
+          mimeType: img.mimeType,
+        })),
+      });
       const { data } = await api.post("/layout", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      console.log("[OwnerSetup] /layout loaded", {
+        spotCount: data?.spots?.length ?? 0,
+        spotSource: data?.spot_source,
+        canvas: data?.canvas,
+      });
       setLayout(data);
       onLayoutReady(data);
-    } catch {
+    } catch (layoutError) {
+      console.warn("[OwnerSetup] /layout failed; trying /map fallback", {
+        message: layoutError?.message,
+        status: layoutError?.response?.status,
+        response: layoutError?.response?.data,
+      });
       try {
         const { data } = await api.get("/map");
+        console.log("[OwnerSetup] /map fallback loaded", {
+          spotCount: data?.spots?.length ?? 0,
+          spotSource: data?.spot_source,
+          canvas: data?.canvas,
+        });
         setLayout(data);
         onLayoutReady(data);
-      } catch {
+      } catch (mapError) {
+        console.error("[OwnerSetup] /map fallback failed", {
+          message: mapError?.message,
+          status: mapError?.response?.status,
+          response: mapError?.response?.data,
+        });
         Alert.alert("Backend unreachable", "Could not load layout from server.");
       }
     }

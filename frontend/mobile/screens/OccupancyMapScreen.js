@@ -26,11 +26,20 @@ export default function OccupancyMapScreen({ layout }) {
     try {
       const { data } = await api.get("/status");
       setStatus(data.spots ?? data);
+      console.log("[OccupancyMap] status loaded", {
+        statusCount: Object.keys(data.spots ?? data ?? {}).length,
+        layoutCount: layout?.spots?.length ?? 0,
+      });
       setLastUpdated(new Date());
-    } catch {
+    } catch (error) {
+      console.warn("[OccupancyMap] status poll failed", {
+        message: error?.message,
+        status: error?.response?.status,
+        response: error?.response?.data,
+      });
       setLastUpdated(new Date());
     }
-  }, []);
+  }, [layout?.spots?.length]);
 
   const startPolling = () => {
     setPolling(true);
@@ -55,11 +64,14 @@ export default function OccupancyMapScreen({ layout }) {
     );
   }
 
+  const layoutStatuses = layout.spots.map(
+    (spot) => status?.[spot.spot_id] ?? "unknown",
+  );
   const freeCount = status
-    ? Object.values(status).filter((v) => v === "free").length
+    ? layoutStatuses.filter((value) => value === "free").length
     : 0;
   const occCount = status
-    ? Object.values(status).filter((v) => v === "occupied").length
+    ? layoutStatuses.filter((value) => value === "occupied").length
     : 0;
 
   return (
