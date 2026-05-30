@@ -18,6 +18,7 @@ export default function FindMyCarScreen({ layout }) {
   const [sessionId, setSessionId] = useState(null);
   const [foundSpot, setFoundSpot] = useState(null);
   const [confidence, setConfidence] = useState(null);
+  const [similarityScore, setSimilarityScore] = useState(null);
   const [error, setError] = useState(null);
 
   const takePhoto = async () => {
@@ -32,6 +33,8 @@ export default function FindMyCarScreen({ layout }) {
       setStep("ready");
       setFoundSpot(null);
       setSessionId(null);
+      setConfidence(null);
+      setSimilarityScore(null);
       setError(null);
     }
   };
@@ -46,6 +49,8 @@ export default function FindMyCarScreen({ layout }) {
       setStep("ready");
       setFoundSpot(null);
       setSessionId(null);
+      setConfidence(null);
+      setSimilarityScore(null);
       setError(null);
     }
   };
@@ -75,8 +80,21 @@ export default function FindMyCarScreen({ layout }) {
     setStep("locating");
     try {
       const { data } = await api.get(`/find/${sessionId}`);
+      const normalizedConfidence =
+        data.confidence == null ? NaN : Number(data.confidence);
+      const rawSimilarityScore =
+        data.similarity_score == null ? NaN : Number(data.similarity_score);
       setFoundSpot(data.spot_id);
-      setConfidence(data.similarity_score ?? data.confidence ?? 0.91);
+      setConfidence(
+        Number.isFinite(normalizedConfidence) &&
+          normalizedConfidence >= 0 &&
+          normalizedConfidence <= 1
+          ? normalizedConfidence
+          : null
+      );
+      setSimilarityScore(
+        Number.isFinite(rawSimilarityScore) ? rawSimilarityScore : null
+      );
       setStep("found");
     } catch (err) {
       setError(err?.response?.data?.detail ?? "Could not locate your car.");
@@ -90,6 +108,7 @@ export default function FindMyCarScreen({ layout }) {
     setSessionId(null);
     setFoundSpot(null);
     setConfidence(null);
+    setSimilarityScore(null);
     setError(null);
   };
 
@@ -175,9 +194,16 @@ export default function FindMyCarScreen({ layout }) {
               <Text style={styles.resultTitle}>
                 Your car: <Text style={styles.resultSpot}>{foundSpot}</Text>
               </Text>
-              <Text style={styles.resultConfidence}>
-                Confidence: {(confidence * 100).toFixed(0)}%
-              </Text>
+              {confidence !== null && (
+                <Text style={styles.resultConfidence}>
+                  Confidence: {(confidence * 100).toFixed(0)}%
+                </Text>
+              )}
+              {similarityScore !== null && (
+                <Text style={styles.resultConfidence}>
+                  Similarity score: {similarityScore.toFixed(3)}
+                </Text>
+              )}
             </View>
 
             {/* Highlight found spot in spot grid */}
