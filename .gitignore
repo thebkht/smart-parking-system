@@ -38,6 +38,7 @@ downloads/
 .vscode/
 
 datasets/*
+patch_detect.py
 
 # Exact Week 5 handoff artifacts that must stay trackable
 !acpds_cls/

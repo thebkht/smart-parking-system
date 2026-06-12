@@ -2,6 +2,10 @@
 
 Web app (Vite + React) and mobile app (Expo + React Native) for the SmartParking v6 system.
 
+**Platform split (final):**
+- **Web** — Owner Setup + Live Occupancy Map
+- **Mobile** — Live Occupancy Map + Find My Car
+
 ---
 
 ## Structure
@@ -24,17 +28,22 @@ npm install
 
 ### Environment
 
-The API base URL is hardcoded in `src/App.jsx`:
+Copy `.env.example` to `.env.local` and set `VITE_API_BASE`:
 
-```js
-const API_BASE = "http://172.16.32.43:8000";
+```bash
+cp .env.example .env.local
+# edit .env.local
 ```
 
-Change this to match your backend address before running.
+```env
+VITE_API_BASE=http://localhost:8000
+```
 
-For local demos, start the backend with `make backend` from the repo root. The
-default backend bind address is `0.0.0.0:8000`, so browsers and phones on the
-same Wi-Fi can reach the Mac through its LAN IP.
+For LAN testing (phone or other device on the same Wi-Fi), use the host machine's IP:
+
+```env
+VITE_API_BASE=http://192.168.1.100:8000
+```
 
 ### Run
 
@@ -48,13 +57,11 @@ npm run dev
 
 **Live Occupancy Map** — polls `GET /status` every 3 seconds and colors each spot polygon green (free) or red (occupied) on a Leaflet map. Shows free/occupied/total counts in the header.
 
-**Find My Car** — take or upload a photo, POST to `/park` to run SIFT localization, store the returned `session_id`, then GET `/find/{session_id}` to highlight your spot in amber on the map.
-
 ### Tech stack
 
 - Vite + React
-- Leaflet for polygon map rendering
-- Tailwind CSS v4 with custom stone/green/red/amber theme tokens
+- Leaflet for polygon map rendering (raw `leaflet`, no `react-leaflet`)
+- Tailwind CSS v4
 - Radix UI icons
 - Axios for all API calls
 
@@ -71,26 +78,15 @@ npm install
 
 ### Environment
 
-The API base URL is in `frontend/mobile/api.js`:
+Copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_API_BASE` if needed:
 
-```js
-const API_BASE = "http://172.16.32.43:8000";
+```bash
+cp .env.example .env.local
 ```
 
-Change this to match your backend address.
+In Expo Go the backend host is **auto-detected** from the Metro bundler IP (`Constants.expoConfig.hostUri`), so you usually don't need this. Set it explicitly only if auto-detection fails or you're pointing at a different machine.
 
-Use the Mac's LAN IP when running on a real phone through Expo Go. Do not use
-`127.0.0.1` or `localhost` for a physical device; those point at the phone
-itself. Example:
-
-```js
-const API_BASE = "http://172.16.32.43:8000";
-```
-
-The mobile Axios client logs every request, response, and failed request with
-the resolved URL, HTTP status, error code, and response body. Owner Setup also
-logs selected image metadata and whether `/layout` or the `/map` fallback
-loaded the layout.
+Do **not** use `127.0.0.1` or `localhost` on a physical device — those resolve to the phone itself.
 
 ### Run
 
@@ -98,35 +94,32 @@ loaded the layout.
 npx expo start
 ```
 
-Scan the QR code with the Expo Go app on your phone, or press `a` for Android emulator.
-Keep the backend terminal open and confirm it says
-`Uvicorn running on http://0.0.0.0:8000` before testing from a phone.
+Scan the QR code with the Expo Go app, or press `a` for Android emulator. Keep the backend terminal open (`make backend`) before testing from a phone.
 
 ### Screens
 
-Same three screens as the web app — Owner Setup, Live Occupancy, Find My Car — built with native React Native components and bottom tab navigation.
+**Live Occupancy Map** — fetches `GET /map` on launch, polls `GET /status` every 3 seconds, renders spot quadrilaterals at exact coordinates with pinch-to-zoom and pan. Counts Free / Occupied / Total scoped to the active layout.
 
-Live Occupancy counts only the currently loaded layout's spot IDs when showing
-Free / Occupied / Total. If `/status` contains stale or larger payloads from a
-previous layout, the grid and counters stay scoped to the active 12-spot layout.
+**Find My Car** — take or upload a photo, POST to `/park` to run SIFT localization, store the returned `session_id`, then GET `/find/{session_id}` to highlight your spot in amber on the coordinate-accurate map.
 
 ### Tech stack
 
-- Expo SDK 56
+- Expo SDK 54
 - React Navigation (bottom tabs)
-- expo-camera + expo-image-picker for native camera access
+- react-native-svg for coordinate-accurate polygon map
+- react-native-gesture-handler + react-native-reanimated for pinch/pan
+- expo-image-picker for photo selection
 - Axios for API calls
 
 ---
 
 ## API Contract
 
-The frontend expects the backend at `http://172.16.32.43:8000` with these endpoints:
-
-| Method | Path                 | Used by                                                     |
-| ------ | -------------------- | ----------------------------------------------------------- |
-| `POST` | `/layout`            | Owner Setup                                                 |
-| `GET`  | `/map`               | Owner Setup fallback                                        |
-| `GET`  | `/status`            | Live Occupancy — returns `{ spots, confidence, timestamp }` |
-| `POST` | `/park`              | Find My Car                                                 |
-| `GET`  | `/find/{session_id}` | Find My Car                                                 |
+| Method | Path                 | Used by                              |
+| ------ | -------------------- | ------------------------------------ |
+| `POST` | `/layout`            | Web — Owner Setup                    |
+| `GET`  | `/map`               | Both — fetch lot layout              |
+| `GET`  | `/map/background`    | Both — BEV background image          |
+| `GET`  | `/status`            | Both — Live Occupancy polling        |
+| `POST` | `/park`              | Mobile — Find My Car (park photo)    |
+| `GET`  | `/find/{session_id}` | Mobile — Find My Car (locate spot)   |

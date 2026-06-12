@@ -1,23 +1,27 @@
 # Edge Track
 
-The edge pipeline follows the v3 architecture:
+The v6 edge pipeline:
 
-`static camera -> fixed ROIs -> crop each spot -> YOLOv8*-cls -> status smoothing -> JSON -> FastAPI`
+`GET /map quads → order_corners() + warpPerspective → YOLOv8-cls → temporal smoothing → POST /update JSON → FastAPI`
+
+At startup `edge/detect.py` fetches quadrilateral polygons from `GET /map`. Each spot is perspective-warped to a clean 128×128 patch before classification — this is the ACPDS paper method a, ensuring each patch contains only one spot's pixels.
+
+**Legacy note:** an earlier v3 path used fixed rectangular ROIs configured in `edge/config.yaml`. That path still works as a fallback for a single fixed camera, but the canonical v6 path loads quad polygons from the backend.
 
 ## Default Behavior
 
-- fixed ROI boxes are the default static-camera localization path
-- Stage 2 classification is the required model path for normal use
-- backend POSTs are enabled by default, so backend `/status` and `/history` update automatically unless `--no-post` is used
-- smoothing stabilizes only the final occupied/free status
-- confidence values are reported directly from the classifier and are not smoothed
+- quad polygons are loaded from `GET /map` at startup (v6 canonical path)
+- fixed ROI boxes remain available in `edge/config.yaml` as a legacy fallback for fixed single-camera deployments
+- Stage 2 classification (YOLOv8-cls on 128×128 warped patches) is the required model path
+- backend POSTs are enabled by default; `--no-post` disables them
+- smoothing stabilizes only the final occupied/free status; confidence is reported unsmoothed
 - image mode and camera mode share the same inference and postprocess logic
-- camera mode updates `logs/latest_frame.jpg` on every processed frame for backend MJPEG streaming
+- camera mode writes `logs/latest_frame.jpg` on every frame for backend MJPEG streaming
 - camera mode tolerates short read glitches before stopping, which helps Continuity Camera sessions recover
 
 ## Stage 1 Parking-Space Detection
 
-`edge/detect.py` supports a YOLO Stage 1 parking-space detector behind `--stage1-detector`. This is the repo's ML localization path for full-frame scenes. For a single fixed deployment camera, configured ROIs can still be simpler and more stable.
+`edge/detect.py` supports a YOLO Stage 1 parking-space detector behind `--stage1-detector`. This is the ML localization path for novel full-frame scenes. For a fixed deployment camera with a published quad layout, `GET /map` is simpler and more stable.
 
 ## Config
 

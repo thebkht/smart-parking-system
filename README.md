@@ -3,6 +3,8 @@
 Edge-based smart parking system using ACPDS quadrilateral pooling, `YOLOv8-cls`, FastAPI, and `Find My Car` product flows.
 The canonical project definition is [docs/prd.md](docs/prd.md). This README summarizes the current `v6` direction.
 
+**Platform split (final):** Owner Setup → web only · Live Occupancy Map → both · Find My Car → mobile only. Mobile map renders spot quadrilaterals at exact image coordinates with pinch-to-zoom via `react-native-svg` + `react-native-gesture-handler`.
+
 ---
 
 ## Architecture
@@ -72,7 +74,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 **Two weeks later: final submission**
 
-- [ ] Finalize all accuracy tables and figures (fill in model comparison table with test results)
+- [x] Finalize all accuracy tables and figures — see ML Status table above (test results confirmed)
 - [ ] Present ACPDS justification, quad pooling, and ML pipeline in class
 - [x] **Update `docs/final-artifact-summary.md` and `docs/final-runbook.md`** — both now describe the canonical ACPDS quadrilateral warp + `YOLOv8n-cls` demo path and the current backend/mobile contract
 
@@ -180,16 +182,18 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
 - [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
 - [x] React Native (Expo) wrapper — native camera/photo-picker access for the same Owner Setup, Live Occupancy, and Find My Car demo screens
-- [ ] Write App section of technical report — 3 screens, tech stack, Leaflet integration, Find My Car flow
+- [ ] Write App section of technical report — platform split, tech stacks (web: Leaflet; mobile: SVG+gestures), Find My Car flow
 
 **Two weeks later: final submission**
 
 - [ ] Write Abstract, Conclusion, and References
 - [ ] Submit technical report via email before deadline
-- [ ] Run live Find My Car demo in class — present all 3 app screens
-- [x] **Decide React Native in/out and update docs accordingly** — Expo wrapper is in scope and documented for the final mobile demo
-- [x] **Fix `GET /status` parser and Find My Car frontend** — web and mobile clients read `response.spots` and use the real `POST /park` -> `GET /find/{session_id}` flow
+- [ ] Run live demo in class — web: Owner Setup + Live Map; mobile: Live Map + Find My Car
+- [x] **Platform split implemented** — Owner Setup web-only; Find My Car mobile-only; Live Map on both
+- [x] **Mobile coordinate-accurate SVG map** — `LotMap.js` renders quad polygons at exact coordinates with pinch/pan
+- [x] **Fix `GET /status` parser and Find My Car frontend** — web and mobile clients read `response.spots` and use the real `POST /park` → `GET /find/{session_id}` flow
 - [x] **Verify `POST /layout` fetch path** matches the canonical backend route — `/layout` is a documented compatibility alias over the `/map` layout contract
+- [x] **API env config** — web: `VITE_API_BASE`; mobile: `EXPO_PUBLIC_API_BASE` with auto-detect fallback
 
 ---
 
