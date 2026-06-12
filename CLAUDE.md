@@ -18,10 +18,14 @@ If another doc conflicts with `docs/prd.md`, treat the PRD as authoritative.
 
 ## Current Repo Reality
 
-Some implementation docs still reflect the earlier `v3` architecture:
+Both `edge/README.md` and `backend/README.md` are current (v6). The edge README now describes the quad-polygon path as canonical and labels fixed ROIs as a legacy fallback; the backend README documents all endpoints including `/map/background`.
 
-- [edge/README.md](edge/README.md)
-- [backend/README.md](backend/README.md)
+**Platform split (final):**
+- Owner Setup → web only (`frontend/src/App.jsx`)
+- Find My Car → mobile only (`frontend/mobile/screens/FindMyCarScreen.js`)
+- Live Occupancy Map → both platforms
+
+**Mobile map rendering:** coordinate-accurate SVG polygons via `react-native-svg` with pinch-to-zoom + pan using `react-native-gesture-handler` + `react-native-reanimated`. The `LotMap` component lives at `frontend/mobile/components/LotMap.js`.
 
 When editing code or docs:
 
