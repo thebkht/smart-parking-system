@@ -424,11 +424,16 @@ function OccupancyMap({ layout }) {
   };
   useEffect(() => () => clearInterval(intervalRef.current), []);
 
+  // Count only spots that exist in the published layout — the /status payload
+  // can include stale spot IDs from earlier edge runs.
+  const layoutStatuses = (layout?.spots ?? []).map(
+    (spot) => status?.[spot.spot_id],
+  );
   const freeCount = status
-    ? Object.values(status).filter((v) => v === "free").length
+    ? layoutStatuses.filter((v) => v === "free").length
     : 0;
   const occCount = status
-    ? Object.values(status).filter((v) => v === "occupied").length
+    ? layoutStatuses.filter((v) => v === "occupied").length
     : 0;
 
   if (!layout)
