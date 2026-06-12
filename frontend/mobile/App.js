@@ -1,25 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StyleSheet, View } from "react-native";
-import OwnerSetupScreen from "./screens/OwnerSetupScreen";
 import OccupancyMapScreen from "./screens/OccupancyMapScreen";
 import FindMyCarScreen from "./screens/FindMyCarScreen";
+import { api, API_BASE } from "./api";
+import { normalizeLayout } from "./layout";
 
 const Tab = createBottomTabNavigator();
-
-function SetupIcon({ color }) {
-  return (
-    <View style={styles.iconFrame}>
-      <View style={[styles.gearToothVertical, { backgroundColor: color }]} />
-      <View style={[styles.gearToothHorizontal, { backgroundColor: color }]} />
-      <View style={[styles.gearRing, { borderColor: color }]}>
-        <View style={[styles.gearDot, { backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
 
 function MapIcon({ color }) {
   return (
@@ -43,92 +33,92 @@ function FindIcon({ color }) {
 
 export default function App() {
   const [layout, setLayout] = useState(null);
+  const [layoutError, setLayoutError] = useState(null);
+
+  // Owner setup lives on the web app — the mobile app consumes the
+  // published layout from the backend.
+  const loadLayout = useCallback(async () => {
+    setLayoutError(null);
+    try {
+      const { data } = await api.get("/map");
+      setLayout(normalizeLayout(data, { apiBase: API_BASE }));
+    } catch (error) {
+      setLayoutError(
+        error?.response?.status === 404
+          ? "No layout published yet."
+          : "Backend unreachable.",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLayout();
+  }, [loadLayout]);
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={{
-            headerStyle: { backgroundColor: "#fafaf9" },
-            headerTintColor: "#1c1917",
-            headerTitleStyle: { fontWeight: "600" },
-            tabBarStyle: {
-              backgroundColor: "#fafaf9",
-              borderTopColor: "#e7e5e4",
-            },
-            tabBarActiveTintColor: "#1c1917",
-            tabBarInactiveTintColor: "#a8a29e",
-          }}
-        >
-          <Tab.Screen
-            name="Setup"
-            options={{
-              title: "Owner Setup",
-              tabBarLabel: "Setup",
-              tabBarIcon: ({ color }) => <SetupIcon color={color} />,
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Tab.Navigator
+            screenOptions={{
+              headerStyle: { backgroundColor: "#fafaf9" },
+              headerTintColor: "#1c1917",
+              headerTitleStyle: { fontWeight: "600" },
+              tabBarStyle: {
+                backgroundColor: "#fafaf9",
+                borderTopColor: "#e7e5e4",
+              },
+              tabBarActiveTintColor: "#1c1917",
+              tabBarInactiveTintColor: "#a8a29e",
             }}
           >
-            {() => <OwnerSetupScreen onLayoutReady={setLayout} />}
-          </Tab.Screen>
+            <Tab.Screen
+              name="Map"
+              options={{
+                title: "Live Occupancy",
+                tabBarLabel: "Live Map",
+                tabBarIcon: ({ color }) => <MapIcon color={color} />,
+              }}
+            >
+              {() => (
+                <OccupancyMapScreen
+                  layout={layout}
+                  layoutError={layoutError}
+                  onRetry={loadLayout}
+                />
+              )}
+            </Tab.Screen>
 
-          <Tab.Screen
-            name="Map"
-            options={{
-              title: "Live Occupancy",
-              tabBarLabel: "Live Map",
-              tabBarIcon: ({ color }) => <MapIcon color={color} />,
-            }}
-          >
-            {() => <OccupancyMapScreen layout={layout} />}
-          </Tab.Screen>
-
-          <Tab.Screen
-            name="Find"
-            options={{
-              title: "Find My Car",
-              tabBarLabel: "Find Car",
-              tabBarIcon: ({ color }) => <FindIcon color={color} />,
-            }}
-          >
-            {() => <FindMyCarScreen layout={layout} />}
-          </Tab.Screen>
-        </Tab.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+            <Tab.Screen
+              name="Find"
+              options={{
+                title: "Find My Car",
+                tabBarLabel: "Find Car",
+                tabBarIcon: ({ color }) => <FindIcon color={color} />,
+              }}
+            >
+              {() => (
+                <FindMyCarScreen
+                  layout={layout}
+                  layoutError={layoutError}
+                  onRetry={loadLayout}
+                />
+              )}
+            </Tab.Screen>
+          </Tab.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   iconFrame: {
     width: 24,
     height: 24,
     alignItems: "center",
     justifyContent: "center",
-  },
-  gearRing: {
-    width: 16,
-    height: 16,
-    borderWidth: 2,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gearDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  gearToothVertical: {
-    position: "absolute",
-    width: 4,
-    height: 22,
-    borderRadius: 2,
-  },
-  gearToothHorizontal: {
-    position: "absolute",
-    width: 22,
-    height: 4,
-    borderRadius: 2,
   },
   mapLine: {
     position: "absolute",

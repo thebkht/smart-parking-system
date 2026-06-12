@@ -11,8 +11,9 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { api } from "../api";
+import LotMap from "../components/LotMap";
 
-export default function FindMyCarScreen({ layout }) {
+export default function FindMyCarScreen({ layout, layoutError, onRetry }) {
   const [step, setStep] = useState("idle");
   const [photo, setPhoto] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -41,7 +42,7 @@ export default function FindMyCarScreen({ layout }) {
 
   const pickPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.8,
     });
     if (!result.canceled) {
@@ -116,8 +117,14 @@ export default function FindMyCarScreen({ layout }) {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>
-          No layout loaded. Go to Owner Setup first.
+          Lot layout not available — publish it from the web dashboard.
         </Text>
+        {layoutError && <Text style={styles.emptyDetail}>{layoutError}</Text>}
+        {onRetry && (
+          <TouchableOpacity style={styles.retryBtn} onPress={onRetry}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -206,30 +213,14 @@ export default function FindMyCarScreen({ layout }) {
               )}
             </View>
 
-            {/* Highlight found spot in spot grid */}
-            <Text style={styles.mapLabel}>Parking map</Text>
-            <View style={styles.grid}>
-              {layout.spots.map((spot) => {
-                const isFound = spot.spot_id === foundSpot;
-                return (
-                  <View
-                    key={spot.spot_id}
-                    style={[
-                      styles.spotCard,
-                      isFound ? styles.spotFound : styles.spotDim,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.spotLabel,
-                        isFound && styles.spotLabelFound,
-                      ]}
-                    >
-                      {spot.spot_id.replace("spot_", "P")}
-                    </Text>
-                  </View>
-                );
-              })}
+            {/* Highlight found spot on the coordinate-accurate lot map */}
+            <Text style={styles.mapLabel}>Parking map — amber = your car</Text>
+            <View style={styles.mapWrap}>
+              <LotMap
+                layout={layout}
+                highlightSpot={foundSpot}
+                dimUnhighlighted={!!foundSpot}
+              />
             </View>
 
             <TouchableOpacity style={styles.btnSecondary} onPress={reset}>
@@ -252,6 +243,21 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: { fontSize: 15, color: "#78716c", textAlign: "center" },
+  emptyDetail: {
+    fontSize: 13,
+    color: "#a8a29e",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  retryBtn: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#d4d0cb",
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { fontSize: 14, color: "#44403c" },
   title: { fontSize: 20, fontWeight: "600", color: "#1c1917", marginBottom: 8 },
   subtitle: {
     fontSize: 14,
@@ -326,15 +332,5 @@ const styles = StyleSheet.create({
   resultSpot: { fontWeight: "700" },
   resultConfidence: { fontSize: 13, color: "#7d5200" },
   mapLabel: { fontSize: 13, color: "#78716c", marginBottom: 10 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
-  spotCard: {
-    width: "30%",
-    borderRadius: 10,
-    padding: 12,
-    alignItems: "center",
-  },
-  spotFound: { backgroundColor: "#e89600" },
-  spotDim: { backgroundColor: "#e7e5e4", opacity: 0.4 },
-  spotLabel: { fontSize: 14, fontWeight: "600", color: "#78716c" },
-  spotLabelFound: { color: "#fff" },
+  mapWrap: { marginBottom: 16 },
 });

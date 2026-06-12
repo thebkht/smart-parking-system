@@ -1,31 +1,17 @@
 import LeafletMap from "./LeafletMap";
+import { normalizeLayout } from "./layout";
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
 import {
   CameraIcon,
   GearIcon,
-  MagnifyingGlassIcon,
   PlayIcon,
   StopIcon,
   Cross2Icon,
   ArrowRightIcon,
-  ArrowDownIcon,
-  ImageIcon,
-  TokensIcon,
   UpdateIcon,
 } from "@radix-ui/react-icons";
-
-const PREVIEW_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
-
-function isPreviewableImage(file) {
-  return Boolean(file?.type && PREVIEW_MIME_TYPES.has(file.type));
-}
 
 // ---------------------------------------------------------------------------
 // PropTypes shapes
@@ -184,7 +170,7 @@ const MOCK_STATUS = {
 // ---------------------------------------------------------------------------
 // Axios instance — all requests go through here
 // ---------------------------------------------------------------------------
-const API_BASE = "http://172.16.32.43:8000";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -253,14 +239,14 @@ function OwnerSetup({ layout, setLayout }) {
     const { data } = await api.post("/layout", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    setLayout(data);
+    setLayout(normalizeLayout(data, { apiBase: API_BASE }));
   } catch {
     // Backend has no stored layout — try GET /map as fallback
     try {
       const { data } = await api.get("/map");
-      setLayout(data);
+      setLayout(normalizeLayout(data, { apiBase: API_BASE }));
     } catch {
-      setLayout(MOCK_LAYOUT);
+      setLayout(normalizeLayout(MOCK_LAYOUT));
     }
   }
   setStep("done");
@@ -339,7 +325,7 @@ function OwnerSetup({ layout, setLayout }) {
           </button>
           <button
             onClick={() => {
-              setLayout(MOCK_LAYOUT);
+              setLayout(normalizeLayout(MOCK_LAYOUT));
               setStep("done");
             }}
             className="px-5 py-3 rounded-lg border border-stone-200 bg-transparent text-sm
@@ -570,290 +556,11 @@ function OccupancyMap({ layout }) {
 OccupancyMap.propTypes = { layout: layoutShape };
 
 // ---------------------------------------------------------------------------
-// FindMyCar
-// ---------------------------------------------------------------------------
-function FindMyCar({ layout }) {
-  const [step, setStep] = useState("idle");
-  const [sessionId, setSessionId] = useState(null);
-  const [foundSpot, setFoundSpot] = useState(null);
-  const [confidence, setConfidence] = useState(null);
-  const [file, setFile] = useState(null);
-  const [error, setError] = useState(null);
-  const fileRef = useRef();
-  const previewCanvasRef = useRef(null);
-  const previewContainerRef = useRef(null);
-
-  // Draw image preview onto canvas
-  useEffect(() => {
-    const canvas = previewCanvasRef.current;
-    if (!file) {
-      if (canvas)
-        canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-      return;
-    }
-    if (!canvas || !previewContainerRef.current) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const bitmap = await createImageBitmap(file);
-        if (cancelled) {
-          bitmap.close();
-          return;
-        }
-        const container = previewContainerRef.current;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          bitmap.close();
-          return;
-        }
-        const w = Math.max(1, Math.round(container.clientWidth));
-        const h = Math.max(1, Math.round(container.clientHeight));
-        canvas.width = w;
-        canvas.height = h;
-        const scale = Math.max(w / bitmap.width, h / bitmap.height);
-        const dw = bitmap.width * scale;
-        const dh = bitmap.height * scale;
-        ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(bitmap, (w - dw) / 2, (h - dh) / 2, dw, dh);
-        bitmap.close();
-      } catch {
-        if (!cancelled) setError("Unable to render preview for this image.");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [file]);
-
-  const handleFile = (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    if (!isPreviewableImage(f)) {
-      setError("Please upload a PNG, JPEG, WebP, or GIF image.");
-      setFile(null);
-      setStep("idle");
-      return;
-    }
-    setFile(f);
-    setStep("ready");
-    setFoundSpot(null);
-    setSessionId(null);
-    setError(null);
-  };
-
-  const park = async () => {
-    setStep("matching");
-    setError(null);
-
-    // multipart/form-data — field name must match FastAPI param: photo
-    const form = new FormData();
-    form.append("photo", file);
-
-    try {
-      const { data } = await api.post("/park", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setSessionId(data.session_id);
-      setStep("parked");
-    } catch (err) {
-      const detail = err?.response?.data?.detail ?? "Could not reach backend.";
-      setError(detail);
-      setStep("ready");
-    }
-  };
-
-  const find = async () => {
-    setStep("locating");
-    try {
-      const { data } = await api.get(`/find/${sessionId}`);
-      setFoundSpot(data.spot_id);
-      setConfidence(data.similarity_score ?? data.confidence ?? 0.91);
-      setStep("found");
-    } catch (err) {
-      const detail =
-        err?.response?.data?.detail ?? "Could not locate your car.";
-      setError(detail);
-      setStep("parked");
-    }
-  };
-
-  const reset = () => {
-    setStep("idle");
-    setSessionId(null);
-    setFoundSpot(null);
-    setFile(null);
-    setError(null);
-    setConfidence(null);
-  };
-
-  if (!layout)
-    return (
-      <div className="text-center py-20 text-stone-500 text-base">
-        No layout loaded. Go to <strong>Owner Setup</strong> first.
-      </div>
-    );
-
-  return (
-    <div className="grid grid-cols-2 gap-7">
-      {/* Left column */}
-      <div>
-        <p className="text-base text-stone-500 mb-4 leading-relaxed">
-          Take a photo from near where you parked. SIFT feature matching will
-          identify your spot.
-        </p>
-
-        {/* Photo drop zone */}
-        <div
-          ref={previewContainerRef}
-          className="border-2 border-dashed border-stone-300 rounded-2xl overflow-hidden cursor-pointer
-                     min-h-48 relative bg-stone-50 hover:border-stone-400 transition-colors"
-          onClick={() => !foundSpot && fileRef.current?.click()}
-        >
-          {file ? (
-            <canvas
-              ref={previewCanvasRef}
-              aria-label="Your photo preview"
-              className="w-full h-full block"
-            />
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-              <TokensIcon className="w-12 h-12 text-stone-400" />
-              <span className="text-sm text-stone-500">
-                Tap to take / upload photo
-              </span>
-            </div>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFile}
-            className="hidden"
-          />
-        </div>
-
-        {/* Error banner */}
-        {error && (
-          <p className="text-sm text-red-600 mt-2 flex items-center gap-1.5">
-            <Cross2Icon className="w-3.5 h-3.5 shrink-0" />
-            {error}
-          </p>
-        )}
-
-        {/* Step buttons */}
-        <div className="mt-4 flex flex-col gap-3">
-          {(step === "idle" || step === "ready") && (
-            <button
-              onClick={park}
-              disabled={!file}
-              className="inline-flex items-center justify-center gap-2 py-3 rounded-xl
-                         border border-stone-400 bg-white text-sm font-medium hover:bg-stone-50
-                         transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              POST /park — find my spot
-              <ArrowRightIcon className="w-4 h-4" />
-            </button>
-          )}
-
-          {step === "matching" && (
-            <div className="flex items-center gap-3 py-3">
-              <Spinner />
-              <span className="text-sm text-stone-500">
-                Running SIFT localization…
-              </span>
-            </div>
-          )}
-
-          {step === "parked" && (
-            <>
-              <div className="px-4 py-3 rounded-xl bg-stone-100 text-sm font-mono">
-                session_id: <strong>{sessionId}</strong>
-              </div>
-              <button
-                onClick={find}
-                className="inline-flex items-center justify-center gap-2 py-3 rounded-xl
-                           border border-stone-300 bg-transparent text-sm hover:bg-stone-50
-                           transition-colors cursor-pointer"
-              >
-                GET /find/{sessionId}
-                <ArrowRightIcon className="w-4 h-4" />
-              </button>
-            </>
-          )}
-
-          {step === "locating" && (
-            <div className="flex items-center gap-3 py-3">
-              <Spinner />
-              <span className="text-sm text-stone-500">Querying backend…</span>
-            </div>
-          )}
-
-          {step === "found" && (
-            <>
-              <div className="px-4 py-4 rounded-xl border border-amber-400 bg-amber-50">
-                <p className="text-base font-medium text-amber-800 mb-1">
-                  Your car: <span className="font-mono">{foundSpot}</span>
-                </p>
-                <p className="text-sm text-amber-700">
-                  Confidence: {(confidence * 100).toFixed(0)}%
-                </p>
-              </div>
-              <button
-                onClick={reset}
-                className="text-sm py-2.5 rounded-xl border border-stone-200 bg-transparent
-                           text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
-              >
-                New session
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Right column — map */}
-      <div>
-        <p className="text-sm text-stone-500 mb-2.5 flex items-center gap-1.5">
-          {step === "found" ? (
-            <>
-              Your spot is highlighted below{" "}
-              <ArrowDownIcon className="w-4 h-4" />
-            </>
-          ) : (
-            <>
-              <ImageIcon className="w-4 h-4" /> Map will highlight your spot
-              after matching
-            </>
-          )}
-        </p>
-        <LeafletMap
-          layout={layout}
-          status={Object.fromEntries(
-            (layout?.spots ?? []).map((s) => [s.spot_id, "unknown"]),
-          )}
-          highlightSpot={foundSpot}
-          dimUnhighlighted={!!foundSpot}
-        />
-        {step === "found" && (
-          <p className="text-xs text-stone-400 mt-2 font-mono">
-            amber = your car · GET /find/{sessionId}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-FindMyCar.propTypes = { layout: layoutShape };
-
-// ---------------------------------------------------------------------------
 // Root App
 // ---------------------------------------------------------------------------
 const TABS = [
   { id: "setup", label: "Owner setup", Icon: GearIcon },
   { id: "map", label: "Live occupancy", Icon: UpdateIcon },
-  { id: "find", label: "Find my car", Icon: MagnifyingGlassIcon },
 ];
 
 export default function App() {
@@ -901,7 +608,6 @@ export default function App() {
 
       {tab === "setup" && <OwnerSetup layout={layout} setLayout={setLayout} />}
       {tab === "map" && <OccupancyMap layout={layout} />}
-      {tab === "find" && <FindMyCar layout={layout} />}
     </div>
   );
 }
