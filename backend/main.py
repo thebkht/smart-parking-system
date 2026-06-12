@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 app = FastAPI()
@@ -45,6 +45,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 DB = Path("parking.db")
 LATEST_FRAME_PATH = Path("logs/latest_frame.jpg")
+BEV_BACKGROUND_PATH = Path("artifacts/layout_sample/bev_map.png")
 _conn: sqlite3.Connection | None = None
 
 
@@ -86,6 +87,12 @@ class LayoutPayload(BaseModel):
     spots: List[SpotPolygon]
     image_width: Optional[int] = None
     image_height: Optional[int] = None
+    # Layout metadata produced by the SfM pipeline (round-tripped so the apps
+    # can scale the map to the real canvas and fetch the BEV background).
+    canvas: Optional[Dict[str, int]] = None
+    background_image: Optional[str] = None
+    spot_source: Optional[str] = None
+    source_images: Optional[List[str]] = None
 
 
 class ParkSession(BaseModel):
@@ -340,6 +347,14 @@ async def get_map() -> dict:
     data = json.loads(row[0])
     data["updated_at"] = row[1]
     return data
+
+
+@app.get("/map/background")
+async def get_map_background() -> FileResponse:
+    """Serve the BEV background image referenced by the stored layout."""
+    if not BEV_BACKGROUND_PATH.exists():
+        raise HTTPException(status_code=404, detail="No background image available.")
+    return FileResponse(BEV_BACKGROUND_PATH, media_type="image/png")
 
 
 @app.get("/sessions")

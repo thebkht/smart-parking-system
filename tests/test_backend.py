@@ -202,6 +202,46 @@ def test_save_map_persists_layout_and_spot_references():
     ]
 
 
+def test_save_map_round_trips_layout_metadata():
+    client = TestClient(app)
+    layout = sample_layout()
+    layout["canvas"] = {"width": 2560, "height": 1440}
+    layout["background_image"] = "bev_map.png"
+    layout["spot_source"] = "placeholder_grid"
+    layout["source_images"] = ["lot-1.jpg", "lot-2.jpg"]
+
+    response = client.post("/map", json=layout)
+    assert response.status_code == 200
+
+    body = client.get("/map").json()
+    assert body["canvas"] == {"width": 2560, "height": 1440}
+    assert body["background_image"] == "bev_map.png"
+    assert body["spot_source"] == "placeholder_grid"
+    assert body["source_images"] == ["lot-1.jpg", "lot-2.jpg"]
+
+
+def test_map_background_serves_png(monkeypatch, tmp_path):
+    bev_path = tmp_path / "bev_map.png"
+    bev_bytes = b"\x89PNG\r\n\x1a\nfake"
+    bev_path.write_bytes(bev_bytes)
+    monkeypatch.setattr(backend_module, "BEV_BACKGROUND_PATH", bev_path)
+
+    client = TestClient(app)
+    response = client.get("/map/background")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content == bev_bytes
+
+
+def test_map_background_missing_returns_404(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        backend_module, "BEV_BACKGROUND_PATH", tmp_path / "missing.png"
+    )
+    client = TestClient(app)
+    response = client.get("/map/background")
+    assert response.status_code == 404
+
+
 def test_layout_aliases_return_latest_layout():
     client = TestClient(app)
 
