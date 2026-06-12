@@ -70,11 +70,11 @@ Start backend:
 make backend
 ```
 
-The backend binds to `0.0.0.0:8000` by default. Use the Mac's LAN IP in
-`frontend/mobile/api.js` for Expo/mobile testing, for example
-`http://172.16.32.43:8000`. Keep the backend terminal open; request failures
-from the mobile app are logged with `[api]` and screen-specific tags such as
-`[OwnerSetup]` or `[OccupancyMap]`.
+The backend binds to `0.0.0.0:8000` by default. The Expo mobile app
+auto-detects the host machine's IP from the Metro bundler; set
+`EXPO_PUBLIC_API_BASE` in `frontend/mobile/.env.local` only if auto-detection
+fails. Keep the backend terminal open; request failures from the mobile app are
+logged with `[api]` and screen-specific tags such as `[OccupancyMap]`.
 
 Run integrated demo:
 
@@ -90,15 +90,19 @@ make stability BENCHMARK_IMAGE=samples/demo.jpg STAGE1_VARIANT=s STAGE2_WEIGHTS=
 
 For the formal Week 7 soak test, run `make stability STAGE1_VARIANT=s STAGE2_WEIGHTS=acpds_cls/weights/best.pt STABILITY_ARGS="--device mps"` to use the default `1800` second duration.
 
+**Demo flow (platform split):**
+
+1. **Publish layout from web** — open the web app, go to Owner Setup, upload lot photos or load the sample handoff; verify the map renders at the correct canvas scale.
+2. **View live occupancy on both platforms** — start `make edge --post`; confirm spot colors update on both the web app and the phone simultaneously.
+3. **Find My Car (mobile)** — on the phone, switch to the Find Car tab, take a photo near your parking spot, tap POST /park, then GET /find/{id}; verify the amber polygon appears at the correct coordinates on the map.
+
 Mobile validation checklist:
 
-- Owner Setup uploads 4+ photos to `POST /layout`; if it fails, check the
-  `[OwnerSetup] /layout failed; trying /map fallback` log and the backend
-  terminal.
-- Live Occupancy polls `GET /status` and scopes Free / Occupied counts to the
-  active layout's spot IDs, so counts should sum to the displayed Total.
-- Find My Car posts a driver photo to `POST /park`, stores the returned
-  `session_id`, then calls `GET /find/{session_id}`.
+- Launch: app opens on Live Map tab, fetches layout automatically, no Setup tab visible.
+- Layout missing: shows "Lot layout not available — publish it from the web dashboard" + Retry button.
+- Live Occupancy polls `GET /status` and scopes Free / Occupied counts to the active layout's spot IDs.
+- Map: spot quads render at exact coordinates; pinch zooms 1×–5×; at zoom >1× one-finger pan moves the map.
+- Find My Car posts a driver photo to `POST /park`, stores the returned `session_id`, then calls `GET /find/{session_id}`; amber quad highlights the found spot on the coordinate map.
 
 ## 6. Final Packaging
 
