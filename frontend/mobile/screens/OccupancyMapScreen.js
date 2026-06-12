@@ -3,19 +3,13 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
 import { api } from "../api";
+import LotMap from "../components/LotMap";
 
-const SPOT_COLORS = {
-  free: "#1a7a4a",
-  occupied: "#c0392b",
-  unknown: "#e7e5e4",
-};
-
-export default function OccupancyMapScreen({ layout }) {
+export default function OccupancyMapScreen({ layout, layoutError, onRetry }) {
   const [status, setStatus] = useState(null);
   const [polling, setPolling] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -58,8 +52,14 @@ export default function OccupancyMapScreen({ layout }) {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>
-          No layout loaded. Go to Owner Setup first.
+          Lot layout not available — publish it from the web dashboard.
         </Text>
+        {layoutError && <Text style={styles.emptyDetail}>{layoutError}</Text>}
+        {onRetry && (
+          <TouchableOpacity style={styles.retryBtn} onPress={onRetry}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -75,7 +75,7 @@ export default function OccupancyMapScreen({ layout }) {
     : 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={[styles.container, styles.content]}>
       {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
@@ -124,29 +124,18 @@ export default function OccupancyMapScreen({ layout }) {
         )}
       </View>
 
-      {/* Spot grid */}
-      <View style={styles.grid}>
-        {layout.spots.map((spot) => {
-          const occ = status?.[spot.spot_id] ?? "unknown";
-          const isSelected = selectedSpot === spot.spot_id;
-          return (
-            <TouchableOpacity
-              key={spot.spot_id}
-              style={[
-                styles.spotCard,
-                { backgroundColor: SPOT_COLORS[occ] },
-                isSelected && styles.spotSelected,
-              ]}
-              onPress={() => setSelectedSpot(isSelected ? null : spot.spot_id)}
-            >
-              <Text style={styles.spotLabel}>
-                {spot.spot_id.replace("spot_", "P")}
-              </Text>
-              <Text style={styles.spotStatus}>{occ}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* Coordinate-accurate lot map — pinch to zoom, drag to pan */}
+      <LotMap
+        layout={layout}
+        status={status}
+        selectedSpot={selectedSpot}
+        onSpotPress={(spotId) =>
+          setSelectedSpot(selectedSpot === spotId ? null : spotId)
+        }
+      />
+      <Text style={styles.mapHint}>
+        pinch to zoom · drag to pan · tap a spot to select
+      </Text>
 
       {/* Selected spot */}
       {selectedSpot && status && (
@@ -167,7 +156,7 @@ export default function OccupancyMapScreen({ layout }) {
           </TouchableOpacity>
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -181,6 +170,21 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: { fontSize: 15, color: "#78716c", textAlign: "center" },
+  emptyDetail: {
+    fontSize: 13,
+    color: "#a8a29e",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  retryBtn: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#d4d0cb",
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { fontSize: 14, color: "#44403c" },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   statCard: {
     flex: 1,
@@ -217,22 +221,12 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
     fontVariant: ["tabular-nums"],
   },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  spotCard: {
-    width: "30%",
-    borderRadius: 10,
-    padding: 12,
-    alignItems: "center",
-    marginBottom: 4,
+  mapHint: {
+    fontSize: 12,
+    color: "#a8a29e",
+    textAlign: "center",
+    marginTop: 8,
   },
-  spotSelected: { borderWidth: 2, borderColor: "#1c1917" },
-  spotLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fff",
-    marginBottom: 2,
-  },
-  spotStatus: { fontSize: 11, color: "rgba(255,255,255,0.8)" },
   selectedPanel: {
     marginTop: 16,
     flexDirection: "row",

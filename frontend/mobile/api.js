@@ -1,6 +1,17 @@
 import axios from "axios";
+import Constants from "expo-constants";
 
-const API_BASE = "http://172.16.32.43:8000";
+// In Expo Go the Metro bundler host is the dev machine — assume the backend
+// runs there on :8000 unless EXPO_PUBLIC_API_BASE overrides it.
+function deriveDevHostBase() {
+  const host = Constants.expoConfig?.hostUri?.split(":")[0];
+  return host ? `http://${host}:8000` : null;
+}
+
+export const API_BASE =
+  process.env.EXPO_PUBLIC_API_BASE ??
+  deriveDevHostBase() ??
+  "http://127.0.0.1:8000";
 
 export const api = axios.create({
   baseURL: API_BASE,
