@@ -12,8 +12,7 @@ make backend
 API docs available at: `http://127.0.0.1:8000/docs`
 
 `make backend` binds uvicorn to `0.0.0.0:8000` so Expo/mobile devices on the
-same Wi-Fi can reach the API through the Mac's LAN IP, for example
-`http://172.16.32.43:8000`. To run local-only, use:
+same Wi-Fi can reach the API through the host machine's LAN IP. To run local-only, use:
 
 ```bash
 make backend BACKEND_HOST=127.0.0.1
@@ -107,15 +106,19 @@ Saves the parking lot layout. Accepts spot polygons using either `points` or `co
     {
       "spot_id": "spot_1",
       "points": [[x1,y1],[x2,y2],[x3,y3],[x4,y4]],
-      "label": "occupied"
+      "label": "A1"
     }
   ],
   "image_width": 1920,
-  "image_height": 1080
+  "image_height": 1080,
+  "canvas": {"width": 2560, "height": 1440},
+  "background_image": "bev_map.png",
+  "spot_source": "placeholder_grid",
+  "source_images": ["img_001.jpg"]
 }
 ```
 
-> **Note:** `corners` field is accepted as an alias for `points` (used by ML pipeline output).
+> **Note:** `corners` is accepted as an alias for `points` (used by ML pipeline output). `canvas`, `background_image`, `spot_source`, and `source_images` are optional metadata fields that are round-tripped verbatim by `GET /map`.
 
 **Response:**
 ```json
@@ -125,7 +128,7 @@ Saves the parking lot layout. Accepts spot polygons using either `points` or `co
 ---
 
 #### `GET /map` (alias: `GET /layout`)
-Returns the latest parking lot layout. Called by `edge/detect.py` at startup to load spot polygons.
+Returns the latest parking lot layout. Called by `edge/detect.py` at startup to load spot polygons, and by both apps on launch to render the lot map.
 
 **Response:**
 ```json
@@ -134,16 +137,27 @@ Returns the latest parking lot layout. Called by `edge/detect.py` at startup to 
     {
       "spot_id": "spot_1",
       "points": [[x1,y1],[x2,y2],[x3,y3],[x4,y4]],
-      "label": "occupied"
+      "label": "A1"
     }
   ],
   "image_width": 1920,
   "image_height": 1080,
+  "canvas": {"width": 2560, "height": 1440},
+  "background_image": "bev_map.png",
+  "spot_source": "placeholder_grid",
+  "source_images": ["img_001.jpg"],
   "updated_at": "2026-04-21T00:00:00Z"
 }
 ```
 
 > Returns `404` if no layout has been posted yet.
+
+---
+
+#### `GET /map/background`
+Serves `artifacts/layout_sample/bev_map.png` as a PNG image for use as the map background in both apps.
+
+> Returns `404` if the file is not present.
 
 ---
 
@@ -169,10 +183,12 @@ Returns recent parking session records. Optionally filter by `spot_id`.
 
 ---
 
-### Find My Car
+### Find My Car (mobile only)
 
 #### `POST /park`
 Accepts a driver photo, runs SIFT feature matching against stored reference images in `samples/localization_refs/`, inserts a row into `park_sessions`, and returns a `session_id` for later lookup.
+
+Used by: **Mobile** — Find My Car screen.
 
 **Request:** `multipart/form-data` with field `photo` (image file).
 
@@ -193,6 +209,8 @@ Accepts a driver photo, runs SIFT feature matching against stored reference imag
 
 #### `GET /find/{session_id}`
 Looks up a parking session by ID and returns the spot location with corner coordinates for map display.
+
+Used by: **Mobile** — Find My Car screen.
 
 **Response:**
 ```json
