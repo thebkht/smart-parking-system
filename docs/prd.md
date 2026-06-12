@@ -443,13 +443,23 @@ The /map endpoint must return corners as an array of \[x, y\] pairs in the same 
 | **Backend** | FastAPI \+ SQLite | 7 endpoints |
 | **HTTP client** | Axios | Simple REST calls |
 
-## **9.2 Three screens**
+## **9.2 Screens — platform split (final)**
 
-* Owner setup: upload 4–5 photos → POST /layout → spinner while SfM runs → show 2D map with quadrilateral overlays → allow label correction.
+**Web only:**
 
-* Live occupancy map: render 2D layout (GET /map) with spot polygons colored green / red → poll GET /status every 2–5 s → free / occupied count in header.
+* Owner setup: upload 4–5 photos → POST /layout → spinner while SfM runs → show 2D Leaflet map with quadrilateral overlays → allow label correction.
 
-* Find My Car: camera → POST /park → store session\_id → GET /find/{id} → highlight spot polygon in amber on map.
+**Both platforms:**
+
+* Live occupancy map: fetch quad layout from GET /map on launch → render spot polygons at exact coordinates → poll GET /status every 3 s → color each spot green (free) / red (occupied) → show free/occupied/total counts.
+
+**Mobile only:**
+
+* Find My Car: camera or image picker → POST /park → SIFT localization → store session\_id → GET /find/{id} → highlight spot polygon in amber on the coordinate-accurate map.
+
+**Mobile map rendering:**
+
+Coordinate-accurate SVG polygons via `react-native-svg` inside a `react-native-gesture-handler` v2 + `react-native-reanimated` container. Pinch zooms 1×–5×; one-finger pan enabled only when zoomed >1.05× to avoid fighting the parent ScrollView. Exact image-coordinate corners always honored — no flexWrap grid.
 
 # **10\. Team structure**
 
@@ -469,10 +479,10 @@ The /map endpoint must return corners as an array of \[x, y\] pairs in the same 
 | **Core** | Load quad polygons from GET /map at startup; no hardcoded FIXED\_ROIS |
 | **Core** | Temporal smoothing, FPS benchmark (MPS / CPU / ONNX FP32 / ONNX INT8) |
 | **Core** | Bandwidth measurement and analysis |
-| **New** | React web app: 3 screens (owner setup, live map, Find My Car) |
-| **New** | React Native (Expo) wrapper for mobile camera access |
-| **New** | Leaflet.js: render quadrilateral polygon overlays per spot; real-time color updates |
-| **New** | FastAPI 7 endpoints \+ SQLite schema (layout, spot\_references, park\_sessions tables) |
+| **New** | React web app: 2 screens (owner setup + live map); Find My Car removed from web |
+| **New** | React Native (Expo) wrapper for mobile camera access; Owner Setup removed from mobile |
+| **New** | Web: Leaflet polygon overlays; Mobile: react-native-svg quads with pinch/pan |
+| **New** | FastAPI 8 endpoints + SQLite schema (layout, spot\_references, park\_sessions tables) |
 
 | Handoff points |
 | :---- |
