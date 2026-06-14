@@ -108,7 +108,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [ ] Write Discussion section — cover what worked (n beats larger models, quad warp beats rect crop), limitations (patch quality bottleneck, label ambiguity, localization sample size), and production considerations
 - [ ] Review full report for consistency across all sections before [@mirzayv](https://github.com/mirzayv) compiles
 - [ ] Present Related Work and Stage 2 model findings in class
-- [ ] **Generate confusion matrix figure and PR curve plot as image files** — use the promoted `yolov8n-cls` evaluation outputs and save report-ready figures under `artifacts/figures/`
+- [x] **Generate confusion matrix figure and PR curve plot as image files** — `ml/make_report_figures.py` (`make figures`) scores the promoted `yolov8n-cls` checkpoint on the ACPDS test split and writes `artifacts/figures/confusion_matrix.png` (TN=877, FP=8, FN=26, TP=579) and `artifacts/figures/pr_curve.png` (AP=0.9945)
 - [x] **Assemble final model comparison table** — merge `n/s/m` test results plus export/backend notes into one report-ready table; keep the conclusion explicit that larger variants did not beat the promoted checkpoint
 
 ---
@@ -339,18 +339,18 @@ The core system exists in the repo, but the PRD is still not fully satisfied. Th
 - [x] **Align `edge/stability_test.py` with the live quad-geometry path** — the checked-in stability harness still builds fixed ROI boxes, while the production runtime loads quadrilaterals from `/map`; the soak test should exercise the same geometry contract as `edge/detect.py` — [@abdusattormv](https://github.com/abdusattormv)
 - [ ] **Reference-photo management for Find My Car** — PRD implies per-spot stored references; backend currently reads a fixed local sample folder rather than persisting uploaded references per spot in the DB — [@abdusattormv](https://github.com/abdusattormv)
 - [x] **Resolve the `GET /layout` contract explicitly** — `backend/main.py` exposes `GET /layout` as an alias for `GET /map`, and `backend/README.md` documents `/map` as canonical — [@abdusattormv](https://github.com/abdusattormv)
-- [ ] **Decide whether Find My Car stays SIFT-only** — PRD marks MobileNetV3 embeddings as the optional upgrade path; record the final decision in docs/report and implement it only if it remains in scope — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- [x] **Decide whether Find My Car stays SIFT-only** — decision recorded in `docs/final-artifact-summary.md`: SIFT-only is the final scope (21/21 top-1/top-3 on the labeled night-overhead set, CPU-only, no training); MobileNetV3 stays a documented optional upgrade and is out of scope for this submission — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 - [x] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
 - [x] **Resolve doc inconsistencies on canonical routes and architecture** — `docs/final-artifact-summary.md`, `docs/final-runbook.md`, and `backend/README.md` now agree on ACPDS v6, canonical `/map`, and `/layout` compatibility aliases — [@thebkht](https://github.com/thebkht)
-- [ ] **Add frontend tests for three PRD screens and API contracts** — no frontend tests exist for owner setup, live map, or Find My Car flows — [@mirzayv](https://github.com/mirzayv)
+- [x] **Add frontend tests for three PRD screens and API contracts** — Vitest suite (`cd frontend && npm test`, 19 tests): `src/__tests__/layout.test.js` (Owner Setup map contract), `src/__tests__/occupancy.test.js` (Live Map `/status` parsing + layout-scoped counts), `mobile/__tests__/findMyCar.test.js` (Find My Car `/park` → `/find/{id}` contract) — [@mirzayv](https://github.com/mirzayv)
 - [x] **Decide React Native in/out and update all docs** — Expo wrapper is built and documented as part of the final demo path — [@mirzayv](https://github.com/mirzayv)
 
 ### 🟢 Nice to have
 
-- [ ] **End-to-end smoke-test script** — a single runnable script that proves the full PRD path works: owner setup → map persistence → edge updates → live map → park/find flow; currently no such script exists
+- [x] **End-to-end smoke-test script** — `scripts/smoke_test.py` (`make smoke-test`) drives the full PRD path in-process against the real app + real SIFT localizer using an isolated in-memory DB: owner setup (`POST /map`) → map persistence (`GET /map`) → edge update (`POST /update`) → live map (`GET /status`) → park (`POST /park`) → find (`GET /find/{id}`), with a PASS/FAIL line per stage
 - [x] **React Native / Expo wrapper** — native camera/photo-picker access for the Owner Setup, Live Occupancy, and Find My Car demo screens — [@mirzayv](https://github.com/mirzayv)
 - [ ] **Auth and session ownership model** — no auth, multi-user handling, or session ownership is present; acceptable for a class demo but absent from a fuller product interpretation
-- [ ] **Run one full green local verification pass** — after fixing the multipart dependency, confirm `make test`, `make backend`, and one representative `make edge ...` path all work in the checked-in environment
+- [x] **Run one full green local verification pass** — `make test` is green (128 backend/edge/ML pytest + 19 frontend Vitest), `backend.main` imports and serves (`/health` via TestClient in the smoke test), and a representative `make edge EDGE_ARGS="--image samples/photo_2026-04-23 21.29.16.jpeg --device cpu"` produces a full 12-spot occupancy JSON payload. Fixed 2 non-hermetic edge tests that read a live backend instead of the config file (`load_*` now accepts `backend_url=None`)
 
 ---
 
