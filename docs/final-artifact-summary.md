@@ -72,3 +72,4 @@
 - Owner setup scope: Expo/web clients can upload 4+ photos to `POST /layout`; until server-side SfM is wired end-to-end, the backend returns the latest stored layout or lets the frontend fall back to `GET /map`.
 - Live occupancy scope: clients read `GET /status`, use `response.spots`, and scope counts to the active layout's spot IDs.
 - Find My Car scope: clients upload a driver photo to `POST /park`, store the returned `session_id`, then call `GET /find/{session_id}` for the highlighted spot polygon.
+- Find My Car localizer decision: **SIFT-only is the final scope.** SIFT + FLANN + RANSAC already scores `21/21` top-1 / top-3 on the labeled night-overhead query set (avg `536 ms`), meeting the accuracy targets with no training and CPU-only inference. The MobileNetV3 embedding path stays documented as an optional future upgrade for day/night lighting robustness and is intentionally out of scope for this submission.
