@@ -111,14 +111,14 @@ def test_normalize_rois_accepts_valid_boxes():
 def test_load_rois_reads_config(tmp_path):
     config = tmp_path / "config.yaml"
     config.write_text("rois:\n  a: [1, 2, 3, 4]\n", encoding="utf-8")
-    assert load_rois(config) == {"a": (1, 2, 3, 4)}
+    assert load_rois(config, backend_url=None) == {"a": (1, 2, 3, 4)}
 
 
 def test_load_spot_geometries_reads_config_boxes_as_quads(tmp_path):
     config = tmp_path / "config.yaml"
     config.write_text("rois:\n  a: [1, 2, 5, 6]\n", encoding="utf-8")
 
-    geometries = load_spot_geometries(config)
+    geometries = load_spot_geometries(config, backend_url=None)
 
     assert np.array_equal(geometries["a"], np.array([[1, 2], [5, 2], [5, 6], [1, 6]], dtype=np.float32))
 

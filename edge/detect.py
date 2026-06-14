@@ -385,7 +385,13 @@ def fetch_rois_from_backend(
     backend_url: str = "http://127.0.0.1:8000",
     timeout: float = 3.0,
 ) -> SpotGeometries:
-    """Fetch spot polygons from GET /map without collapsing them to rectangles."""
+    """Fetch spot polygons from GET /map without collapsing them to rectangles.
+
+    A falsy ``backend_url`` skips the backend entirely and returns ``{}`` so
+    callers can force the config-file path (used by config-parsing tests).
+    """
+    if not backend_url:
+        return {}
     try:
         response = requests.get(f"{backend_url}/map", timeout=timeout)
         response.raise_for_status()
