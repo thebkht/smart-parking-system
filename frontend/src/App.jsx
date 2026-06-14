@@ -1,5 +1,6 @@
 import LeafletMap from "./LeafletMap";
 import { normalizeLayout } from "./layout";
+import { parseStatus, countOccupancy } from "./occupancy";
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
@@ -396,7 +397,7 @@ function OccupancyMap({ layout }) {
     try {
       const { data } = await api.get("/status");
       // Backend returns { spots, confidence, timestamp } — extract spots map
-      setStatus(data.spots ?? data);
+      setStatus(parseStatus(data));
       setLastUpdated(new Date());
       setPollState("connected");
     } catch {
@@ -426,15 +427,10 @@ function OccupancyMap({ layout }) {
 
   // Count only spots that exist in the published layout — the /status payload
   // can include stale spot IDs from earlier edge runs.
-  const layoutStatuses = (layout?.spots ?? []).map(
-    (spot) => status?.[spot.spot_id],
+  const { free: freeCount, occupied: occCount } = countOccupancy(
+    layout?.spots ?? [],
+    status,
   );
-  const freeCount = status
-    ? layoutStatuses.filter((v) => v === "free").length
-    : 0;
-  const occCount = status
-    ? layoutStatuses.filter((v) => v === "occupied").length
-    : 0;
 
   if (!layout)
     return (

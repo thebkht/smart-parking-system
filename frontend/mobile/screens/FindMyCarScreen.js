@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { api } from "../api";
+import { parseParkResponse, parseFindResponse } from "../findMyCar";
 import LotMap from "../components/LotMap";
 
 export default function FindMyCarScreen({ layout, layoutError, onRetry }) {
@@ -69,7 +70,7 @@ export default function FindMyCarScreen({ layout, layoutError, onRetry }) {
       const { data } = await api.post("/park", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setSessionId(data.session_id);
+      setSessionId(parseParkResponse(data).sessionId);
       setStep("parked");
     } catch (err) {
       setError(err?.response?.data?.detail ?? "Could not reach backend.");
@@ -81,21 +82,10 @@ export default function FindMyCarScreen({ layout, layoutError, onRetry }) {
     setStep("locating");
     try {
       const { data } = await api.get(`/find/${sessionId}`);
-      const normalizedConfidence =
-        data.confidence == null ? NaN : Number(data.confidence);
-      const rawSimilarityScore =
-        data.similarity_score == null ? NaN : Number(data.similarity_score);
-      setFoundSpot(data.spot_id);
-      setConfidence(
-        Number.isFinite(normalizedConfidence) &&
-          normalizedConfidence >= 0 &&
-          normalizedConfidence <= 1
-          ? normalizedConfidence
-          : null
-      );
-      setSimilarityScore(
-        Number.isFinite(rawSimilarityScore) ? rawSimilarityScore : null
-      );
+      const parsed = parseFindResponse(data);
+      setFoundSpot(parsed.spotId);
+      setConfidence(parsed.confidence);
+      setSimilarityScore(parsed.similarityScore);
       setStep("found");
     } catch (err) {
       setError(err?.response?.data?.detail ?? "Could not locate your car.");
