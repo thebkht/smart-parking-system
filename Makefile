@@ -54,6 +54,7 @@ STABILITY_ARGS ?=
 	train-stage1 train-stage2 train-stage2-all \
 	evaluate-stage1 evaluate-stage2 compare-stage2 sweep-stage2 \
 	export-stage2 benchmark-stage2 bandwidth stability test lint finalize \
+	figures smoke-test \
 	localize-car week6-stage2 week6-export week7-eval \
 	backend edge predict
 
@@ -179,6 +180,12 @@ stability:
 
 finalize:
 	$(VENV_PYTHON) ml/finalize.py
+
+figures:
+	$(VENV_PYTHON) ml/make_report_figures.py $(FIGURES_ARGS)
+
+smoke-test:
+	$(VENV_PYTHON) scripts/smoke_test.py $(SMOKE_ARGS)
 
 test:
 	$(VENV_PYTHON) -m pytest -q
