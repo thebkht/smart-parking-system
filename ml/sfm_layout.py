@@ -12,6 +12,10 @@ import cv2
 import numpy as np
 
 
+class SfMError(RuntimeError):
+    """Raised when SfM cannot produce a usable layout from the input photos."""
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a Week 5 BEV-style map sample from 4-5 lot photos.")
     parser.add_argument("--images", required=True, help="Directory containing lot photos.")
@@ -25,7 +29,7 @@ def image_paths(images_dir: Path) -> list[Path]:
     for suffix in ("*.jpg", "*.jpeg", "*.png"):
         paths.extend(sorted(images_dir.glob(suffix)))
     if len(paths) < 1:
-        raise SystemExit(f"No images found in {images_dir}")
+        raise SfMError(f"No images found in {images_dir}")
     return paths
 
 
@@ -34,7 +38,7 @@ def load_images(paths: list[Path]) -> list[np.ndarray]:
     for path in paths:
         frame = cv2.imread(str(path))
         if frame is None:
-            raise SystemExit(f"Failed to read image: {path}")
+            raise SfMError(f"Failed to read image: {path}")
         frames.append(frame)
     return frames
 
@@ -113,21 +117,35 @@ def load_spots(path: str | None, width: int, height: int) -> tuple[list[dict[str
     return data, "provided_json"
 
 
-def main() -> None:
-    args = parse_args()
-    images_dir = Path(args.images)
-    output_dir = Path(args.output)
+def generate_layout(
+    paths: list[Path],
+    output_dir: Path,
+    spots_json: Path | str | None = None,
+) -> dict[str, Any]:
+    """Run the SfM/BEV pipeline and persist ``bev_map.png`` + ``layout.json``.
+
+    Returns the layout dict (``canvas``, ``background_image``, ``spot_source``,
+    ``source_images``, ``spots``). Raises :class:`SfMError` when the input photos
+    cannot produce a usable layout, so callers (e.g. the backend) can fall back
+    to manual polygon submission.
+    """
+    if not paths:
+        raise SfMError("No images provided for SfM.")
+
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    paths = image_paths(images_dir)
     frames = load_images(paths)
     bev = build_bev_canvas(frames)
+    if bev is None or bev.size == 0:
+        raise SfMError("SfM produced an empty BEV canvas.")
+
     bev_path = output_dir / "bev_map.png"
     if not cv2.imwrite(str(bev_path), bev):
-        raise SystemExit(f"Failed to write {bev_path}")
+        raise SfMError(f"Failed to write {bev_path}")
 
     height, width = bev.shape[:2]
-    spots, spot_source = load_spots(args.spots_json, width, height)
+    spots, spot_source = load_spots(str(spots_json) if spots_json else None, width, height)
     layout = {
         "canvas": {"width": width, "height": height},
         "background_image": bev_path.name,
@@ -136,8 +154,22 @@ def main() -> None:
         "spots": spots,
     }
     (output_dir / "layout.json").write_text(json.dumps(layout, indent=2), encoding="utf-8")
-    print(f"[SfM] wrote {bev_path}")
-    print(f"[SfM] wrote {output_dir / 'layout.json'}")
+    return layout
+
+
+def main() -> None:
+    args = parse_args()
+    images_dir = Path(args.images)
+    output_dir = Path(args.output)
+
+    try:
+        paths = image_paths(images_dir)
+        layout = generate_layout(paths, output_dir, args.spots_json)
+    except SfMError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    print(f"[SfM] wrote {output_dir / 'bev_map.png'}")
+    print(f"[SfM] wrote {output_dir / 'layout.json'} ({len(layout['spots'])} spots)")
 
 
 if __name__ == "__main__":
