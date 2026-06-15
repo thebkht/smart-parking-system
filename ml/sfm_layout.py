@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a deterministic Week 5 BEV-style layout sample from lot photos."""
+"""Build a deterministic BEV-style layout sample from lot photos."""
 
 from __future__ import annotations
 
@@ -17,10 +17,22 @@ class SfMError(RuntimeError):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate a Week 5 BEV-style map sample from 4-5 lot photos.")
-    parser.add_argument("--images", required=True, help="Directory containing lot photos.")
-    parser.add_argument("--output", required=True, help="Output directory for bev_map.png and layout.json.")
-    parser.add_argument("--spots-json", default=None, help="Optional explicit spot polygons in BEV coordinates.")
+    parser = argparse.ArgumentParser(
+        description="Generate a BEV-style map sample from 4-5 lot photos."
+    )
+    parser.add_argument(
+        "--images", required=True, help="Directory containing lot photos."
+    )
+    parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for bev_map.png and layout.json.",
+    )
+    parser.add_argument(
+        "--spots-json",
+        default=None,
+        help="Optional explicit spot polygons in BEV coordinates.",
+    )
     return parser.parse_args()
 
 
@@ -49,7 +61,7 @@ def build_bev_canvas(frames: list[np.ndarray]) -> np.ndarray:
     canvas = np.zeros((height * 2, width * 2, 3), dtype=np.uint8)
     offset_x = width // 2
     offset_y = height // 2
-    canvas[offset_y:offset_y + height, offset_x:offset_x + width] = base
+    canvas[offset_y : offset_y + height, offset_x : offset_x + width] = base
 
     orb = cv2.ORB_create(2000)
     kp1, des1 = orb.detectAndCompute(base, None)
@@ -68,8 +80,12 @@ def build_bev_canvas(frames: list[np.ndarray]) -> np.ndarray:
         homography, _mask = cv2.findHomography(src, dst, cv2.RANSAC, 4.0)
         if homography is None:
             continue
-        translate = np.array([[1, 0, offset_x], [0, 1, offset_y], [0, 0, 1]], dtype=np.float64)
-        warped = cv2.warpPerspective(frame, translate @ homography, (canvas.shape[1], canvas.shape[0]))
+        translate = np.array(
+            [[1, 0, offset_x], [0, 1, offset_y], [0, 0, 1]], dtype=np.float64
+        )
+        warped = cv2.warpPerspective(
+            frame, translate @ homography, (canvas.shape[1], canvas.shape[0])
+        )
         mask = warped.any(axis=2)
         canvas[mask] = warped[mask]
 
@@ -82,10 +98,12 @@ def crop_nonzero(frame: np.ndarray) -> np.ndarray:
     if coords is None:
         return frame
     x, y, w, h = cv2.boundingRect(coords)
-    return frame[y:y + h, x:x + w]
+    return frame[y : y + h, x : x + w]
 
 
-def build_placeholder_spots(width: int, height: int, count: int = 6) -> list[dict[str, Any]]:
+def build_placeholder_spots(
+    width: int, height: int, count: int = 6
+) -> list[dict[str, Any]]:
     cols = 3
     rows = max(1, int(np.ceil(count / cols)))
     margin_x = max(20, width // 12)
@@ -108,7 +126,9 @@ def build_placeholder_spots(width: int, height: int, count: int = 6) -> list[dic
     return spots
 
 
-def load_spots(path: str | None, width: int, height: int) -> tuple[list[dict[str, Any]], str]:
+def load_spots(
+    path: str | None, width: int, height: int
+) -> tuple[list[dict[str, Any]], str]:
     if not path:
         return build_placeholder_spots(width, height), "placeholder_grid"
     data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -145,7 +165,9 @@ def generate_layout(
         raise SfMError(f"Failed to write {bev_path}")
 
     height, width = bev.shape[:2]
-    spots, spot_source = load_spots(str(spots_json) if spots_json else None, width, height)
+    spots, spot_source = load_spots(
+        str(spots_json) if spots_json else None, width, height
+    )
     layout = {
         "canvas": {"width": width, "height": height},
         "background_image": bev_path.name,
@@ -153,7 +175,9 @@ def generate_layout(
         "source_images": [path.name for path in paths],
         "spots": spots,
     }
-    (output_dir / "layout.json").write_text(json.dumps(layout, indent=2), encoding="utf-8")
+    (output_dir / "layout.json").write_text(
+        json.dumps(layout, indent=2), encoding="utf-8"
+    )
     return layout
 
 

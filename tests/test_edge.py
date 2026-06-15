@@ -120,7 +120,9 @@ def test_load_spot_geometries_reads_config_boxes_as_quads(tmp_path):
 
     geometries = load_spot_geometries(config, backend_url=None)
 
-    assert np.array_equal(geometries["a"], np.array([[1, 2], [5, 2], [5, 6], [1, 6]], dtype=np.float32))
+    assert np.array_equal(
+        geometries["a"], np.array([[1, 2], [5, 2], [5, 6], [1, 6]], dtype=np.float32)
+    )
 
 
 def test_fetch_rois_from_backend_preserves_quad(monkeypatch):
@@ -138,13 +140,17 @@ def test_fetch_rois_from_backend_preserves_quad(monkeypatch):
                 ]
             }
 
-    monkeypatch.setattr("edge.detect.requests.get", lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr(
+        "edge.detect.requests.get", lambda *args, **kwargs: FakeResponse()
+    )
 
     rois = fetch_rois_from_backend("http://127.0.0.1:8000")
 
     assert rois["spot_1"].shape == (4, 2)
     assert geometry_to_box(rois["spot_1"]) == (8, 8, 35, 28)
-    assert not np.array_equal(rois["spot_1"], np.array([[8, 8], [35, 8], [35, 28], [8, 28]], dtype=np.float32))
+    assert not np.array_equal(
+        rois["spot_1"], np.array([[8, 8], [35, 8], [35, 28], [8, 28]], dtype=np.float32)
+    )
 
 
 def test_fetch_rois_from_backend_skips_malformed_spots(monkeypatch):
@@ -166,7 +172,9 @@ def test_fetch_rois_from_backend_skips_malformed_spots(monkeypatch):
                 ]
             }
 
-    monkeypatch.setattr("edge.detect.requests.get", lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr(
+        "edge.detect.requests.get", lambda *args, **kwargs: FakeResponse()
+    )
 
     rois = fetch_rois_from_backend("http://127.0.0.1:8000")
 
@@ -263,7 +271,9 @@ def test_resolve_camera_source_requires_detected_iphone_camera(monkeypatch):
     monkeypatch.setattr("edge.detect.platform.system", lambda: "Darwin")
     monkeypatch.setattr(
         "edge.detect.subprocess.run",
-        lambda *args, **kwargs: SimpleNamespace(stdout='{"SPCameraDataType": [{"_name": "FaceTime HD Camera"}]}'),
+        lambda *args, **kwargs: SimpleNamespace(
+            stdout='{"SPCameraDataType": [{"_name": "FaceTime HD Camera"}]}'
+        ),
     )
     with pytest.raises(ValueError, match="No iPhone camera detected"):
         resolve_camera_source("iphone")
@@ -305,11 +315,15 @@ def test_resolve_camera_source_fails_when_no_camera_index_opens(monkeypatch):
         lambda index, backend: FakeCapture(opens=False, reads=False),
     )
 
-    with pytest.raises(RuntimeError, match="could not open any AVFoundation camera index"):
+    with pytest.raises(
+        RuntimeError, match="could not open any AVFoundation camera index"
+    ):
         resolve_camera_source("iphone", probe_limit=3)
 
 
-def test_resolve_camera_source_stops_after_miss_streak_once_candidates_exist(monkeypatch):
+def test_resolve_camera_source_stops_after_miss_streak_once_candidates_exist(
+    monkeypatch,
+):
     monkeypatch.setattr("edge.detect.platform.system", lambda: "Darwin")
     monkeypatch.setattr(
         "edge.detect.subprocess.run",
@@ -335,10 +349,14 @@ def test_resolve_camera_source_stops_after_miss_streak_once_candidates_exist(mon
 
 def test_resolve_camera_runtime_includes_builtin_fallback_for_iphone(monkeypatch):
     monkeypatch.setattr("edge.detect.platform.system", lambda: "Darwin")
-    monkeypatch.setattr("edge.detect._resolve_macos_iphone_camera", lambda probe_limit=10: (3, 0))
+    monkeypatch.setattr(
+        "edge.detect._resolve_macos_iphone_camera", lambda probe_limit=10: (3, 0)
+    )
     monkeypatch.setattr("edge.detect._macos_camera_backend", lambda: 1200)
 
-    camera, backend, fallback_camera, fallback_backend, label = resolve_camera_runtime("iphone")
+    camera, backend, fallback_camera, fallback_backend, label = resolve_camera_runtime(
+        "iphone"
+    )
 
     assert camera == 3
     assert backend == 1200
@@ -348,7 +366,9 @@ def test_resolve_camera_runtime_includes_builtin_fallback_for_iphone(monkeypatch
 
 
 def test_resolve_camera_runtime_handles_numeric_without_fallback():
-    camera, backend, fallback_camera, fallback_backend, label = resolve_camera_runtime("1")
+    camera, backend, fallback_camera, fallback_backend, label = resolve_camera_runtime(
+        "1"
+    )
 
     assert camera == 1
     assert backend is None
@@ -452,26 +472,32 @@ def test_roi_bounds_returns_union_box():
 
 def test_filter_stage1_box_rejects_small_detections():
     frame = np.zeros((200, 300, 3), dtype=np.uint8)
-    assert filter_stage1_box(
-        frame.shape,
-        (10, 10, 20, 20),
-        lot_mask=None,
-        min_box_area=150,
-        filter_mode="bounds",
-    ) is None
+    assert (
+        filter_stage1_box(
+            frame.shape,
+            (10, 10, 20, 20),
+            lot_mask=None,
+            min_box_area=150,
+            filter_mode="bounds",
+        )
+        is None
+    )
 
 
 def test_filter_stage1_box_rejects_boxes_outside_lot_mask():
     frame = np.zeros((200, 300, 3), dtype=np.uint8)
     lot_mask = (50, 50, 250, 180)
-    assert filter_stage1_box(
-        frame.shape,
-        (0, 60, 80, 120),
-        lot_mask=lot_mask,
-        roi_boxes=None,
-        min_box_area=100,
-        filter_mode="bounds",
-    ) is None
+    assert (
+        filter_stage1_box(
+            frame.shape,
+            (0, 60, 80, 120),
+            lot_mask=lot_mask,
+            roi_boxes=None,
+            min_box_area=100,
+            filter_mode="bounds",
+        )
+        is None
+    )
 
 
 def test_filter_stage1_box_rejects_box_between_slots_even_inside_lot_bounds():
@@ -562,7 +588,9 @@ def test_post_enabled_by_default(monkeypatch):
 
 
 def test_no_post_flag_disables_backend_updates(monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["detect.py", "--image", "samples/demo.jpg", "--no-post"])
+    monkeypatch.setattr(
+        sys, "argv", ["detect.py", "--image", "samples/demo.jpg", "--no-post"]
+    )
     args = parse_args()
     resolved = resolve_settings(args, {})
     assert resolved.post is False
@@ -592,7 +620,9 @@ def test_run_pipeline_uses_shared_postprocess_path():
         frame=frame,
         fixed_geometries={
             "spot_1": np.array([[0, 0], [20, 0], [20, 20], [0, 20]], dtype=np.float32),
-            "spot_2": np.array([[20, 0], [40, 0], [40, 20], [20, 20]], dtype=np.float32),
+            "spot_2": np.array(
+                [[20, 0], [40, 0], [40, 20], [20, 20]], dtype=np.float32
+            ),
         },
         stage1_model=None,
         stage2_model=FakeYOLO([("occupied", 0.9), ("free", 0.7)]),

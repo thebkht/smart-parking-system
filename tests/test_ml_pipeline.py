@@ -31,14 +31,21 @@ def test_stratified_split_creates_all_splits():
         "free": [Path(f"free_{i}.jpg") for i in range(10)],
         "occupied": [Path(f"occ_{i}.jpg") for i in range(10)],
     }
-    splits = prepare_dataset.stratified_split(class_images, val_ratio=0.2, test_ratio=0.2, seed=7)
+    splits = prepare_dataset.stratified_split(
+        class_images, val_ratio=0.2, test_ratio=0.2, seed=7
+    )
     assert set(splits.keys()) == {"train", "val", "test"}
     assert all(splits[split]["free"] for split in splits)
     assert all(splits[split]["occupied"] for split in splits)
 
 
 def test_normalize_source_stem_strips_roboflow_suffix():
-    assert prepare_dataset.normalize_source_stem("parking_lot_1_mp4-75_jpg.rf.97bf95f9bd26391575f2c08e5866c6bd.jpg") == "parking_lot_1_mp4-75_jpg"
+    assert (
+        prepare_dataset.normalize_source_stem(
+            "parking_lot_1_mp4-75_jpg.rf.97bf95f9bd26391575f2c08e5866c6bd.jpg"
+        )
+        == "parking_lot_1_mp4-75_jpg"
+    )
     assert prepare_dataset.normalize_source_stem("sample.jpg") == "sample"
 
 
@@ -49,7 +56,9 @@ def test_assign_scene_splits_has_no_overlap():
         {"scene_id": "scene_c", "normalized_stem": "c", "box_count": 1},
         {"scene_id": "scene_d", "normalized_stem": "d", "box_count": 1},
     ]
-    splits = prepare_dataset.assign_scene_splits(records, val_ratio=0.2, test_ratio=0.2, seed=7)
+    splits = prepare_dataset.assign_scene_splits(
+        records, val_ratio=0.2, test_ratio=0.2, seed=7
+    )
 
     seen = {}
     for split, split_records in splits.items():
@@ -116,9 +125,15 @@ def test_prepare_single_model_detection_preserves_two_classes(tmp_path):
         ],
     )
     make_image(root / "valid" / "images" / "parking_lot_2_mp4-1_jpg.rf.bbbb.jpg", 20)
-    make_label(root / "valid" / "labels" / "parking_lot_2_mp4-1_jpg.rf.bbbb.txt", ["1 0.5 0.5 0.4 0.4"])
+    make_label(
+        root / "valid" / "labels" / "parking_lot_2_mp4-1_jpg.rf.bbbb.txt",
+        ["1 0.5 0.5 0.4 0.4"],
+    )
     make_image(root / "test" / "images" / "parking_lot_3_mp4-2_jpg.rf.cccc.jpg", 20)
-    make_label(root / "test" / "labels" / "parking_lot_3_mp4-2_jpg.rf.cccc.txt", ["0 0.5 0.5 0.4 0.4"])
+    make_label(
+        root / "test" / "labels" / "parking_lot_3_mp4-2_jpg.rf.cccc.txt",
+        ["0 0.5 0.5 0.4 0.4"],
+    )
 
     out_dir = tmp_path / "single_model_data"
     yaml_path = tmp_path / "single_model.yaml"
@@ -127,17 +142,21 @@ def test_prepare_single_model_detection_preserves_two_classes(tmp_path):
     all_labels = []
     for label_path in sorted((out_dir).glob("*/*/*.txt")):
         all_labels.extend(label_path.read_text(encoding="utf-8").splitlines())
-    assert sorted(all_labels) == sorted([
-        "0 0.500000 0.500000 0.400000 0.400000",
-        "1 0.200000 0.200000 0.100000 0.100000",
-        "1 0.500000 0.500000 0.400000 0.400000",
-        "0 0.500000 0.500000 0.400000 0.400000",
-    ])
+    assert sorted(all_labels) == sorted(
+        [
+            "0 0.500000 0.500000 0.400000 0.400000",
+            "1 0.200000 0.200000 0.100000 0.100000",
+            "1 0.500000 0.500000 0.400000 0.400000",
+            "0 0.500000 0.500000 0.400000 0.400000",
+        ]
+    )
     yaml_text = yaml_path.read_text(encoding="utf-8")
     assert "names:" in yaml_text
     assert "- free" in yaml_text
     assert "- occupied" in yaml_text
-    report = json.loads((out_dir / prepare_dataset.DETECTION_REPORT).read_text(encoding="utf-8"))
+    report = json.loads(
+        (out_dir / prepare_dataset.DETECTION_REPORT).read_text(encoding="utf-8")
+    )
     assert report["track"] == "single_model"
     assert report["empty_label_frames_excluded"] == 0
     assert report["leakage_checks"]["scene_leakage_detected"] is False
@@ -191,26 +210,39 @@ def test_prepare_single_model_detection_converts_polygon_labels(tmp_path):
     all_labels = []
     for label_path in sorted((out_dir).glob("*/*/*.txt")):
         all_labels.extend(label_path.read_text(encoding="utf-8").splitlines())
-    assert sorted(all_labels) == sorted([
-        "0 0.250000 0.400000 0.300000 0.400000",
-        "1 0.600000 0.700000 0.200000 0.400000",
-        "1 0.600000 0.700000 0.200000 0.400000",
-        "0 0.250000 0.400000 0.300000 0.400000",
-    ])
-    report = json.loads((out_dir / prepare_dataset.DETECTION_REPORT).read_text(encoding="utf-8"))
+    assert sorted(all_labels) == sorted(
+        [
+            "0 0.250000 0.400000 0.300000 0.400000",
+            "1 0.600000 0.700000 0.200000 0.400000",
+            "1 0.600000 0.700000 0.200000 0.400000",
+            "0 0.250000 0.400000 0.300000 0.400000",
+        ]
+    )
+    report = json.loads(
+        (out_dir / prepare_dataset.DETECTION_REPORT).read_text(encoding="utf-8")
+    )
     assert report["polygon_labels_converted"] == 4
 
 
 def test_prepare_stage1_excludes_empty_label_frames(tmp_path):
     root = tmp_path / "pklot"
     make_image(root / "train" / "images" / "parking_lot_1_mp4-0_jpg.rf.aaaa.jpg", 20)
-    make_label(root / "train" / "labels" / "parking_lot_1_mp4-0_jpg.rf.aaaa.txt", ["1 0.5 0.5 0.4 0.4"])
+    make_label(
+        root / "train" / "labels" / "parking_lot_1_mp4-0_jpg.rf.aaaa.txt",
+        ["1 0.5 0.5 0.4 0.4"],
+    )
     make_image(root / "train" / "images" / "parking_lot_1_mp4-1_jpg.rf.bbbb.jpg", 20)
     make_label(root / "train" / "labels" / "parking_lot_1_mp4-1_jpg.rf.bbbb.txt", [])
     make_image(root / "valid" / "images" / "parking_lot_2_mp4-2_jpg.rf.cccc.jpg", 20)
-    make_label(root / "valid" / "labels" / "parking_lot_2_mp4-2_jpg.rf.cccc.txt", ["0 0.5 0.5 0.4 0.4"])
+    make_label(
+        root / "valid" / "labels" / "parking_lot_2_mp4-2_jpg.rf.cccc.txt",
+        ["0 0.5 0.5 0.4 0.4"],
+    )
     make_image(root / "test" / "images" / "parking_lot_3_mp4-3_jpg.rf.dddd.jpg", 20)
-    make_label(root / "test" / "labels" / "parking_lot_3_mp4-3_jpg.rf.dddd.txt", ["0 0.5 0.5 0.4 0.4"])
+    make_label(
+        root / "test" / "labels" / "parking_lot_3_mp4-3_jpg.rf.dddd.txt",
+        ["0 0.5 0.5 0.4 0.4"],
+    )
 
     out_dir = tmp_path / "stage1_data"
     yaml_path = tmp_path / "stage1.yaml"
@@ -219,7 +251,9 @@ def test_prepare_stage1_excludes_empty_label_frames(tmp_path):
     written = sorted((out_dir / "train" / "images").glob("*.jpg"))
     assert written
     assert all("parking_lot_1_mp4-1_jpg" not in path.name for path in written)
-    report = json.loads((out_dir / prepare_dataset.DETECTION_REPORT).read_text(encoding="utf-8"))
+    report = json.loads(
+        (out_dir / prepare_dataset.DETECTION_REPORT).read_text(encoding="utf-8")
+    )
     assert report["track"] == "stage1"
     assert report["empty_label_frames_excluded"] == 1
     assert report["leakage_checks"]["scene_leakage_detected"] is False
@@ -270,7 +304,11 @@ def test_extract_patches_script_mode_imports_patch_geometry(monkeypatch):
     repo_root = module_dir.parent
     script_mode_path = [
         str(module_dir),
-        *[entry for entry in sys.path if Path(entry or ".").resolve() != repo_root.resolve()],
+        *[
+            entry
+            for entry in sys.path
+            if Path(entry or ".").resolve() != repo_root.resolve()
+        ],
     ]
 
     monkeypatch.setattr(sys, "path", script_mode_path)
@@ -312,11 +350,20 @@ def test_collect_roboflow_patches_uses_polygon_boxes(tmp_path):
 def test_prepare_stage2_inherits_scene_holdout(tmp_path):
     root = tmp_path / "pklot"
     make_image(root / "train" / "images" / "parking_lot_1_mp4-0_jpg.rf.aaaa.jpg", 100)
-    make_label(root / "train" / "labels" / "parking_lot_1_mp4-0_jpg.rf.aaaa.txt", ["0 0.3 0.3 0.2 0.2", "1 0.7 0.7 0.2 0.2"])
+    make_label(
+        root / "train" / "labels" / "parking_lot_1_mp4-0_jpg.rf.aaaa.txt",
+        ["0 0.3 0.3 0.2 0.2", "1 0.7 0.7 0.2 0.2"],
+    )
     make_image(root / "valid" / "images" / "parking_lot_2_mp4-1_jpg.rf.bbbb.jpg", 100)
-    make_label(root / "valid" / "labels" / "parking_lot_2_mp4-1_jpg.rf.bbbb.txt", ["0 0.3 0.3 0.2 0.2", "1 0.7 0.7 0.2 0.2"])
+    make_label(
+        root / "valid" / "labels" / "parking_lot_2_mp4-1_jpg.rf.bbbb.txt",
+        ["0 0.3 0.3 0.2 0.2", "1 0.7 0.7 0.2 0.2"],
+    )
     make_image(root / "test" / "images" / "parking_lot_3_mp4-2_jpg.rf.cccc.jpg", 100)
-    make_label(root / "test" / "labels" / "parking_lot_3_mp4-2_jpg.rf.cccc.txt", ["0 0.3 0.3 0.2 0.2", "1 0.7 0.7 0.2 0.2"])
+    make_label(
+        root / "test" / "labels" / "parking_lot_3_mp4-2_jpg.rf.cccc.txt",
+        ["0 0.3 0.3 0.2 0.2", "1 0.7 0.7 0.2 0.2"],
+    )
 
     args = SimpleNamespace(
         pklot_dir=str(root),
@@ -331,7 +378,11 @@ def test_prepare_stage2_inherits_scene_holdout(tmp_path):
     )
     prepare_dataset.prepare_stage2(args)
 
-    report = json.loads((tmp_path / "stage2_data" / prepare_dataset.SANITY_REPORT).read_text(encoding="utf-8"))
+    report = json.loads(
+        (tmp_path / "stage2_data" / prepare_dataset.SANITY_REPORT).read_text(
+            encoding="utf-8"
+        )
+    )
     assert report["scene_holdout"]["source"] == "pklot_scene_holdout"
     assert report["scene_holdout"]["leakage_checks"]["scene_leakage_detected"] is False
 
@@ -345,26 +396,32 @@ def test_prepare_stage2_accepts_roi_annotations_dataset(tmp_path):
     annotations = {
         "train": {
             "file_names": ["frame_a.jpg"],
-            "rois_list": [[
-                [[0.10, 0.10], [0.30, 0.10], [0.30, 0.40], [0.10, 0.40]],
-                [[0.50, 0.20], [0.80, 0.20], [0.80, 0.60], [0.50, 0.60]],
-            ]],
+            "rois_list": [
+                [
+                    [[0.10, 0.10], [0.30, 0.10], [0.30, 0.40], [0.10, 0.40]],
+                    [[0.50, 0.20], [0.80, 0.20], [0.80, 0.60], [0.50, 0.60]],
+                ]
+            ],
             "occupancy_list": [[False, True]],
         },
         "valid": {
             "file_names": ["frame_b.jpg"],
-            "rois_list": [[
-                [[0.15, 0.15], [0.35, 0.15], [0.35, 0.45], [0.15, 0.45]],
-                [[0.55, 0.25], [0.85, 0.25], [0.85, 0.65], [0.55, 0.65]],
-            ]],
+            "rois_list": [
+                [
+                    [[0.15, 0.15], [0.35, 0.15], [0.35, 0.45], [0.15, 0.45]],
+                    [[0.55, 0.25], [0.85, 0.25], [0.85, 0.65], [0.55, 0.65]],
+                ]
+            ],
             "occupancy_list": [[False, True]],
         },
         "test": {
             "file_names": ["frame_c.jpg"],
-            "rois_list": [[
-                [[0.20, 0.20], [0.40, 0.20], [0.40, 0.50], [0.20, 0.50]],
-                [[0.60, 0.30], [0.90, 0.30], [0.90, 0.70], [0.60, 0.70]],
-            ]],
+            "rois_list": [
+                [
+                    [[0.20, 0.20], [0.40, 0.20], [0.40, 0.50], [0.20, 0.50]],
+                    [[0.60, 0.30], [0.90, 0.30], [0.90, 0.70], [0.60, 0.70]],
+                ]
+            ],
             "occupancy_list": [[False, True]],
         },
     }
@@ -384,13 +441,21 @@ def test_prepare_stage2_accepts_roi_annotations_dataset(tmp_path):
     prepare_dataset.prepare_stage2(args)
 
     assert len(list((tmp_path / "stage2_data" / "train" / "free").glob("*.jpg"))) == 1
-    assert len(list((tmp_path / "stage2_data" / "train" / "occupied").glob("*.jpg"))) == 1
+    assert (
+        len(list((tmp_path / "stage2_data" / "train" / "occupied").glob("*.jpg"))) == 1
+    )
     assert len(list((tmp_path / "stage2_data" / "val" / "free").glob("*.jpg"))) == 1
     assert len(list((tmp_path / "stage2_data" / "val" / "occupied").glob("*.jpg"))) == 1
     assert len(list((tmp_path / "stage2_data" / "test" / "free").glob("*.jpg"))) == 1
-    assert len(list((tmp_path / "stage2_data" / "test" / "occupied").glob("*.jpg"))) == 1
+    assert (
+        len(list((tmp_path / "stage2_data" / "test" / "occupied").glob("*.jpg"))) == 1
+    )
 
-    report = json.loads((tmp_path / "stage2_data" / prepare_dataset.SANITY_REPORT).read_text(encoding="utf-8"))
+    report = json.loads(
+        (tmp_path / "stage2_data" / prepare_dataset.SANITY_REPORT).read_text(
+            encoding="utf-8"
+        )
+    )
     assert report["split_strategy"] == "source_presplit"
     assert report["annotation_source"] == "annotations.json"
     assert report["invalid_polygons_skipped"] == 0
@@ -399,8 +464,22 @@ def test_prepare_stage2_accepts_roi_annotations_dataset(tmp_path):
 
 def test_collect_cnrpark_patches_reads_official_labels_layout(tmp_path):
     root = tmp_path / "cnr"
-    sunny_free = root / "PATCHES" / "SUNNY" / "2015-11-22" / "camera6" / "S_2015-11-22_09.47_C06_205.jpg"
-    rainy_busy = root / "PATCHES" / "RAINY" / "2015-11-23" / "camera1" / "R_2015-11-23_09.47_C01_099.jpg"
+    sunny_free = (
+        root
+        / "PATCHES"
+        / "SUNNY"
+        / "2015-11-22"
+        / "camera6"
+        / "S_2015-11-22_09.47_C06_205.jpg"
+    )
+    rainy_busy = (
+        root
+        / "PATCHES"
+        / "RAINY"
+        / "2015-11-23"
+        / "camera1"
+        / "R_2015-11-23_09.47_C01_099.jpg"
+    )
     make_image(sunny_free, 90)
     make_image(rainy_busy, 180)
     make_label(
@@ -452,7 +531,9 @@ def test_train_requires_explicit_mode(monkeypatch):
 def test_train_stage2_mode_resolution(monkeypatch, tmp_path):
     data_dir = tmp_path / "stage2_data"
     data_dir.mkdir()
-    (data_dir / "validation_report.json").write_text(json.dumps({"status": "passed"}), encoding="utf-8")
+    (data_dir / "validation_report.json").write_text(
+        json.dumps({"status": "passed"}), encoding="utf-8"
+    )
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(train, "STAGE2_DATA_DIR", str(data_dir))
     monkeypatch.setattr(sys, "argv", ["train.py", "--stage2"])
@@ -465,7 +546,10 @@ def test_train_stage2_mode_resolution(monkeypatch, tmp_path):
 
 def test_train_single_model_mode_resolution(monkeypatch, tmp_path):
     yaml_path = tmp_path / "single_model.yaml"
-    yaml_path.write_text("path: /tmp\ntrain: train/images\nval: valid/images\ntest: test/images\nnc: 2\nnames: [free, occupied]\n", encoding="utf-8")
+    yaml_path.write_text(
+        "path: /tmp\ntrain: train/images\nval: valid/images\ntest: test/images\nnc: 2\nnames: [free, occupied]\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(train, "SINGLE_MODEL_YAML", str(yaml_path))
     monkeypatch.setattr(sys, "argv", ["train.py", "--single-model"])
     args = train.parse_args()
@@ -478,7 +562,9 @@ def test_train_single_model_mode_resolution(monkeypatch, tmp_path):
 def test_train_stage2_accuracy_defaults(monkeypatch, tmp_path):
     data_dir = tmp_path / "stage2_data"
     data_dir.mkdir()
-    (data_dir / "validation_report.json").write_text(json.dumps({"status": "passed"}), encoding="utf-8")
+    (data_dir / "validation_report.json").write_text(
+        json.dumps({"status": "passed"}), encoding="utf-8"
+    )
     monkeypatch.setattr(train, "STAGE2_DATA_DIR", str(data_dir))
     monkeypatch.setattr(sys, "argv", ["train.py", "--stage2"])
     args = train.parse_args()
@@ -500,14 +586,18 @@ def test_stage2_promotion_defaults_to_n_only(monkeypatch):
 
 
 def test_stage2_promotion_can_be_forced_for_non_n_variant(monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["train.py", "--stage2", "--variant", "m", "--promote-stage2"])
+    monkeypatch.setattr(
+        sys, "argv", ["train.py", "--stage2", "--variant", "m", "--promote-stage2"]
+    )
     args = train.parse_args()
     assert train.should_promote_stage2(args) is True
 
 
 def test_order_corners_normalizes_shuffled_quad():
     ordered = extract_patches.order_corners([[20, 50], [70, 15], [15, 20], [80, 60]])
-    assert np.allclose(ordered, np.array([[15, 20], [70, 15], [80, 60], [20, 50]], dtype=np.float32))
+    assert np.allclose(
+        ordered, np.array([[15, 20], [70, 15], [80, 60], [20, 50]], dtype=np.float32)
+    )
 
 
 def test_order_corners_rejects_duplicate_points():
@@ -517,13 +607,17 @@ def test_order_corners_rejects_duplicate_points():
 
 def test_warp_patch_emits_fixed_size_image():
     image = np.zeros((40, 60, 3), dtype=np.uint8)
-    warped = extract_patches.warp_patch(image, [[5, 5], [35, 5], [35, 25], [5, 25]], size=128)
+    warped = extract_patches.warp_patch(
+        image, [[5, 5], [35, 5], [35, 25], [5, 25]], size=128
+    )
     assert warped.shape == (128, 128, 3)
 
 
 def test_square_patch_emits_fixed_size_image():
     image = np.zeros((40, 60, 3), dtype=np.uint8)
-    squared = extract_patches.square_patch(image, [[5, 5], [35, 5], [30, 25], [8, 25]], size=128)
+    squared = extract_patches.square_patch(
+        image, [[5, 5], [35, 5], [30, 25], [8, 25]], size=128
+    )
     assert squared.shape == (128, 128, 3)
 
 
@@ -551,7 +645,9 @@ def test_sample_validation_entries_caps_at_available_count():
         {"split": "train", "label": "occupied", "patch_path": "b"},
         {"split": "val", "label": "free", "patch_path": "c"},
     ]
-    sampled = extract_patches.sample_validation_entries(entries, sample_count=20, seed=7)
+    sampled = extract_patches.sample_validation_entries(
+        entries, sample_count=20, seed=7
+    )
     assert len(sampled) == 3
 
 
@@ -559,7 +655,9 @@ def test_extract_dataset_writes_acpds_outputs(tmp_path):
     dataset_root = tmp_path / "acpds"
     images_dir = dataset_root / "images"
     images_dir.mkdir(parents=True)
-    for index, name in enumerate(("frame_a.jpg", "frame_b.jpg", "frame_c.jpg"), start=1):
+    for index, name in enumerate(
+        ("frame_a.jpg", "frame_b.jpg", "frame_c.jpg"), start=1
+    ):
         image = np.zeros((24, 32, 3), dtype=np.uint8)
         image[:, :, 0] = np.arange(32, dtype=np.uint8)
         image[:, :, 1] = (np.arange(24, dtype=np.uint8)[:, None] * index) % 255
@@ -615,8 +713,12 @@ def test_extract_dataset_writes_acpds_outputs(tmp_path):
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     output_dir = tmp_path / "acpds_stage2"
 
-    patch_index, report = extract_patches.extract_dataset(dataset_root, manifest_path, output_dir, size=128, seed=7)
-    validation = extract_patches.validate_patches(output_dir, sample_count=20, seed=7, status="passed")
+    patch_index, report = extract_patches.extract_dataset(
+        dataset_root, manifest_path, output_dir, size=128, seed=7
+    )
+    validation = extract_patches.validate_patches(
+        output_dir, sample_count=20, seed=7, status="passed"
+    )
 
     assert len(patch_index) == 6
     assert report["counts"]["train"] == {"free": 1, "occupied": 1}
@@ -669,7 +771,9 @@ def test_extract_dataset_records_square_pooling(tmp_path):
 def test_ensure_stage2_validation_passed_requires_passed_status(tmp_path):
     data_dir = tmp_path / "acpds_stage2"
     data_dir.mkdir()
-    (data_dir / "validation_report.json").write_text(json.dumps({"status": "pending"}), encoding="utf-8")
+    (data_dir / "validation_report.json").write_text(
+        json.dumps({"status": "pending"}), encoding="utf-8"
+    )
     with pytest.raises(SystemExit) as exc:
         train.ensure_stage2_validation_passed(str(data_dir))
     assert "not passed" in str(exc.value)
@@ -687,7 +791,9 @@ def test_promote_stage2_checkpoint_copies_file(tmp_path):
 
 def test_promote_stage2_checkpoint_fails_for_missing_file(tmp_path):
     with pytest.raises(SystemExit) as exc:
-        train.promote_stage2_checkpoint(tmp_path / "missing.pt", str(tmp_path / "dest.pt"))
+        train.promote_stage2_checkpoint(
+            tmp_path / "missing.pt", str(tmp_path / "dest.pt")
+        )
     assert "not found for promotion" in str(exc.value)
 
 
@@ -721,7 +827,10 @@ def test_sfm_layout_writes_expected_artifacts(tmp_path):
 
 def test_train_stage1_allows_custom_checkpoint_and_run_paths(monkeypatch, tmp_path):
     yaml_path = tmp_path / "stage1.yaml"
-    yaml_path.write_text("path: /tmp\ntrain: train/images\nval: val/images\ntest: test/images\nnc: 1\nnames: [space]\n", encoding="utf-8")
+    yaml_path.write_text(
+        "path: /tmp\ntrain: train/images\nval: val/images\ntest: test/images\nnc: 1\nnames: [space]\n",
+        encoding="utf-8",
+    )
     weights = tmp_path / "best.pt"
     weights.write_bytes(b"checkpoint")
     monkeypatch.setattr(train, "STAGE1_YAML", str(yaml_path))

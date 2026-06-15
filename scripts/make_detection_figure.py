@@ -61,21 +61,37 @@ def main() -> None:
     annotated = frame.copy()
     free = occ = 0
     for raw in quads:
-        corners = order_corners(np.array([[x * w, y * h] for x, y in raw], dtype=np.float32))
-        status, conf = classify_patch(frame, corners, model, device="cpu", threshold=0.5)
+        corners = order_corners(
+            np.array([[x * w, y * h] for x, y in raw], dtype=np.float32)
+        )
+        status, conf = classify_patch(
+            frame, corners, model, device="cpu", threshold=0.5
+        )
         color = OCC_BGR if status == "occupied" else FREE_BGR
         if status == "occupied":
             occ += 1
         else:
             free += 1
         poly = np.round(corners).astype(np.int32).reshape((-1, 1, 2))
-        cv2.polylines(annotated, [poly], isClosed=True, color=color, thickness=thickness)
+        cv2.polylines(
+            annotated, [poly], isClosed=True, color=color, thickness=thickness
+        )
         label = f"{int(round(conf * 100))}%"
         tx, ty = int(corners[:, 0].min()), int(corners[:, 1].min()) - 6
-        (tw, th), base = cv2.getTextSize(label, font, font_scale, max(1, thickness // 2))
+        (tw, th), base = cv2.getTextSize(
+            label, font, font_scale, max(1, thickness // 2)
+        )
         cv2.rectangle(annotated, (tx, ty - th - base), (tx + tw, ty + base), color, -1)
-        cv2.putText(annotated, label, (tx, ty), font, font_scale, (255, 255, 255),
-                    max(1, thickness // 2), cv2.LINE_AA)
+        cv2.putText(
+            annotated,
+            label,
+            (tx, ty),
+            font,
+            font_scale,
+            (255, 255, 255),
+            max(1, thickness // 2),
+            cv2.LINE_AA,
+        )
 
     full_out = REPO / "runs/output/detection.jpg"
     full_out.parent.mkdir(parents=True, exist_ok=True)
@@ -84,7 +100,9 @@ def main() -> None:
     # Report-sized copy (cap width at 1920) for a lean PDF.
     report_out = REPO / "outputs/figures/detection.jpg"
     scale = min(1.0, 1920.0 / w)
-    resized = cv2.resize(annotated, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    resized = cv2.resize(
+        annotated, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA
+    )
     cv2.imwrite(str(report_out), resized, [cv2.IMWRITE_JPEG_QUALITY, 90])
 
     print(f"{IMAGE_NAME}: {len(quads)} spots -> {free} free / {occ} occupied")

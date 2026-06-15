@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bandwidth analysis: v3 JSON payload vs equivalent H.264 video stream.
+"""Bandwidth analysis: JSON payload vs equivalent H.264 video stream.
 
 Compares the bandwidth used by the smart parking system's JSON POST approach
 against a conservative estimate for a continuous H.264 parking camera feed.
@@ -15,12 +15,12 @@ import argparse
 import json
 from pathlib import Path
 
-DEFAULT_H264_KBPS = 2000       # kbps for 1080p H.264 parking camera
-DEFAULT_POSTS_PER_SEC = 0.5    # 1 POST every 2 seconds (matches DEFAULT_POST_INTERVAL_S)
+DEFAULT_H264_KBPS = 2000  # kbps for 1080p H.264 parking camera
+DEFAULT_POSTS_PER_SEC = 0.5  # 1 POST every 2 seconds (matches DEFAULT_POST_INTERVAL_S)
 DEFAULT_LOG_DIR = "logs"
 OUTPUT_FILE = "logs/bandwidth_analysis.txt"
 
-# v3 JSON contract shape (worst-case: 6 spots)
+# JSON contract shape (worst-case: 6 spots)
 SAMPLE_PAYLOAD = {
     "spots": {
         "spot_1": "occupied",
@@ -83,7 +83,10 @@ def measure_real_payloads(log_path: Path) -> list[int]:
     with open(log_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            payload = {"spots": {k: v for k, v in row.items() if k != "timestamp"}, "timestamp": row.get("timestamp")}
+            payload = {
+                "spots": {k: v for k, v in row.items() if k != "timestamp"},
+                "timestamp": row.get("timestamp"),
+            }
             sizes.append(len(json.dumps(payload).encode()))
     return sizes
 
@@ -107,7 +110,9 @@ def main() -> None:
         if log_path.exists():
             sizes = measure_real_payloads(log_path)
             avg_bytes = sum(sizes) / len(sizes) if sizes else sample_bytes
-            print(f"Real log: {len(sizes)} records, avg payload = {avg_bytes:.0f} bytes")
+            print(
+                f"Real log: {len(sizes)} records, avg payload = {avg_bytes:.0f} bytes"
+            )
         else:
             print(f"Log not found ({log_path}), using sample payload size.")
             avg_bytes = sample_bytes
@@ -115,7 +120,6 @@ def main() -> None:
         avg_bytes = sample_bytes
 
     json_bytes_per_sec = avg_bytes * args.posts_per_sec
-    json_bytes_per_hour = json_bytes_per_sec * 3600
 
     # HTTP overhead (headers ~300 bytes per POST)
     http_overhead_per_sec = 300 * args.posts_per_sec
@@ -137,7 +141,7 @@ def main() -> None:
         "Assumptions:",
         f"  JSON posts per second : {args.posts_per_sec}",
         f"  JSON payload size     : {avg_bytes:.0f} bytes (sample: {sample_bytes} bytes)",
-        f"  HTTP overhead         : ~300 bytes per POST",
+        "  HTTP overhead         : ~300 bytes per POST",
         f"  H.264 stream          : {args.h264_kbps} kbps (1080p parking camera)",
         "",
         "JSON POST bandwidth:",

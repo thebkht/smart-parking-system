@@ -64,7 +64,9 @@ def clip_unit(value: float) -> float:
     return min(1.0, max(0.0, value))
 
 
-def xyxy_to_cxcywh(x1: float, y1: float, x2: float, y2: float) -> tuple[float, float, float, float] | None:
+def xyxy_to_cxcywh(
+    x1: float, y1: float, x2: float, y2: float
+) -> tuple[float, float, float, float] | None:
     x1 = clip_unit(x1)
     y1 = clip_unit(y1)
     x2 = clip_unit(x2)
@@ -74,7 +76,9 @@ def xyxy_to_cxcywh(x1: float, y1: float, x2: float, y2: float) -> tuple[float, f
     return ((x1 + x2) / 2.0, (y1 + y2) / 2.0, x2 - x1, y2 - y1)
 
 
-def polygon_to_box(points: str, *, width: int, height: int) -> tuple[float, float, float, float] | None:
+def polygon_to_box(
+    points: str, *, width: int, height: int
+) -> tuple[float, float, float, float] | None:
     xs: list[float] = []
     ys: list[float] = []
     for pair in points.split(";"):
@@ -92,11 +96,17 @@ def polygon_to_box(points: str, *, width: int, height: int) -> tuple[float, floa
     return xyxy_to_cxcywh(min(xs), min(ys), max(xs), max(ys))
 
 
-def split_items(items: list[dict[str, object]], *, val_ratio: float, test_ratio: float, seed: int) -> dict[str, list[dict[str, object]]]:
+def split_items(
+    items: list[dict[str, object]], *, val_ratio: float, test_ratio: float, seed: int
+) -> dict[str, list[dict[str, object]]]:
     if val_ratio <= 0 or test_ratio <= 0 or (val_ratio + test_ratio) >= 1:
-        raise SystemExit("val_ratio and test_ratio must be positive and sum to less than 1.")
+        raise SystemExit(
+            "val_ratio and test_ratio must be positive and sum to less than 1."
+        )
     if len(items) < 3:
-        raise SystemExit("Need at least 3 labeled images to create train/val/test splits.")
+        raise SystemExit(
+            "Need at least 3 labeled images to create train/val/test splits."
+        )
 
     shuffled = items[:]
     random.Random(seed).shuffle(shuffled)
@@ -245,7 +255,9 @@ def main() -> None:
         json.dump(report, handle, indent=2)
 
     print(f"YOLO dataset written to {output}")
-    print(f"Images kept: {report['images_kept']} | Boxes kept: {report['boxes_kept_total']}")
+    print(
+        f"Images kept: {report['images_kept']} | Boxes kept: {report['boxes_kept_total']}"
+    )
     print(f"Splits: {report['split_counts']}")
     print(f"Classes: {names}")
 

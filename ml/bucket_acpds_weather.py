@@ -18,12 +18,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Create luminance-based ACPDS weather splits.")
-    parser.add_argument("--patch-index", default="datasets/acpds_stage2/patch_index.json")
+    parser = argparse.ArgumentParser(
+        description="Create luminance-based ACPDS weather splits."
+    )
+    parser.add_argument(
+        "--patch-index", default="datasets/acpds_stage2/patch_index.json"
+    )
     parser.add_argument("--output", default="datasets/acpds_stage2_weather")
     parser.add_argument("--split", default="test")
     parser.add_argument("--mode", choices=["symlink", "copy"], default="symlink")
-    parser.add_argument("--summary-json", default="logs/week7/acpds_weather_buckets.json")
+    parser.add_argument(
+        "--summary-json", default="logs/week7/acpds_weather_buckets.json"
+    )
     return parser.parse_args()
 
 
@@ -87,7 +93,9 @@ def main() -> None:
             }
         )
 
-    luminance_values = np.array([row["luminance"] for row in luminance_rows], dtype=np.float32)
+    luminance_values = np.array(
+        [row["luminance"] for row in luminance_rows], dtype=np.float32
+    )
     low_cut = float(np.quantile(luminance_values, 1.0 / 3.0))
     high_cut = float(np.quantile(luminance_values, 2.0 / 3.0))
 

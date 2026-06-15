@@ -14,8 +14,12 @@ EXPECTED_STAGE2_MODELS = ("n", "s", "m")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Summarize smart parking final artifacts.")
-    parser.add_argument("--stage1-report", default="datasets/stage1_data/detection_dataset_report.json")
+    parser = argparse.ArgumentParser(
+        description="Summarize smart parking final artifacts."
+    )
+    parser.add_argument(
+        "--stage1-report", default="datasets/stage1_data/detection_dataset_report.json"
+    )
     parser.add_argument("--stage2-dir", default="datasets/stage2_data")
     parser.add_argument("--pklot-test", default="datasets/pklot_test")
     parser.add_argument("--cnrpark-test", default="datasets/cnrpark_test")
@@ -23,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--runs-dir", default="runs")
     parser.add_argument("--artifacts-dir", default="artifacts")
     parser.add_argument("--output-json", default="artifacts/final_manifest.json")
-    parser.add_argument("--output-md", default="docs/final-artifact-summary.md")
+    parser.add_argument("--output-md", default="artifacts/final-artifact-summary.md")
     return parser.parse_args()
 
 
@@ -129,13 +133,20 @@ def first_existing_checkpoint(paths: Iterable[Path]) -> dict[str, Any]:
 
 def collect_checkpoints(runs_dir: Path, artifacts_dir: Path) -> dict[str, Any]:
     stage1_s = runs_dir / "stage1_det" / "yolov8s_stage1" / "weights" / "best.pt"
-    stage1_n = runs_dir / "stage1_det" / "yolov8n_stage1" / "weights" / "best.pt"
     stage1_m = runs_dir / "stage1_det" / "yolov8m_stage1" / "weights" / "best.pt"
     stage2 = {
         variant: first_existing_checkpoint(
             [
-                runs_dir / "acpds_cls" / f"yolov8{variant}_stage2" / "weights" / "best.pt",
-                runs_dir / "stage2_cls" / f"yolov8{variant}_stage2" / "weights" / "best.pt",
+                runs_dir
+                / "acpds_cls"
+                / f"yolov8{variant}_stage2"
+                / "weights"
+                / "best.pt",
+                runs_dir
+                / "stage2_cls"
+                / f"yolov8{variant}_stage2"
+                / "weights"
+                / "best.pt",
             ]
         )
         for variant in EXPECTED_STAGE2_MODELS
@@ -158,7 +169,8 @@ def required_artifact_checks(manifest: dict[str, Any]) -> dict[str, bool]:
     stage2_logs = manifest["metrics"]
     datasets = manifest["datasets"]
     return {
-        "stage1_detector_checkpoint": checkpoints["stage1_s"]["present"] or checkpoints["stage1_m"]["present"],
+        "stage1_detector_checkpoint": checkpoints["stage1_s"]["present"]
+        or checkpoints["stage1_m"]["present"],
         "stage2_n_checkpoint": checkpoints["stage2"]["n"]["present"],
         "stage2_s_checkpoint": checkpoints["stage2"]["s"]["present"],
         "stage2_m_checkpoint": checkpoints["stage2"]["m"]["present"],
@@ -186,8 +198,12 @@ def load_metrics(logs_dir: Path) -> dict[str, Any]:
     return {
         "stage1_evaluation": latest_csv_row(logs_dir / "stage1_evaluation.csv"),
         "stage2_evaluation": latest_csv_row(logs_dir / "stage2_evaluation.csv"),
-        "stage2_model_comparison": best_csv_row(logs_dir / "stage2_model_comparison.csv", "f1"),
-        "stage2_threshold_sweep": best_csv_row(logs_dir / "stage2_threshold_sweep.csv", "f1"),
+        "stage2_model_comparison": best_csv_row(
+            logs_dir / "stage2_model_comparison.csv", "f1"
+        ),
+        "stage2_threshold_sweep": best_csv_row(
+            logs_dir / "stage2_threshold_sweep.csv", "f1"
+        ),
         "stage2_cross_dataset": latest_csv_row(logs_dir / "stage2_cross_dataset.csv"),
         "stage2_per_weather": latest_csv_row(logs_dir / "stage2_per_weather.csv"),
         "benchmark_results": read_json(logs_dir / "benchmark_results.json"),
@@ -215,7 +231,9 @@ def stage1_inventory(report: dict[str, Any] | None) -> dict[str, Any]:
         "duplicates_removed": report.get("duplicates_removed"),
         "empty_label_frames_excluded": report.get("empty_label_frames_excluded"),
         "polygon_labels_converted": report.get("polygon_labels_converted"),
-        "scene_leakage_detected": report.get("leakage_checks", {}).get("scene_leakage_detected"),
+        "scene_leakage_detected": report.get("leakage_checks", {}).get(
+            "scene_leakage_detected"
+        ),
         "splits": splits,
     }
 
@@ -324,7 +342,9 @@ def main() -> None:
             "pklot_test": flat_test_inventory(Path(args.pklot_test)),
             "cnrpark_test": flat_test_inventory(Path(args.cnrpark_test)),
         },
-        "checkpoints": collect_checkpoints(Path(args.runs_dir), Path(args.artifacts_dir)),
+        "checkpoints": collect_checkpoints(
+            Path(args.runs_dir), Path(args.artifacts_dir)
+        ),
         "metrics": load_metrics(Path(args.logs_dir)),
     }
     manifest["checks"] = required_artifact_checks(manifest)

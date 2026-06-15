@@ -52,7 +52,9 @@ def test_classification_output_normalizes_probabilities():
         probs=FakeProbs(),
     )
 
-    payload = predict.classification_output(result, source="sample.jpg", weights="best.pt")
+    payload = predict.classification_output(
+        result, source="sample.jpg", weights="best.pt"
+    )
 
     assert payload["task"] == "classify"
     assert payload["label"] == "occupied"

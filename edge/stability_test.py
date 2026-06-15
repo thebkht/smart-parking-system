@@ -29,12 +29,20 @@ from edge.detect import (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a timed stability test for the edge pipeline.")
+    parser = argparse.ArgumentParser(
+        description="Run a timed stability test for the edge pipeline."
+    )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--image", help="Static image source. Reuses the same frame for the duration.")
+    group.add_argument(
+        "--image", help="Static image source. Reuses the same frame for the duration."
+    )
     group.add_argument("--camera", help="Camera index to use for the duration.")
 
-    parser.add_argument("--stage1-detector", action="store_true", help="Use Stage 1 detector instead of fixed ROIs.")
+    parser.add_argument(
+        "--stage1-detector",
+        action="store_true",
+        help="Use Stage 1 detector instead of fixed ROIs.",
+    )
     parser.add_argument("--stage1-model", default=None)
     parser.add_argument("--stage2-model", default=None)
     parser.add_argument("--device", default=None)
@@ -44,7 +52,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend-url", default=DEFAULT_BACKEND_URL)
     parser.add_argument("--backend-timeout", type=float, default=0.75)
     parser.add_argument("--backend-retry-delay", type=float, default=10.0)
-    parser.add_argument("--post", action="store_true", help="POST payloads during the test.")
+    parser.add_argument(
+        "--post", action="store_true", help="POST payloads during the test."
+    )
     parser.add_argument("--post-interval", type=float, default=None, metavar="SEC")
     parser.add_argument("--log-dir", default=None)
     parser.add_argument("--log-format", choices=["csv", "json"], default=None)
@@ -58,8 +68,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage1-overlap", type=float, default=None)
     parser.add_argument("--save-annotated", default=None)
     parser.add_argument("--status-url", default="http://127.0.0.1:8000/status")
-    parser.add_argument("--duration", type=int, default=1800, help="Duration in seconds.")
-    parser.add_argument("--frame-interval", type=int, default=250, help="Delay between iterations in milliseconds.")
+    parser.add_argument(
+        "--duration", type=int, default=1800, help="Duration in seconds."
+    )
+    parser.add_argument(
+        "--frame-interval",
+        type=int,
+        default=250,
+        help="Delay between iterations in milliseconds.",
+    )
     parser.add_argument("--output", default="logs/stability_summary.json")
     return parser.parse_args()
 
@@ -139,7 +156,9 @@ def main() -> None:
                     continue
 
             try:
-                payload, _ = run_pipeline(frame, fixed_rois, stage1_model, stage2_model, smoothing, args)
+                payload, _ = run_pipeline(
+                    frame, fixed_rois, stage1_model, stage2_model, smoothing, args
+                )
                 last_payload = payload
                 summary["successful_iterations"] += 1
                 if args.post:
@@ -160,7 +179,9 @@ def main() -> None:
                     except requests.RequestException as exc:
                         summary["backend_status_failures"] += 1
                         summary["errors"].append(f"GET /status failed: {exc}")
-            except Exception as exc:  # pragma: no cover - protection for long-running test
+            except (
+                Exception
+            ) as exc:  # pragma: no cover - protection for long-running test
                 summary["errors"].append(str(exc))
 
             time.sleep(args.frame_interval / 1000.0)
@@ -171,7 +192,9 @@ def main() -> None:
     ended_at = time.perf_counter()
     elapsed = ended_at - started_at
     summary["elapsed_s"] = round(elapsed, 2)
-    summary["avg_iterations_per_sec"] = round(summary["iterations"] / elapsed, 3) if elapsed else 0.0
+    summary["avg_iterations_per_sec"] = (
+        round(summary["iterations"] / elapsed, 3) if elapsed else 0.0
+    )
     summary["last_payload"] = last_payload
     summary["passed"] = (
         summary["successful_iterations"] > 0

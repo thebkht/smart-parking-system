@@ -41,7 +41,10 @@ def test_export_writes_summary_json(tmp_path, monkeypatch):
     module = type(
         "FakeQuantModule",
         (),
-        {"QuantType": FakeQuantType, "quantize_dynamic": staticmethod(fake_quantize_dynamic)},
+        {
+            "QuantType": FakeQuantType,
+            "quantize_dynamic": staticmethod(fake_quantize_dynamic),
+        },
     )
     monkeypatch.setitem(sys.modules, "onnxruntime.quantization", module)
     monkeypatch.setattr(

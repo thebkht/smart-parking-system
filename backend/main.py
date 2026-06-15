@@ -4,27 +4,26 @@ import json
 import os
 import secrets
 import sqlite3
-import shutil
 import tempfile
-from pathlib import Path as FilePath
 from asyncio import sleep
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile, File
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-# Auth is opt-in so the class demo keeps working without tokens. Set
+__version__ = "1.0.0"
+
+# Auth is opt-in so the local demo keeps working without tokens. Set
 # AUTH_ENABLED=1 to require bearer tokens on owner-mutating routes and to scope
 # Find My Car sessions to their owner.
 AUTH_ENABLED = os.getenv("AUTH_ENABLED", "").strip().lower() in {"1", "true", "yes"}
 
-app = FastAPI()
-
-from fastapi.middleware.cors import CORSMiddleware
+app = FastAPI(title="Smart Parking System API", version=__version__)
 
 app.add_middleware(
     CORSMiddleware,
@@ -98,6 +97,7 @@ def resolve_references_path() -> Path | None:
 # Pydantic models
 # ---------------------------------------------------------------------------
 
+
 class ParkingUpdate(BaseModel):
     spots: Dict[str, Literal["occupied", "free"]] = Field(default_factory=dict)
     confidence: Dict[str, float] = Field(default_factory=dict)
@@ -115,7 +115,7 @@ class HistoryResponse(BaseModel):
 
 class SpotPolygon(BaseModel):
     spot_id: str
-    points: Optional[List[List[float]]] = None   # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
+    points: Optional[List[List[float]]] = None  # [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
     corners: Optional[List[List[float]]] = None  # alias used by ML pipeline
     label: Optional[str] = None
 
@@ -155,7 +155,9 @@ class RegisterPayload(BaseModel):
     username: str
 
 
-def validate_quad_points(raw_points: List[List[float]], spot_id: str) -> List[List[float]]:
+def validate_quad_points(
+    raw_points: List[List[float]], spot_id: str
+) -> List[List[float]]:
     if not isinstance(raw_points, list) or len(raw_points) != 4:
         raise ValueError(f"Spot {spot_id!r} must contain exactly 4 [x, y] points.")
 
@@ -171,6 +173,7 @@ def validate_quad_points(raw_points: List[List[float]], spot_id: str) -> List[Li
 # ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
+
 
 def init_db(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
     global _conn
@@ -249,7 +252,9 @@ def init_db(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
     )
 
     # Migration: attach session ownership to park_sessions if not present yet.
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(park_sessions)").fetchall()}
+    cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(park_sessions)").fetchall()
+    }
     if "user_id" not in cols:
         conn.execute("ALTER TABLE park_sessions ADD COLUMN user_id INTEGER")
 
@@ -272,6 +277,7 @@ def utc_now_iso() -> str:
 # ---------------------------------------------------------------------------
 # Auth helpers (active only when AUTH_ENABLED)
 # ---------------------------------------------------------------------------
+
 
 def _token_from_header(authorization: Optional[str]) -> Optional[str]:
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -316,6 +322,7 @@ async def optional_user(authorization: Optional[str] = Header(None)) -> Optional
 # MJPEG stream helper
 # ---------------------------------------------------------------------------
 
+
 async def generate_mjpeg_stream(
     frame_path: Path = LATEST_FRAME_PATH,
     poll_interval: float = 0.1,
@@ -340,9 +347,7 @@ async def generate_mjpeg_stream(
                     last_sent_at = now
                     yield (
                         b"--frame\r\n"
-                        b"Content-Type: image/jpeg\r\n\r\n"
-                        + last_frame_bytes
-                        + b"\r\n"
+                        b"Content-Type: image/jpeg\r\n\r\n" + last_frame_bytes + b"\r\n"
                     )
         except FileNotFoundError:
             pass
@@ -355,6 +360,7 @@ init_db()
 # ---------------------------------------------------------------------------
 # Endpoints — original 5
 # ---------------------------------------------------------------------------
+
 
 @app.post("/update")
 async def update(payload: ParkingUpdate) -> dict:
@@ -379,9 +385,7 @@ async def update(payload: ParkingUpdate) -> dict:
 @app.get("/status")
 async def status() -> dict:
     conn = get_conn()
-    row = conn.execute(
-        "SELECT payload FROM log ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = conn.execute("SELECT payload FROM log ORDER BY id DESC LIMIT 1").fetchone()
     return json.loads(row[0]) if row else {}
 
 
@@ -420,7 +424,9 @@ async def auth_register(payload: RegisterPayload) -> dict:
         )
         conn.commit()
     except sqlite3.IntegrityError as exc:
-        raise HTTPException(status_code=409, detail="Username already registered.") from exc
+        raise HTTPException(
+            status_code=409, detail="Username already registered."
+        ) from exc
     return {"user_id": cursor.lastrowid, "username": payload.username, "token": token}
 
 
@@ -441,6 +447,7 @@ async def stream() -> StreamingResponse:
 # ---------------------------------------------------------------------------
 # NEW Endpoints — /map and /sessions
 # ---------------------------------------------------------------------------
+
 
 @app.post("/map")
 async def save_map(
@@ -522,11 +529,11 @@ async def get_sessions(spot_id: Optional[str] = None, limit: int = 100) -> dict:
     ]
     return {"sessions": sessions, "count": len(sessions)}
 
+
 # ---------------------------------------------------------------------------
 # Find My Car endpoints
 # ---------------------------------------------------------------------------
 
-from fastapi import UploadFile, File
 
 @app.post("/park")
 async def park_car(
@@ -534,6 +541,7 @@ async def park_car(
 ) -> dict:
     """Accept a driver photo, run SIFT localization, insert park_session row."""
     import sys
+
     sys.path.insert(0, str(Path("ml")))
     from localize import localize_query
 
@@ -606,7 +614,9 @@ async def find_car(
     # When auth is on, an owned session is only visible to its owner.
     if AUTH_ENABLED and session_user_id is not None:
         if user is None or user["id"] != session_user_id:
-            raise HTTPException(status_code=404, detail=f"Session {session_id} not found.")
+            raise HTTPException(
+                status_code=404, detail=f"Session {session_id} not found."
+            )
 
     # Get corners from spot_references
     spot_row = conn.execute(
@@ -628,6 +638,7 @@ async def find_car(
 # ---------------------------------------------------------------------------
 # Find My Car — per-spot reference photo management
 # ---------------------------------------------------------------------------
+
 
 @app.patch("/spots/{spot_id}")
 async def update_spot_label(
@@ -774,7 +785,9 @@ async def save_layout_alias(
         body = await request.json()
         layout = LayoutPayload.model_validate(body)
     except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Invalid layout payload: {exc}") from exc
+        raise HTTPException(
+            status_code=422, detail=f"Invalid layout payload: {exc}"
+        ) from exc
 
     return await save_map(layout, user=user)
 

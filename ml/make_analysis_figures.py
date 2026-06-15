@@ -34,7 +34,6 @@ from report_style import (
     MAGENTA,
     OCC_RED,
     PURPLE,
-    SERIES,
     apply_style,
 )
 
@@ -68,8 +67,15 @@ def grouped_bars(groups, series, title, out_path, ylabel="Score", ymin=None):
     all_vals = []
     for i, (label, values, color) in enumerate(series):
         offset = (i - (n_series - 1) / 2) * width
-        bars = ax.bar(x + offset, values, width, label=label, color=color,
-                      edgecolor="white", linewidth=0.5)
+        bars = ax.bar(
+            x + offset,
+            values,
+            width,
+            label=label,
+            color=color,
+            edgecolor="white",
+            linewidth=0.5,
+        )
         _bar_labels(ax, bars)
         all_vals.extend(values)
     ax.set_xticks(x)
@@ -102,7 +108,11 @@ def per_weather() -> None:
     rec = [float(rows[k]["recall"]) for k, _ in order]
     grouped_bars(
         labels,
-        [("Accuracy", acc, CYAN), ("Precision", prec, PURPLE), ("Recall", rec, MAGENTA)],
+        [
+            ("Accuracy", acc, CYAN),
+            ("Precision", prec, PURPLE),
+            ("Recall", rec, MAGENTA),
+        ],
         "YOLOv8n-cls — Per-Weather Accuracy (Test Split)",
         OUT / "w11_per_weather.png",
         ymin=0.90,
@@ -130,15 +140,21 @@ def val_test_gap() -> None:
 def pooling_compare() -> None:
     data = json.load(open(LOGS / "week7" / "pooling_comparison.json"))
     quad, square = data["quad"], data["square"]
-    metrics = [("top1_accuracy", "Accuracy"), ("precision", "Precision"),
-               ("recall", "Recall"), ("f1", "F1")]
+    metrics = [
+        ("top1_accuracy", "Accuracy"),
+        ("precision", "Precision"),
+        ("recall", "Recall"),
+        ("f1", "F1"),
+    ]
     labels = [disp for _, disp in metrics]
     q = [quad[k] for k, _ in metrics]
     s = [square[k] for k, _ in metrics]
     grouped_bars(
         labels,
-        [("Quadrilateral pooling (method a)", q, CYAN),
-         ("Square pooling (method b)", s, PURPLE)],
+        [
+            ("Quadrilateral pooling (method a)", q, CYAN),
+            ("Square pooling (method b)", s, PURPLE),
+        ],
         "Pooling Method Comparison — YOLOv8n-cls Test Split",
         OUT / "w11_pooling_compare.png",
         ymin=0.92,
@@ -184,12 +200,19 @@ def main() -> None:
     per_weather()
     val_test_gap()
     pooling_compare()
-    training_curves("yolov8n_stage2", "YOLOv8n-cls — Training Curves",
-                    OUT / "yolov8n_results.png")
-    training_curves("yolov8s_stage2", "YOLOv8s-cls — Training Curves (32 epochs)",
-                    OUT / "w11_yolov8s_curves.png")
-    training_curves("yolov8m_stage2", "YOLOv8m-cls — Training Curves (26 epochs)",
-                    OUT / "w11_yolov8m_curves.png")
+    training_curves(
+        "yolov8n_stage2", "YOLOv8n-cls — Training Curves", OUT / "yolov8n_results.png"
+    )
+    training_curves(
+        "yolov8s_stage2",
+        "YOLOv8s-cls — Training Curves (32 epochs)",
+        OUT / "w11_yolov8s_curves.png",
+    )
+    training_curves(
+        "yolov8m_stage2",
+        "YOLOv8m-cls — Training Curves (26 epochs)",
+        OUT / "w11_yolov8m_curves.png",
+    )
 
 
 if __name__ == "__main__":

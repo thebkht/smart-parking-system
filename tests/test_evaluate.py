@@ -34,7 +34,9 @@ class FakeYOLO:
 
     def __call__(self, image_path, **_kwargs):
         if isinstance(image_path, list):
-            return [FakeResult(self.probs_by_name[Path(path).name]) for path in image_path]
+            return [
+                FakeResult(self.probs_by_name[Path(path).name]) for path in image_path
+            ]
         return [FakeResult(self.probs_by_name[Path(image_path).name])]
 
     def val(self, **_kwargs):
@@ -192,4 +194,8 @@ def test_per_weather_uses_custom_weather_labels(tmp_path, monkeypatch):
     evaluate.evaluate_per_weather(args)
 
     payload = json.loads((tmp_path / "weather.json").read_text(encoding="utf-8"))
-    assert [row["dataset"] for row in payload["rows"]] == ["sunny", "overcast", "low_light"]
+    assert [row["dataset"] for row in payload["rows"]] == [
+        "sunny",
+        "overcast",
+        "low_light",
+    ]

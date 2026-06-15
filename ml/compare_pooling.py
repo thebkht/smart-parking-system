@@ -10,7 +10,9 @@ from typing import Any
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a Week 7 pooling comparison summary JSON.")
+    parser = argparse.ArgumentParser(
+        description="Build a pooling comparison summary JSON."
+    )
     parser.add_argument("--quad-json", default="logs/week7/pooling_quad_test.json")
     parser.add_argument("--square-json", default="logs/week7/pooling_square_test.json")
     parser.add_argument("--output", default="logs/week7/pooling_comparison.json")
@@ -58,10 +60,17 @@ def main() -> None:
             "f1": metric_delta(square, quad, "f1"),
         },
         "summary": {
-            "better_pooling_by_accuracy": "quad" if float(quad["top1_accuracy"]) >= float(square["top1_accuracy"]) else "square",
+            "better_pooling_by_accuracy": (
+                "quad"
+                if float(quad["top1_accuracy"]) >= float(square["top1_accuracy"])
+                else "square"
+            ),
             "quad_accuracy": float(quad["top1_accuracy"]),
             "square_accuracy": float(square["top1_accuracy"]),
-            "accuracy_gap_pp": round((float(square["top1_accuracy"]) - float(quad["top1_accuracy"])) * 100.0, 2),
+            "accuracy_gap_pp": round(
+                (float(square["top1_accuracy"]) - float(quad["top1_accuracy"])) * 100.0,
+                2,
+            ),
         },
         "narrative": [
             "Quadrilateral pooling is the production path because it preserves the train/serve geometry contract.",

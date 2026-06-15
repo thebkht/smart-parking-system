@@ -60,7 +60,9 @@ def test_evaluate_queries_scores_predictions(tmp_path, monkeypatch):
             },
         ]
     )
-    monkeypatch.setattr(evaluate_localization, "localize_query", lambda *args, **kwargs: next(results))
+    monkeypatch.setattr(
+        evaluate_localization, "localize_query", lambda *args, **kwargs: next(results)
+    )
 
     args = SimpleNamespace(
         queries=str(queries),

@@ -86,9 +86,11 @@ def test_update_persists_payload_as_is():
     client = TestClient(app)
     payload = sample_payload()
     client.post("/update", json=payload)
-    row = backend_module.get_conn().execute(
-        "SELECT payload FROM log ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = (
+        backend_module.get_conn()
+        .execute("SELECT payload FROM log ORDER BY id DESC LIMIT 1")
+        .fetchone()
+    )
     assert row is not None
     assert backend_module.json.loads(row[0]) == payload
 
@@ -135,7 +137,9 @@ def test_generate_mjpeg_stream_wraps_latest_frame(tmp_path):
     frame_path.write_bytes(frame_bytes)
 
     async def consume():
-        stream = backend_module.generate_mjpeg_stream(frame_path=frame_path, poll_interval=0.0)
+        stream = backend_module.generate_mjpeg_stream(
+            frame_path=frame_path, poll_interval=0.0
+        )
         return await asyncio.wait_for(stream.__anext__(), timeout=1)
 
     chunk = asyncio.run(consume())
@@ -195,9 +199,11 @@ def test_save_map_persists_layout_and_spot_references():
     assert body["image_height"] == 80
     assert body["updated_at"].endswith("Z")
 
-    rows = backend_module.get_conn().execute(
-        "SELECT spot_id, label, points FROM spot_references ORDER BY spot_id"
-    ).fetchall()
+    rows = (
+        backend_module.get_conn()
+        .execute("SELECT spot_id, label, points FROM spot_references ORDER BY spot_id")
+        .fetchall()
+    )
     assert rows == [
         ("spot_1", "A1", "[[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]"),
         ("spot_2", "A2", "[[20.0, 0.0], [30.0, 0.0], [30.0, 10.0], [20.0, 10.0]]"),
@@ -236,9 +242,7 @@ def test_map_background_serves_png(monkeypatch, tmp_path):
 
 
 def test_map_background_missing_returns_404(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        backend_module, "BEV_BACKGROUND_PATH", tmp_path / "missing.png"
-    )
+    monkeypatch.setattr(backend_module, "BEV_BACKGROUND_PATH", tmp_path / "missing.png")
     client = TestClient(app)
     response = client.get("/map/background")
     assert response.status_code == 404
@@ -324,9 +328,11 @@ def test_patch_spot_label_updates_references_and_map():
     assert response.json() == {"spot_id": "spot_1", "label": "VIP-1"}
 
     # spot_references updated
-    row = backend_module.get_conn().execute(
-        "SELECT label FROM spot_references WHERE spot_id='spot_1'"
-    ).fetchone()
+    row = (
+        backend_module.get_conn()
+        .execute("SELECT label FROM spot_references WHERE spot_id='spot_1'")
+        .fetchone()
+    )
     assert row[0] == "VIP-1"
 
     # GET /map reflects the new label

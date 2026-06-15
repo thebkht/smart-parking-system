@@ -31,9 +31,19 @@ DEFAULT_MAP_SAMPLE = "map_sample.json"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Extract ACPDS quadrilateral patches into a Stage 2 dataset.")
-    parser.add_argument("--dataset-root", required=True, help="ACPDS dataset root containing images plus a manifest.")
-    parser.add_argument("--manifest", default=None, help="Optional manifest path. Defaults to <dataset-root>/manifest.json.")
+    parser = argparse.ArgumentParser(
+        description="Extract ACPDS quadrilateral patches into a Stage 2 dataset."
+    )
+    parser.add_argument(
+        "--dataset-root",
+        required=True,
+        help="ACPDS dataset root containing images plus a manifest.",
+    )
+    parser.add_argument(
+        "--manifest",
+        default=None,
+        help="Optional manifest path. Defaults to <dataset-root>/manifest.json.",
+    )
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
     parser.add_argument("--size", type=int, default=128)
     parser.add_argument("--seed", type=int, default=42)
@@ -57,14 +67,9 @@ def utc_now_iso() -> str:
 def is_uniform_patch(patch: np.ndarray) -> bool:
     if patch.size == 0:
         return True
-    flattened = patch.reshape(-1, patch.shape[-1]) if patch.ndim == 3 else patch.reshape(-1, 1)
-    return bool(np.all(flattened == flattened[0]))
-
-
-def is_uniform_patch(patch: np.ndarray) -> bool:
-    if patch.size == 0:
-        return True
-    flattened = patch.reshape(-1, patch.shape[-1]) if patch.ndim == 3 else patch.reshape(-1, 1)
+    flattened = (
+        patch.reshape(-1, patch.shape[-1]) if patch.ndim == 3 else patch.reshape(-1, 1)
+    )
     return bool(np.all(flattened == flattened[0]))
 
 
@@ -186,7 +191,13 @@ def extract_dataset(
             else:
                 patch = warp_patch(frame, entry["corners"], size=size)
         except ValueError as exc:
-            invalid_polygons.append({"image": entry["image"], "spot_id": entry["spot_id"], "error": str(exc)})
+            invalid_polygons.append(
+                {
+                    "image": entry["image"],
+                    "spot_id": entry["spot_id"],
+                    "error": str(exc),
+                }
+            )
             continue
         if is_uniform_patch(patch):
             uniform_patches.append(
@@ -227,7 +238,9 @@ def extract_dataset(
         "uniform_patches_skipped": len(uniform_patches),
         "uniform_patches": uniform_patches,
         "missing_images": sorted(set(missing_images)),
-        "unique_source_images": {split: len(paths) for split, paths in source_images.items()},
+        "unique_source_images": {
+            split: len(paths) for split, paths in source_images.items()
+        },
         "patch_size": {"width": size, "height": size},
         "pooling": pooling,
         "generated_at": utc_now_iso(),
@@ -256,7 +269,11 @@ def write_map_sample(output_dir: Path, patch_index: list[dict[str, Any]]) -> Non
         "image_width": width,
         "image_height": height,
         "spots": [
-            {"spot_id": item["spot_id"], "corners": item["ordered_corners"], "label": item["label"]}
+            {
+                "spot_id": item["spot_id"],
+                "corners": item["ordered_corners"],
+                "label": item["label"],
+            }
             for item in sample_entries
         ],
     }
@@ -281,7 +298,9 @@ def validate_patches(
     status: str,
 ) -> dict[str, Any]:
     patch_index = load_patch_index(output_dir)
-    selected = sample_validation_entries(patch_index, sample_count=sample_count, seed=seed)
+    selected = sample_validation_entries(
+        patch_index, sample_count=sample_count, seed=seed
+    )
     validation_dir = output_dir / "validation_samples"
     validation_dir.mkdir(parents=True, exist_ok=True)
 

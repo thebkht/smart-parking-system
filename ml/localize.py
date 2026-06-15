@@ -53,7 +53,9 @@ class ImageFeatures:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run SIFT + FLANN parking spot localization.")
+    parser = argparse.ArgumentParser(
+        description="Run SIFT + FLANN parking spot localization."
+    )
     parser.add_argument("--query", required=True, help="Query image path.")
     parser.add_argument(
         "--references",
@@ -92,7 +94,9 @@ def load_grayscale_image(path: Path) -> np.ndarray:
 def extract_image_features(detector, image_path: Path) -> ImageFeatures:
     image = load_grayscale_image(image_path)
     keypoints, descriptors = detector.detectAndCompute(image, None)
-    return ImageFeatures(image_path=image_path, keypoints=keypoints or [], descriptors=descriptors)
+    return ImageFeatures(
+        image_path=image_path, keypoints=keypoints or [], descriptors=descriptors
+    )
 
 
 def load_references(references_path: Path) -> list[ReferenceImage]:
@@ -114,18 +118,24 @@ def load_reference_manifest(path: Path) -> list[ReferenceImage]:
                 raise SystemExit(f"Invalid manifest entry in {path}")
             spot_id = str(item.get("spot_id", "")).strip()
             image_values = item.get("images", item.get("image"))
-            references.extend(reference_images_for_value(spot_id, image_values, base_dir))
+            references.extend(
+                reference_images_for_value(spot_id, image_values, base_dir)
+            )
         return references
 
     if isinstance(raw, dict):
         for spot_id, image_values in raw.items():
-            references.extend(reference_images_for_value(str(spot_id), image_values, base_dir))
+            references.extend(
+                reference_images_for_value(str(spot_id), image_values, base_dir)
+            )
         return references
 
     raise SystemExit(f"Unsupported reference manifest structure: {path}")
 
 
-def reference_images_for_value(spot_id: str, image_values: Any, base_dir: Path) -> list[ReferenceImage]:
+def reference_images_for_value(
+    spot_id: str, image_values: Any, base_dir: Path
+) -> list[ReferenceImage]:
     if not spot_id:
         raise SystemExit("Reference manifest entry is missing spot_id.")
     values = image_values if isinstance(image_values, list) else [image_values]
@@ -150,7 +160,9 @@ def discover_reference_directory(root: Path) -> list[ReferenceImage]:
                 spot_id = stem.split("__", 1)[0]
             else:
                 spot_id = stem
-            references.append(ReferenceImage(spot_id=spot_id, image_path=image_path.resolve()))
+            references.append(
+                ReferenceImage(spot_id=spot_id, image_path=image_path.resolve())
+            )
         return references
 
     for subdir in sorted(path for path in root.iterdir() if path.is_dir()):
@@ -203,8 +215,12 @@ def estimate_inliers(
     if len(matches) < 4:
         return False, 0
 
-    src = np.float32([query_keypoints[match.queryIdx].pt for match in matches]).reshape(-1, 1, 2)
-    dst = np.float32([reference_keypoints[match.trainIdx].pt for match in matches]).reshape(-1, 1, 2)
+    src = np.float32([query_keypoints[match.queryIdx].pt for match in matches]).reshape(
+        -1, 1, 2
+    )
+    dst = np.float32(
+        [reference_keypoints[match.trainIdx].pt for match in matches]
+    ).reshape(-1, 1, 2)
     _homography, mask = cv2.findHomography(src, dst, cv2.RANSAC, ransac_threshold)
     if mask is None:
         return False, 0
@@ -225,9 +241,13 @@ def evaluate_reference(
     if query_features.descriptors is None:
         return failure_result(reference_features.image_path, "query_has_no_descriptors")
     if reference_features.descriptors is None:
-        return failure_result(reference_features.image_path, "reference_has_no_descriptors")
+        return failure_result(
+            reference_features.image_path, "reference_has_no_descriptors"
+        )
 
-    matches = matcher.knnMatch(query_features.descriptors, reference_features.descriptors, k=2)
+    matches = matcher.knnMatch(
+        query_features.descriptors, reference_features.descriptors, k=2
+    )
     good_matches = ratio_filter(matches, ratio_threshold)
     if len(good_matches) < min_matches:
         return {
@@ -324,7 +344,11 @@ def localize_query(
         "match_count": best["match_count"] if best else 0,
         "inlier_count": best["inlier_count"] if best else 0,
         "elapsed_ms": elapsed_ms,
-        "failure_reason": None if best and best["passed"] else (best["failure_reason"] if best else "no_references"),
+        "failure_reason": (
+            None
+            if best and best["passed"]
+            else (best["failure_reason"] if best else "no_references")
+        ),
         "candidates": candidates[: max(top_k, 0)],
     }
 

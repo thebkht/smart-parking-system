@@ -29,19 +29,19 @@ import numpy as np
 import yaml
 
 # ── colours ────────────────────────────────────────────────────────────────
-COLOR_CONFIRMED = (47, 255, 173)   # green
-COLOR_PENDING   = (0, 200, 255)    # yellow-cyan  (first click placed)
-COLOR_HOVER     = (200, 200, 200)  # grey crosshair
-COLOR_TEXT      = (255, 255, 255)
-COLOR_BG        = (20, 20, 20)
-COLOR_ACCENT    = (255, 80, 180)   # magenta accent
+COLOR_CONFIRMED = (47, 255, 173)  # green
+COLOR_PENDING = (0, 200, 255)  # yellow-cyan  (first click placed)
+COLOR_HOVER = (200, 200, 200)  # grey crosshair
+COLOR_TEXT = (255, 255, 255)
+COLOR_BG = (20, 20, 20)
+COLOR_ACCENT = (255, 80, 180)  # magenta accent
 
 
 # ── state ───────────────────────────────────────────────────────────────────
 class PickerState:
     def __init__(self) -> None:
         self.rois: List[Tuple[str, int, int, int, int]] = []  # (name, x1,y1,x2,y2)
-        self.pending: Optional[Tuple[int, int]] = None         # first click
+        self.pending: Optional[Tuple[int, int]] = None  # first click
         self.mouse_x = 0
         self.mouse_y = 0
 
@@ -103,9 +103,19 @@ def draw_rois(canvas: np.ndarray, state: PickerState, scale: float) -> None:
         # label background
         label = name
         (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-        cv2.rectangle(canvas, (sx1, sy1 - th - 8), (sx1 + tw + 6, sy1), COLOR_CONFIRMED, -1)
-        cv2.putText(canvas, label, (sx1 + 3, sy1 - 4),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_BG, 1, cv2.LINE_AA)
+        cv2.rectangle(
+            canvas, (sx1, sy1 - th - 8), (sx1 + tw + 6, sy1), COLOR_CONFIRMED, -1
+        )
+        cv2.putText(
+            canvas,
+            label,
+            (sx1 + 3, sy1 - 4),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            COLOR_BG,
+            1,
+            cv2.LINE_AA,
+        )
 
     # pending first click
     if state.pending is not None:
@@ -145,15 +155,34 @@ def draw_hud(canvas: np.ndarray, state: PickerState, scale: float) -> None:
     cv2.rectangle(canvas, (pad, pad), (pad + box_w, pad + box_h), COLOR_ACCENT, 1)
 
     for i, line in enumerate(lines):
-        color = COLOR_ACCENT if line.startswith("ROIs") or line.startswith("Next") else COLOR_TEXT
-        cv2.putText(canvas, line,
-                    (pad + 8, pad + pad + i * line_h),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1, cv2.LINE_AA)
+        color = (
+            COLOR_ACCENT
+            if line.startswith("ROIs") or line.startswith("Next")
+            else COLOR_TEXT
+        )
+        cv2.putText(
+            canvas,
+            line,
+            (pad + 8, pad + pad + i * line_h),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.42,
+            color,
+            1,
+            cv2.LINE_AA,
+        )
 
     # coords
     coord_text = f"x={int(state.mouse_x / scale)}  y={int(state.mouse_y / scale)}"
-    cv2.putText(canvas, coord_text, (w - 160, h - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.42, COLOR_HOVER, 1, cv2.LINE_AA)
+    cv2.putText(
+        canvas,
+        coord_text,
+        (w - 160, h - 10),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.42,
+        COLOR_HOVER,
+        1,
+        cv2.LINE_AA,
+    )
 
 
 def render(base: np.ndarray, state: PickerState, scale: float) -> np.ndarray:
@@ -192,7 +221,9 @@ def load_source_rois(config_path: Path, source_path: Path, source_kind: str) -> 
     return {}
 
 
-def save_config(state: PickerState, config_path: Path, source_path: Path, source_kind: str) -> None:
+def save_config(
+    state: PickerState, config_path: Path, source_path: Path, source_kind: str
+) -> None:
     existing: dict = {}
     if config_path.exists():
         with open(config_path, encoding="utf-8") as f:
@@ -221,13 +252,21 @@ def save_config(state: PickerState, config_path: Path, source_path: Path, source
 
 # ── main ────────────────────────────────────────────────────────────────────
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Interactive ROI picker for smart-parking config.yaml")
+    p = argparse.ArgumentParser(
+        description="Interactive ROI picker for smart-parking config.yaml"
+    )
     source = p.add_mutually_exclusive_group(required=True)
     source.add_argument("--image", help="Path to parking lot image")
     source.add_argument("--video", help="Path to parking lot video")
-    p.add_argument("--config", default="edge/config.yaml", help="Output config.yaml path")
-    p.add_argument("--scale", type=float, default=1.0,
-                   help="Display scale factor (e.g. 0.7 to shrink large images)")
+    p.add_argument(
+        "--config", default="edge/config.yaml", help="Output config.yaml path"
+    )
+    p.add_argument(
+        "--scale",
+        type=float,
+        default=1.0,
+        help="Display scale factor (e.g. 0.7 to shrink large images)",
+    )
     p.add_argument(
         "--frame-number",
         type=int,
@@ -274,7 +313,9 @@ def load_source_frame(args: argparse.Namespace) -> tuple[np.ndarray, Path, str]:
         ok, frame = cap.read()
         if not ok or frame is None:
             selector = (
-                f"time {args.time_sec:.3f}s" if args.time_sec is not None else f"frame {args.frame_number}"
+                f"time {args.time_sec:.3f}s"
+                if args.time_sec is not None
+                else f"frame {args.frame_number}"
             )
             sys.exit(f"Could not read {selector} from video: {video_path}")
         return frame, video_path, "video"
@@ -310,18 +351,24 @@ def main() -> None:
             ox, oy = int(x / scale), int(y / scale)
             name = state.click(ox, oy)
             if name:
-                print(f"  + {name}: [{int(x/scale)}, {int(y/scale)}, ...]  (2nd click to finish)")
+                print(
+                    f"  + {name}: [{int(x/scale)}, {int(y/scale)}, ...]  (2nd click to finish)"
+                )
 
     cv2.setMouseCallback(WIN, on_mouse)
 
-    print(f"\nOpened {source_kind}: {source_path}  ({frame.shape[1]}×{frame.shape[0]}px)")
+    print(
+        f"\nOpened {source_kind}: {source_path}  ({frame.shape[1]}×{frame.shape[0]}px)"
+    )
     if source_kind == "video":
         if args.time_sec is not None:
             print(f"Selected video timestamp: {args.time_sec:.3f}s")
         else:
             print(f"Selected video frame: {args.frame_number}")
     if state.rois:
-        print(f"Loaded {len(state.rois)} existing ROIs for this source from {config_path}")
+        print(
+            f"Loaded {len(state.rois)} existing ROIs for this source from {config_path}"
+        )
     print("Click TOP-LEFT then BOTTOM-RIGHT of each parking spot.")
     print("Keys: U=undo  R=reset  S=save+quit  Q=quit\n")
 

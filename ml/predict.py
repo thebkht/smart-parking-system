@@ -31,20 +31,41 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Predict with Stage 2 classification by default, or Stage 1 / single-model detection."
     )
-    parser.add_argument("--weights", required=True, help="Path to model checkpoint (.pt or .onnx).")
-    parser.add_argument("--source", required=True, help="Image path, directory, or video/camera source accepted by Ultralytics.")
-    parser.add_argument("--device", default="mps", help="Inference device, e.g. mps or cpu.")
-    parser.add_argument("--imgsz", type=int, default=None, help="Inference image size override.")
-    parser.add_argument("--conf", type=float, default=DEFAULT_CONF, help="Detection confidence threshold.")
-    parser.add_argument("--save", action="store_true", help="Save Ultralytics prediction artifacts.")
+    parser.add_argument(
+        "--weights", required=True, help="Path to model checkpoint (.pt or .onnx)."
+    )
+    parser.add_argument(
+        "--source",
+        required=True,
+        help="Image path, directory, or video/camera source accepted by Ultralytics.",
+    )
+    parser.add_argument(
+        "--device", default="mps", help="Inference device, e.g. mps or cpu."
+    )
+    parser.add_argument(
+        "--imgsz", type=int, default=None, help="Inference image size override."
+    )
+    parser.add_argument(
+        "--conf",
+        type=float,
+        default=DEFAULT_CONF,
+        help="Detection confidence threshold.",
+    )
+    parser.add_argument(
+        "--save", action="store_true", help="Save Ultralytics prediction artifacts."
+    )
     parser.add_argument(
         "--save-reference-style",
         action="store_true",
         help="Save a custom annotated image with confidence-only labels styled like the reference screenshot.",
     )
 
-    parser.add_argument("--stage1", action="store_true", help="Run Stage 1 detection prediction.")
-    parser.add_argument("--stage2", action="store_true", help="Run Stage 2 classification prediction.")
+    parser.add_argument(
+        "--stage1", action="store_true", help="Run Stage 1 detection prediction."
+    )
+    parser.add_argument(
+        "--stage2", action="store_true", help="Run Stage 2 classification prediction."
+    )
     parser.add_argument(
         "--single-model",
         action="store_true",
@@ -70,7 +91,9 @@ def default_imgsz(mode: str, override: int | None) -> int:
     return DEFAULT_STAGE2_IMGSZ if mode == "stage2" else DEFAULT_DETECT_IMGSZ
 
 
-def classification_output(result: Any, *, source: str, weights: str) -> dict[str, object]:
+def classification_output(
+    result: Any, *, source: str, weights: str
+) -> dict[str, object]:
     top1 = int(result.probs.top1)
     label = str(result.names[top1])
     confidence = float(result.probs.top1conf)
@@ -82,12 +105,16 @@ def classification_output(result: Any, *, source: str, weights: str) -> dict[str
         "confidence": round(confidence, 4),
         "probabilities": {
             str(name): round(float(result.probs.data[int(index)]), 4)
-            for index, name in sorted(result.names.items(), key=lambda item: int(item[0]))
+            for index, name in sorted(
+                result.names.items(), key=lambda item: int(item[0])
+            )
         },
     }
 
 
-def detection_output(result: Any, *, source: str, weights: str, mode: str) -> dict[str, object]:
+def detection_output(
+    result: Any, *, source: str, weights: str, mode: str
+) -> dict[str, object]:
     boxes = []
     names = {int(index): str(name) for index, name in result.names.items()}
     xyxy = result.boxes.xyxy.cpu().tolist() if result.boxes is not None else []
@@ -209,9 +236,17 @@ def main() -> None:
     for result in results:
         result_source = getattr(result, "path", source)
         if mode == "stage2":
-            normalized.append(classification_output(result, source=result_source, weights=str(weights)))
+            normalized.append(
+                classification_output(
+                    result, source=result_source, weights=str(weights)
+                )
+            )
         else:
-            normalized.append(detection_output(result, source=result_source, weights=str(weights), mode=mode))
+            normalized.append(
+                detection_output(
+                    result, source=result_source, weights=str(weights), mode=mode
+                )
+            )
             if args.save_reference_style:
                 output_dir = Path("runs/detect/reference_style")
                 output_name = Path(str(result_source)).name

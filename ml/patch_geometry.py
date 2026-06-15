@@ -39,14 +39,18 @@ def order_corners(corners: Any) -> np.ndarray:
 
 
 def _has_self_intersection(points: np.ndarray) -> bool:
-    return _segments_intersect(points[0], points[1], points[2], points[3]) or _segments_intersect(
-        points[1], points[2], points[3], points[0]
-    )
+    return _segments_intersect(
+        points[0], points[1], points[2], points[3]
+    ) or _segments_intersect(points[1], points[2], points[3], points[0])
 
 
-def _segments_intersect(a: np.ndarray, b: np.ndarray, c: np.ndarray, d: np.ndarray) -> bool:
+def _segments_intersect(
+    a: np.ndarray, b: np.ndarray, c: np.ndarray, d: np.ndarray
+) -> bool:
     def orient(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
-        return float((p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0]))
+        return float(
+            (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0])
+        )
 
     o1 = orient(a, b, c)
     o2 = orient(a, b, d)
@@ -57,7 +61,9 @@ def _segments_intersect(a: np.ndarray, b: np.ndarray, c: np.ndarray, d: np.ndarr
 
 def warp_patch(image: np.ndarray, corners: Any, size: int = 128) -> np.ndarray:
     ordered = order_corners(corners)
-    dst = np.array([[0, 0], [size - 1, 0], [size - 1, size - 1], [0, size - 1]], dtype=np.float32)
+    dst = np.array(
+        [[0, 0], [size - 1, 0], [size - 1, size - 1], [0, size - 1]], dtype=np.float32
+    )
     matrix = cv2.getPerspectiveTransform(ordered, dst)
     return cv2.warpPerspective(image, matrix, (size, size))
 

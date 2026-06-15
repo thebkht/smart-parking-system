@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train YOLOv8 models for the smart parking v3 pipeline.
+"""Train YOLOv8 models for the smart parking pipeline.
 
 Primary path:
   Stage 2 patch classification with YOLOv8*-cls.
@@ -60,7 +60,9 @@ def parse_args() -> argparse.Namespace:
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--stage1", action="store_true", help="Train Stage 1 detector.")
-    group.add_argument("--stage2", action="store_true", help="Train Stage 2 classifier.")
+    group.add_argument(
+        "--stage2", action="store_true", help="Train Stage 2 classifier."
+    )
     group.add_argument(
         "--single-model",
         action="store_true",
@@ -72,19 +74,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--imgsz", type=int, default=None)
     parser.add_argument("--batch", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None, dest="lr0")
-    parser.add_argument("--optimizer", default="AdamW", help="Ultralytics optimizer name.")
+    parser.add_argument(
+        "--optimizer", default="AdamW", help="Ultralytics optimizer name."
+    )
     parser.add_argument("--patience", type=int, default=None)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--no-batch-fallback", action="store_true")
     parser.add_argument("--model-dir", default=MODEL_DIR)
-    parser.add_argument("--weights", default=None, help="Override starting weights/checkpoint path.")
-    parser.add_argument("--project", default=None, help="Override Ultralytics project/output directory.")
+    parser.add_argument(
+        "--weights", default=None, help="Override starting weights/checkpoint path."
+    )
+    parser.add_argument(
+        "--project", default=None, help="Override Ultralytics project/output directory."
+    )
     parser.add_argument("--name", default=None, help="Override Ultralytics run name.")
-    parser.add_argument("--freeze", type=int, default=None, help="Freeze the first N model layers during training.")
-    parser.add_argument("--amp", dest="amp", action="store_true", default=None, help="Enable AMP.")
-    parser.add_argument("--no-amp", dest="amp", action="store_false", help="Disable AMP.")
-    parser.add_argument("--exist-ok", action="store_true", help="Allow reusing an existing run directory.")
+    parser.add_argument(
+        "--freeze",
+        type=int,
+        default=None,
+        help="Freeze the first N model layers during training.",
+    )
+    parser.add_argument(
+        "--amp", dest="amp", action="store_true", default=None, help="Enable AMP."
+    )
+    parser.add_argument(
+        "--no-amp", dest="amp", action="store_false", help="Disable AMP."
+    )
+    parser.add_argument(
+        "--exist-ok",
+        action="store_true",
+        help="Allow reusing an existing run directory.",
+    )
     parser.add_argument("--degrees", type=float, default=0.0)
     parser.add_argument("--fliplr", type=float, default=0.5)
     parser.add_argument("--flipud", type=float, default=0.0)
@@ -123,17 +144,29 @@ def _patch_ultralytics_assigner_for_iou_mismatch() -> None:
     if getattr(TaskAlignedAssigner, "_smart_parking_iou_patch", False):
         return
 
-    def _get_box_metrics_safe(self, pd_scores, pd_bboxes, gt_labels, gt_bboxes, mask_gt):
+    def _get_box_metrics_safe(
+        self, pd_scores, pd_bboxes, gt_labels, gt_bboxes, mask_gt
+    ):
         na = pd_bboxes.shape[-2]
         mask_gt = mask_gt.bool()  # b, max_num_obj, h*w
-        overlaps = torch.zeros([self.bs, self.n_max_boxes, na], dtype=pd_bboxes.dtype, device=pd_bboxes.device)
-        bbox_scores = torch.zeros([self.bs, self.n_max_boxes, na], dtype=pd_scores.dtype, device=pd_scores.device)
+        overlaps = torch.zeros(
+            [self.bs, self.n_max_boxes, na],
+            dtype=pd_bboxes.dtype,
+            device=pd_bboxes.device,
+        )
+        bbox_scores = torch.zeros(
+            [self.bs, self.n_max_boxes, na],
+            dtype=pd_scores.dtype,
+            device=pd_scores.device,
+        )
 
         mask_idx = mask_gt.nonzero(as_tuple=True)
         num_pairs = mask_idx[0].numel()
         if num_pairs:
             cls_idx = gt_labels.squeeze(-1).long().clamp_(0, pd_scores.shape[-1] - 1)
-            cls_scores = pd_scores.permute(0, 2, 1).gather(1, cls_idx.unsqueeze(-1).expand(-1, -1, na))
+            cls_scores = pd_scores.permute(0, 2, 1).gather(
+                1, cls_idx.unsqueeze(-1).expand(-1, -1, na)
+            )
             bbox_scores[mask_idx] = cls_scores[mask_idx]
             pd_boxes_all = pd_bboxes.unsqueeze(1).expand(-1, self.n_max_boxes, -1, -1)
             gt_boxes_all = gt_bboxes.unsqueeze(2).expand(-1, -1, na, -1)
@@ -148,7 +181,9 @@ def _patch_ultralytics_assigner_for_iou_mismatch() -> None:
                 )
             if n:
                 overlaps_vals = self.iou_calculation(gt_boxes[:n], pd_boxes[:n])
-                overlaps[mask_idx[0][:n], mask_idx[1][:n], mask_idx[2][:n]] = overlaps_vals
+                overlaps[mask_idx[0][:n], mask_idx[1][:n], mask_idx[2][:n]] = (
+                    overlaps_vals
+                )
 
         align_metric = bbox_scores.pow(self.alpha) * overlaps.pow(self.beta)
         return align_metric, overlaps
@@ -207,7 +242,9 @@ def _patch_ultralytics_trainer_for_nan_checkpoints() -> None:
         ema = deepcopy(ultralytics_trainer.unwrap_model(self.ema.ema)).half()
         used_model_fallback = False
         if not _state_dict_is_finite(ema.state_dict()):
-            model_snapshot = deepcopy(ultralytics_trainer.unwrap_model(self.model)).half()
+            model_snapshot = deepcopy(
+                ultralytics_trainer.unwrap_model(self.model)
+            ).half()
             if not _state_dict_is_finite(model_snapshot.state_dict()):
                 ultralytics_trainer.LOGGER.warning(
                     f"Skipping checkpoint save at epoch {self.epoch}: EMA and model contain NaN/Inf"
@@ -227,12 +264,17 @@ def _patch_ultralytics_trainer_for_nan_checkpoints() -> None:
                 "model": None,
                 "ema": ema,
                 "updates": self.ema.updates,
-                "optimizer": ultralytics_trainer.convert_optimizer_state_dict_to_fp16(deepcopy(self.optimizer.state_dict())),
+                "optimizer": ultralytics_trainer.convert_optimizer_state_dict_to_fp16(
+                    deepcopy(self.optimizer.state_dict())
+                ),
                 "scaler": self.scaler.state_dict(),
                 "train_args": vars(self.args),
                 "train_metrics": {
                     **self.metrics,
-                    **{"fitness": self.fitness, "ema_fallback_to_model": used_model_fallback},
+                    **{
+                        "fitness": self.fitness,
+                        "ema_fallback_to_model": used_model_fallback,
+                    },
                 },
                 "train_results": self.read_results_csv(),
                 "date": datetime.now().isoformat(),
@@ -260,10 +302,22 @@ def _patch_ultralytics_trainer_for_nan_checkpoints() -> None:
 
     def _handle_nan_recovery_safe(self, epoch):
         loss_nan = self.loss is not None and not self.loss.isfinite()
-        fitness_nan = self.fitness is not None and not ultralytics_trainer.np.isfinite(self.fitness)
-        fitness_collapse = self.best_fitness and self.best_fitness > 0 and self.fitness == 0
-        corrupted = ultralytics_trainer.RANK in {-1, 0} and loss_nan and (fitness_nan or fitness_collapse)
-        reason = "Loss NaN/Inf" if loss_nan else "Fitness NaN/Inf" if fitness_nan else "Fitness collapse"
+        fitness_nan = self.fitness is not None and not ultralytics_trainer.np.isfinite(
+            self.fitness
+        )
+        fitness_collapse = (
+            self.best_fitness and self.best_fitness > 0 and self.fitness == 0
+        )
+        corrupted = (
+            ultralytics_trainer.RANK in {-1, 0}
+            and loss_nan
+            and (fitness_nan or fitness_collapse)
+        )
+        reason = (
+            "Loss NaN/Inf"
+            if loss_nan
+            else "Fitness NaN/Inf" if fitness_nan else "Fitness collapse"
+        )
         if ultralytics_trainer.RANK != -1:
             broadcast_list = [corrupted if ultralytics_trainer.RANK == 0 else None]
             ultralytics_trainer.dist.broadcast_object_list(broadcast_list, 0)
@@ -292,7 +346,9 @@ def _patch_ultralytics_trainer_for_nan_checkpoints() -> None:
         _, ckpt = ultralytics_trainer.load_checkpoint(self.last)
         ema_state = ckpt["ema"].float().state_dict()
         if not _state_dict_is_finite(ema_state):
-            raise RuntimeError(f"Checkpoint {self.last} is corrupted with NaN/Inf weights")
+            raise RuntimeError(
+                f"Checkpoint {self.last} is corrupted with NaN/Inf weights"
+            )
         ultralytics_trainer.unwrap_model(self.model).load_state_dict(ema_state)
         self._load_checkpoint_state(ckpt)
         del ckpt, ema_state
@@ -308,7 +364,11 @@ def _train_with_fallback(model: YOLO, kwargs: dict, args: argparse.Namespace):
     try:
         return model.train(**kwargs)
     except RuntimeError as exc:
-        if args.device != "mps" or args.no_batch_fallback or "shape mismatch" not in str(exc):
+        if (
+            args.device != "mps"
+            or args.no_batch_fallback
+            or "shape mismatch" not in str(exc)
+        ):
             raise
         new_batch = max(1, kwargs["batch"] // 2)
         print(f"[MPS fallback] retrying with batch={new_batch}", file=sys.stderr)
@@ -379,7 +439,9 @@ def task_defaults(args: argparse.Namespace) -> dict[str, object]:
             "run_name": args.name or f"yolov8{args.variant}_single_model",
             "report_name": f"single_model_{args.variant}_report.json",
             "lr0": args.lr0 if args.lr0 is not None else SINGLE_MODEL_LR,
-            "patience": args.patience if args.patience is not None else SINGLE_MODEL_PATIENCE,
+            "patience": (
+                args.patience if args.patience is not None else SINGLE_MODEL_PATIENCE
+            ),
             "dropout": args.dropout if args.dropout is not None else 0.0,
             "cos_lr": args.cos_lr,
         }
@@ -433,7 +495,9 @@ def ensure_stage2_validation_passed(data_path: str) -> None:
 
 def promote_stage2_checkpoint(checkpoint_path: Path, destination: str) -> Path:
     if not checkpoint_path.exists():
-        raise SystemExit(f"Stage 2 checkpoint not found for promotion: {checkpoint_path}")
+        raise SystemExit(
+            f"Stage 2 checkpoint not found for promotion: {checkpoint_path}"
+        )
     destination_path = Path(destination)
     destination_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(checkpoint_path, destination_path)
@@ -463,7 +527,9 @@ def main() -> None:
         f"Epochs : {defaults['epochs']}  imgsz={defaults['imgsz']}  "
         f"batch={defaults['batch']}"
     )
-    print(f"Track  : {defaults['track']}  lr0={defaults['lr0']}  patience={defaults['patience']}")
+    print(
+        f"Track  : {defaults['track']}  lr0={defaults['lr0']}  patience={defaults['patience']}"
+    )
     if defaults["track"] == "stage2":
         ensure_stage2_validation_passed(str(defaults["data_path"]))
 
@@ -507,13 +573,19 @@ def main() -> None:
 
     best_ckpt, last_ckpt = _checkpoint_paths_for_run_dir(actual_run_dir)
     selected_ckpt = _existing_checkpoint(best_ckpt, last_ckpt)
-    synced_best_ckpt, synced_last_ckpt = _checkpoint_paths(defaults["project_dir"], defaults["run_name"])
+    synced_best_ckpt, synced_last_ckpt = _checkpoint_paths(
+        defaults["project_dir"], defaults["run_name"]
+    )
     metric_report = extract_metrics(defaults["task"], results)
     promoted_ckpt = None
     if defaults["track"] == "stage2" and should_promote_stage2(args):
         if selected_ckpt is None:
-            raise SystemExit("Stage 2 training completed without writing best.pt or last.pt; promotion aborted.")
-        promoted_ckpt = promote_stage2_checkpoint(Path(selected_ckpt), str(defaults["promoted_checkpoint"]))
+            raise SystemExit(
+                "Stage 2 training completed without writing best.pt or last.pt; promotion aborted."
+            )
+        promoted_ckpt = promote_stage2_checkpoint(
+            Path(selected_ckpt), str(defaults["promoted_checkpoint"])
+        )
     report = {
         "task": defaults["task"],
         "track": defaults["track"],
@@ -572,9 +644,13 @@ def main() -> None:
         json.dump(report, f, indent=2)
     print(f"Report saved   : {report_path}")
     if defaults["track"] == "stage2":
-        print("Comparison set : run variants n, s, m and compare Top-1 accuracy, size, and latency.")
+        print(
+            "Comparison set : run variants n, s, m and compare Top-1 accuracy, size, and latency."
+        )
     elif defaults["track"] == "single_model":
-        print("Baseline role  : compare this occupancy detector against the separate Stage 1 + Stage 2 pipeline.")
+        print(
+            "Baseline role  : compare this occupancy detector against the separate Stage 1 + Stage 2 pipeline."
+        )
 
 
 if __name__ == "__main__":

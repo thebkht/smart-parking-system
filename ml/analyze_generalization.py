@@ -13,13 +13,22 @@ from ultralytics import YOLO
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ml.evaluate import classify_probabilities, model_label, occupied_probability, stage2_inference_batch
+from ml.evaluate import (
+    classify_probabilities,
+    model_label,
+    occupied_probability,
+    stage2_inference_batch,
+)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Analyze Stage 2 val/test gap and per-lot test behavior.")
+    parser = argparse.ArgumentParser(
+        description="Analyze Stage 2 val/test gap and per-lot test behavior."
+    )
     parser.add_argument("--reports-dir", default="models")
-    parser.add_argument("--patch-index", default="datasets/acpds_stage2/patch_index.json")
+    parser.add_argument(
+        "--patch-index", default="datasets/acpds_stage2/patch_index.json"
+    )
     parser.add_argument("--weights", default="acpds_cls/weights/best.pt")
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--imgsz", type=int, default=128)
@@ -46,21 +55,31 @@ def variant_rows(reports_dir: Path) -> list[dict[str, Any]]:
     for variant in ("n", "s", "m"):
         report = load_json(reports_dir / f"stage2_{variant}_report.json")
         evaluation = report.get("evaluation", {})
-        expected_model_label = "acpds_cls" if variant == "n" else f"yolov8{variant}_stage2"
+        expected_model_label = (
+            "acpds_cls" if variant == "n" else f"yolov8{variant}_stage2"
+        )
         val = evaluation.get("val") or compare_val.get(expected_model_label)
         test = evaluation.get("test") or compare_test.get(expected_model_label)
         if not val or not test:
-            raise SystemExit(f"Missing val/test evaluation block in {reports_dir / f'stage2_{variant}_report.json'}")
+            raise SystemExit(
+                f"Missing val/test evaluation block in {reports_dir / f'stage2_{variant}_report.json'}"
+            )
         rows.append(
             {
                 "variant": variant,
                 "model": report.get("model"),
-                "checkpoint": report.get("promoted_ckpt") or report.get("selected_ckpt") or report.get("best_ckpt"),
+                "checkpoint": report.get("promoted_ckpt")
+                or report.get("selected_ckpt")
+                or report.get("best_ckpt"),
                 "val": val,
                 "test": test,
                 "delta_test_minus_val": {
-                    "top1_accuracy": round(float(test["top1_accuracy"]) - float(val["top1_accuracy"]), 4),
-                    "precision": round(float(test["precision"]) - float(val["precision"]), 4),
+                    "top1_accuracy": round(
+                        float(test["top1_accuracy"]) - float(val["top1_accuracy"]), 4
+                    ),
+                    "precision": round(
+                        float(test["precision"]) - float(val["precision"]), 4
+                    ),
                     "recall": round(float(test["recall"]) - float(val["recall"]), 4),
                     "f1": round(float(test["f1"]) - float(val["f1"]), 4),
                 },
@@ -82,7 +101,7 @@ def predict_patch_entries(
     effective_batch = stage2_inference_batch(weights, batch)
     probabilities: list[tuple[str, float]] = []
     for start in range(0, len(entries), effective_batch):
-        chunk = entries[start:start + effective_batch]
+        chunk = entries[start : start + effective_batch]
         results = model(
             [item["patch_path"] for item in chunk],
             device=device,
@@ -94,7 +113,9 @@ def predict_patch_entries(
     return classify_probabilities(probabilities, threshold=threshold)
 
 
-def group_test_entries_by_image(patch_index: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def group_test_entries_by_image(
+    patch_index: list[dict[str, Any]]
+) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in patch_index:
         if item.get("split") != "test":
@@ -161,17 +182,27 @@ def main() -> None:
 
     image_rows.sort(key=lambda row: (-int(row["sample_count"]), str(row["image"])))
     recall_deltas = [float(row["delta_test_minus_val"]["recall"]) for row in rows]
-    accuracy_deltas = [float(row["delta_test_minus_val"]["top1_accuracy"]) for row in rows]
+    accuracy_deltas = [
+        float(row["delta_test_minus_val"]["top1_accuracy"]) for row in rows
+    ]
     payload = {
         "mode": "stage2_generalization_gap",
         "promoted_model": model_label(args.weights),
         "weights": args.weights,
         "threshold": args.threshold,
         "summary": {
-            "average_accuracy_delta_test_minus_val": round(sum(accuracy_deltas) / len(accuracy_deltas), 4),
-            "average_recall_delta_test_minus_val": round(sum(recall_deltas) / len(recall_deltas), 4),
-            "largest_accuracy_drop_variant": min(rows, key=lambda row: row["delta_test_minus_val"]["top1_accuracy"])["variant"],
-            "largest_recall_drop_variant": min(rows, key=lambda row: row["delta_test_minus_val"]["recall"])["variant"],
+            "average_accuracy_delta_test_minus_val": round(
+                sum(accuracy_deltas) / len(accuracy_deltas), 4
+            ),
+            "average_recall_delta_test_minus_val": round(
+                sum(recall_deltas) / len(recall_deltas), 4
+            ),
+            "largest_accuracy_drop_variant": min(
+                rows, key=lambda row: row["delta_test_minus_val"]["top1_accuracy"]
+            )["variant"],
+            "largest_recall_drop_variant": min(
+                rows, key=lambda row: row["delta_test_minus_val"]["recall"]
+            )["variant"],
             "test_group_count": len(image_rows),
         },
         "variants": rows,

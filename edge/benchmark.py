@@ -157,7 +157,7 @@ def benchmark_onnx(
 
     resized = cv2.resize(frame, (imgsz, imgsz))
     tensor = resized[:, :, ::-1].astype(np.float32) / 255.0  # BGR→RGB, /255
-    tensor = np.transpose(tensor, (2, 0, 1))[np.newaxis]      # HWC → 1CHW
+    tensor = np.transpose(tensor, (2, 0, 1))[np.newaxis]  # HWC → 1CHW
 
     for _ in range(warmup):
         session.run(None, {input_name: tensor})
@@ -216,9 +216,9 @@ def benchmark_coreml(
         times.append(time.perf_counter() - t0)
 
     avg_latency = sum(times) / len(times)
-    size_mb = sum(
-        f.stat().st_size for f in mlpackage_path.rglob("*") if f.is_file()
-    ) / 1e6
+    size_mb = (
+        sum(f.stat().st_size for f in mlpackage_path.rglob("*") if f.is_file()) / 1e6
+    )
 
     return {
         "backend": "CoreML-int8",
@@ -245,7 +245,9 @@ def print_results_table(results: List[Dict[str, Any]]) -> None:
     print()
 
 
-def save_results(results: List[Dict[str, Any]], json_path: Path, csv_path: Path) -> None:
+def save_results(
+    results: List[Dict[str, Any]], json_path: Path, csv_path: Path
+) -> None:
     json_path.parent.mkdir(parents=True, exist_ok=True)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -289,13 +291,16 @@ def main() -> None:
     available_devices = ["cpu"]
     try:
         import torch
+
         if torch.backends.mps.is_available():
             available_devices.insert(0, "mps")
     except Exception:
         pass
 
     for device in available_devices:
-        print(f"Benchmarking YOLO-{device} ({args.iterations} iters, {args.warmup} warmup)...")
+        print(
+            f"Benchmarking YOLO-{device} ({args.iterations} iters, {args.warmup} warmup)..."
+        )
         try:
             r = benchmark_yolo(
                 str(model_path), runtime_frame, device, args.iterations, args.warmup
@@ -306,7 +311,9 @@ def main() -> None:
 
     # --- ONNX backends ---
     for label, path in [("ONNX-fp32", onnx_fp32_path), ("ONNX-int8", onnx_int8_path)]:
-        print(f"Benchmarking {label} ({args.iterations} iters, {args.warmup} warmup)...")
+        print(
+            f"Benchmarking {label} ({args.iterations} iters, {args.warmup} warmup)..."
+        )
         try:
             r = benchmark_onnx(
                 str(path),
@@ -325,7 +332,9 @@ def main() -> None:
             print(f"  Skipped {label}: {exc}")
 
     # --- Core ML backend (Apple Silicon only) ---
-    print(f"Benchmarking CoreML-int8 ({args.iterations} iters, {args.warmup} warmup)...")
+    print(
+        f"Benchmarking CoreML-int8 ({args.iterations} iters, {args.warmup} warmup)..."
+    )
     try:
         r = benchmark_coreml(
             coreml_path,

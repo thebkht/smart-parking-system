@@ -47,11 +47,17 @@ def test_discover_reference_directory_uses_subdirectories(tmp_path):
 
     refs = localize.discover_reference_directory(tmp_path)
 
-    assert refs == [localize.ReferenceImage(spot_id="spot_7", image_path=(tmp_path / "spot_7" / "a.jpg").resolve())]
+    assert refs == [
+        localize.ReferenceImage(
+            spot_id="spot_7", image_path=(tmp_path / "spot_7" / "a.jpg").resolve()
+        )
+    ]
 
 
 def test_evaluate_reference_rejects_homography_failures(monkeypatch, tmp_path):
-    monkeypatch.setattr(localize, "estimate_inliers", lambda *args, **kwargs: (False, 2))
+    monkeypatch.setattr(
+        localize, "estimate_inliers", lambda *args, **kwargs: (False, 2)
+    )
     query_features = localize.ImageFeatures(
         image_path=tmp_path / "query.jpg",
         keypoints=[SimpleNamespace(pt=(float(i), float(i))) for i in range(8)],
@@ -97,14 +103,18 @@ def test_main_writes_localization_json_output(tmp_path, monkeypatch):
         match_count = 10 if "spot_1" in str(image_path) else 5
         return localize.ImageFeatures(
             image_path=image_path,
-            keypoints=[SimpleNamespace(pt=(float(i), float(i))) for i in range(match_count)],
+            keypoints=[
+                SimpleNamespace(pt=(float(i), float(i))) for i in range(match_count)
+            ],
             descriptors=np.full((match_count, 1), match_count, dtype=np.float32),
         )
 
     monkeypatch.setattr(localize, "create_sift_detector", lambda: object())
     monkeypatch.setattr(localize, "build_matcher", lambda: FakeMatcher())
     monkeypatch.setattr(localize, "extract_image_features", fake_extract)
-    monkeypatch.setattr(localize, "estimate_inliers", lambda *_args, **_kwargs: (True, 9))
+    monkeypatch.setattr(
+        localize, "estimate_inliers", lambda *_args, **_kwargs: (True, 9)
+    )
     monkeypatch.setattr(
         sys,
         "argv",

@@ -13,9 +13,19 @@ SPLIT_ALIASES = {"train": "train", "valid": "val", "val": "val", "test": "test"}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build datasets/acpds/manifest.json from annotations.json.")
-    parser.add_argument("--dataset-root", required=True, help="ACPDS dataset root containing annotations.json and images/.")
-    parser.add_argument("--output", default=None, help="Manifest output path. Defaults to <dataset-root>/manifest.json.")
+    parser = argparse.ArgumentParser(
+        description="Build datasets/acpds/manifest.json from annotations.json."
+    )
+    parser.add_argument(
+        "--dataset-root",
+        required=True,
+        help="ACPDS dataset root containing annotations.json and images/.",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Manifest output path. Defaults to <dataset-root>/manifest.json.",
+    )
     return parser.parse_args()
 
 
@@ -53,7 +63,9 @@ def main() -> None:
                 f"files={len(file_names)} rois={len(rois_list)} occupancy={len(occupancy_list)}"
             )
 
-        for file_name, polygons, occupancies in zip(file_names, rois_list, occupancy_list):
+        for file_name, polygons, occupancies in zip(
+            file_names, rois_list, occupancy_list
+        ):
             image_path = images_dir / str(file_name)
             if not image_path.exists():
                 raise SystemExit(f"Referenced image missing: {image_path}")
@@ -70,9 +82,13 @@ def main() -> None:
                 corners = []
                 for point in polygon:
                     if len(point) != 2:
-                        raise SystemExit(f"Invalid point in {file_name} polygon {index}: {point!r}")
+                        raise SystemExit(
+                            f"Invalid point in {file_name} polygon {index}: {point!r}"
+                        )
                     x, y = point
-                    corners.append([round(float(x) * width, 3), round(float(y) * height, 3)])
+                    corners.append(
+                        [round(float(x) * width, 3), round(float(y) * height, 3)]
+                    )
                 samples.append(
                     {
                         "image": f"images/{file_name}",

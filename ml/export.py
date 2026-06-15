@@ -84,14 +84,17 @@ def main() -> None:
     else:
         print(f"Warning: FP32 ONNX not found at expected path {fp32_src}")
         summary["notes"].append(f"FP32 ONNX export missing at expected path {fp32_src}")
-        
+
     print("Exporting Core ML ...")
     coreml_result = model.export(format="coreml", imgsz=args.imgsz, int8=True)
     coreml_src = Path(str(coreml_result))
     if coreml_src.exists():
         dst_coreml = out_dir / "best.mlpackage"
         shutil.copytree(coreml_src, dst_coreml, dirs_exist_ok=True)
-        size_mb = sum(f.stat().st_size for f in dst_coreml.rglob("*") if f.is_file()) / 1_048_576
+        size_mb = (
+            sum(f.stat().st_size for f in dst_coreml.rglob("*") if f.is_file())
+            / 1_048_576
+        )
         print(f"Core ML INT8 → {dst_coreml} ({size_mb:.1f} MB)")
         summary["artifacts"]["best.mlpackage"] = artifact_entry(dst_coreml)
     else:
@@ -115,14 +118,20 @@ def main() -> None:
             print(f"INT8 ONNX → {dst_int8} ({size_mb:.1f} MB)")
             summary["artifacts"]["best_int8.onnx"] = artifact_entry(dst_int8)
         except ImportError:
-            print("Warning: onnxruntime quantization is unavailable; best_int8.onnx was not created.")
-            summary["notes"].append("onnxruntime quantization is unavailable; INT8 ONNX export was skipped.")
+            print(
+                "Warning: onnxruntime quantization is unavailable; best_int8.onnx was not created."
+            )
+            summary["notes"].append(
+                "onnxruntime quantization is unavailable; INT8 ONNX export was skipped."
+            )
         except Exception as exc:
             print(f"Warning: INT8 quantization failed: {exc}")
             summary["notes"].append(f"INT8 quantization failed: {exc}")
     else:
         print("Warning: skipping INT8 ONNX because the FP32 export was not created.")
-        summary["notes"].append("INT8 ONNX export skipped because the FP32 ONNX export was missing.")
+        summary["notes"].append(
+            "INT8 ONNX export skipped because the FP32 ONNX export was missing."
+        )
 
     print(f"\nArtifacts in {out_dir}:")
     for f in sorted(out_dir.iterdir()):

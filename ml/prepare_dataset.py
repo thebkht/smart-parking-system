@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare v3 datasets for smart parking training.
+"""Prepare datasets for smart parking training.
 
 Primary path:
   Stage 1 full-frame parking-slot detection with scene-aware holdout splits.
@@ -67,8 +67,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional Parking Space Detection Dataset root with annotations.xml and images/ for Stage 1 augmentation.",
     )
-    parser.add_argument("--stage1", action="store_true", help="Prepare Stage 1 detection data.")
-    parser.add_argument("--stage2", action="store_true", help="Prepare Stage 2 classification data.")
+    parser.add_argument(
+        "--stage1", action="store_true", help="Prepare Stage 1 detection data."
+    )
+    parser.add_argument(
+        "--stage2", action="store_true", help="Prepare Stage 2 classification data."
+    )
     parser.add_argument(
         "--single-model",
         action="store_true",
@@ -126,7 +130,9 @@ def _clip_unit(value: float) -> float:
     return min(1.0, max(0.0, value))
 
 
-def _xyxy_to_cxcywh(x1: float, y1: float, x2: float, y2: float) -> tuple[float, float, float, float] | None:
+def _xyxy_to_cxcywh(
+    x1: float, y1: float, x2: float, y2: float
+) -> tuple[float, float, float, float] | None:
     x1 = _clip_unit(x1)
     y1 = _clip_unit(y1)
     x2 = _clip_unit(x2)
@@ -136,12 +142,16 @@ def _xyxy_to_cxcywh(x1: float, y1: float, x2: float, y2: float) -> tuple[float, 
     return ((x1 + x2) / 2.0, (y1 + y2) / 2.0, x2 - x1, y2 - y1)
 
 
-def _label_geometry_to_box(values: list[float]) -> tuple[float, float, float, float] | None:
+def _label_geometry_to_box(
+    values: list[float],
+) -> tuple[float, float, float, float] | None:
     if not values or any((not math.isfinite(value)) for value in values):
         return None
     if len(values) == 4:
         cx, cy, bw, bh = values
-        return _xyxy_to_cxcywh(cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0)
+        return _xyxy_to_cxcywh(
+            cx - bw / 2.0, cy - bh / 2.0, cx + bw / 2.0, cy + bh / 2.0
+        )
     if len(values) >= 6 and len(values) % 2 == 0:
         xs = values[0::2]
         ys = values[1::2]
@@ -154,7 +164,9 @@ def normalize_source_stem(name: str) -> str:
     return re.sub(r"\.rf\.[A-Za-z0-9]+$", "", stem)
 
 
-def scene_id_from_frame(normalized_stem: str, *, box_count: int, image_path: Path | None = None) -> tuple[str, str]:
+def scene_id_from_frame(
+    normalized_stem: str, *, box_count: int, image_path: Path | None = None
+) -> tuple[str, str]:
     if image_path is not None:
         parts = list(image_path.parts)
         if len(parts) > 3:
@@ -173,13 +185,17 @@ def scene_id_from_frame(normalized_stem: str, *, box_count: int, image_path: Pat
         day = normalized_stem.split("_", 1)[0]
         return f"layout_{box_count}_date_{day}", "filename_date_plus_box_count"
 
-    prefix = normalized_stem.rsplit("_", 1)[0] if "_" in normalized_stem else normalized_stem
+    prefix = (
+        normalized_stem.rsplit("_", 1)[0] if "_" in normalized_stem else normalized_stem
+    )
     if prefix and prefix != normalized_stem:
         return prefix, "filename_prefix"
     return normalized_stem, "normalized_filename"
 
 
-def iter_detection_boxes(label_path: Path) -> Iterable[tuple[int, tuple[float, float, float, float], str]]:
+def iter_detection_boxes(
+    label_path: Path,
+) -> Iterable[tuple[int, tuple[float, float, float, float], str]]:
     for raw_line in label_path.read_text(encoding="utf-8").splitlines():
         parts = raw_line.strip().split()
         if len(parts) < 5:
@@ -222,7 +238,9 @@ def _pixel_polygon_to_unit_box(
 
 def validate_split_ratios(val_ratio: float, test_ratio: float) -> None:
     if val_ratio <= 0 or test_ratio <= 0 or (val_ratio + test_ratio) >= 1:
-        raise SystemExit("val_ratio and test_ratio must be positive and sum to less than 1.")
+        raise SystemExit(
+            "val_ratio and test_ratio must be positive and sum to less than 1."
+        )
 
 
 def stratified_split(
@@ -237,7 +255,9 @@ def stratified_split(
             raise SystemExit(
                 f"Need at least 3 images for class {class_name!r} to create train/val/test splits."
             )
-        train_val, test = train_test_split(images, test_size=test_ratio, random_state=seed)
+        train_val, test = train_test_split(
+            images, test_size=test_ratio, random_state=seed
+        )
         val_adj = val_ratio / (1.0 - test_ratio)
         train, val = train_test_split(train_val, test_size=val_adj, random_state=seed)
         splits["train"][class_name] = list(train)
@@ -262,7 +282,10 @@ def copy_images(
                 if target.exists():
                     collision_counts[f"{split_name}/{class_name}"] += 1
                     stem, suffix = target.stem, target.suffix
-                    target = target_dir / f"{stem}__{abs(hash(str(src))) & 0xFFFFFF:06x}{suffix}"
+                    target = (
+                        target_dir
+                        / f"{stem}__{abs(hash(str(src))) & 0xFFFFFF:06x}{suffix}"
+                    )
                 shutil.copy2(src, target)
     return dict(collision_counts)
 
@@ -282,12 +305,16 @@ def copy_test_flat(
             if target.exists():
                 collisions[class_name] += 1
                 stem, suffix = target.stem, target.suffix
-                target = target_dir / f"{stem}__{abs(hash(str(src))) & 0xFFFFFF:06x}{suffix}"
+                target = (
+                    target_dir / f"{stem}__{abs(hash(str(src))) & 0xFFFFFF:06x}{suffix}"
+                )
             shutil.copy2(src, target)
     return dict(collisions)
 
 
-def summarize_dimensions(paths: Iterable[Path], sample_limit: int = 25) -> dict[str, object]:
+def summarize_dimensions(
+    paths: Iterable[Path], sample_limit: int = 25
+) -> dict[str, object]:
     widths: list[int] = []
     heights: list[int] = []
     for path in list(paths)[:sample_limit]:
@@ -434,11 +461,15 @@ def _discover_detection_records(
     }
 
 
-def _discover_parking_space_detection_records(root: Path) -> tuple[list[dict[str, object]], dict[str, object]]:
+def _discover_parking_space_detection_records(
+    root: Path,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
     annotations_path = root / "annotations.xml"
     images_dir = root / "images"
     if not annotations_path.exists():
-        raise SystemExit(f"Parking Space Detection Dataset annotations.xml not found in {root}")
+        raise SystemExit(
+            f"Parking Space Detection Dataset annotations.xml not found in {root}"
+        )
     if not images_dir.exists():
         raise SystemExit(f"Parking Space Detection Dataset images/ not found in {root}")
 
@@ -537,9 +568,13 @@ def assign_scene_splits(
             f"Need at least 3 scene groups for scene holdout splitting, found {len(scene_ids)}."
         )
 
-    train_scene_ids, test_scene_ids = train_test_split(scene_ids, test_size=test_ratio, random_state=seed)
+    train_scene_ids, test_scene_ids = train_test_split(
+        scene_ids, test_size=test_ratio, random_state=seed
+    )
     val_adj = val_ratio / (1.0 - test_ratio)
-    train_scene_ids, val_scene_ids = train_test_split(train_scene_ids, test_size=val_adj, random_state=seed)
+    train_scene_ids, val_scene_ids = train_test_split(
+        train_scene_ids, test_size=val_adj, random_state=seed
+    )
 
     split_map = {
         "train": set(train_scene_ids),
@@ -547,7 +582,11 @@ def assign_scene_splits(
         "test": set(test_scene_ids),
     }
     return {
-        split: [record for record in records if str(record["scene_id"]) in scene_ids_for_split]
+        split: [
+            record
+            for record in records
+            if str(record["scene_id"]) in scene_ids_for_split
+        ]
         for split, scene_ids_for_split in split_map.items()
     }
 
@@ -564,9 +603,13 @@ def _detection_audit(records: list[dict[str, object]]) -> dict[str, object]:
     count_jumps = 0
     for scene_id, counts in counts_by_scene.items():
         scene_median = median(counts)
-        suspicious_low += sum(1 for count in counts if scene_median and count < (scene_median * 0.5))
+        suspicious_low += sum(
+            1 for count in counts if scene_median and count < (scene_median * 0.5)
+        )
         prior = None
-        for record in sorted(ordered_by_scene[scene_id], key=lambda item: str(item["normalized_stem"])):
+        for record in sorted(
+            ordered_by_scene[scene_id], key=lambda item: str(item["normalized_stem"])
+        ):
             current = int(record["box_count"])
             if prior is not None and abs(current - prior) >= max(10, int(prior * 0.5)):
                 count_jumps += 1
@@ -574,14 +617,17 @@ def _detection_audit(records: list[dict[str, object]]) -> dict[str, object]:
 
     return {
         "scene_median_box_counts": {
-            scene_id: round(float(median(counts)), 2) for scene_id, counts in sorted(counts_by_scene.items())
+            scene_id: round(float(median(counts)), 2)
+            for scene_id, counts in sorted(counts_by_scene.items())
         },
         "large_count_jumps": count_jumps,
         "suspiciously_low_count_frames": suspicious_low,
     }
 
 
-def _split_scene_summary(records_by_split: dict[str, list[dict[str, object]]]) -> dict[str, dict[str, object]]:
+def _split_scene_summary(
+    records_by_split: dict[str, list[dict[str, object]]]
+) -> dict[str, dict[str, object]]:
     summary: dict[str, dict[str, object]] = {}
     for split, records in records_by_split.items():
         scene_ids = sorted({str(record["scene_id"]) for record in records})
@@ -595,7 +641,9 @@ def _split_scene_summary(records_by_split: dict[str, list[dict[str, object]]]) -
             "normalized_frame_ids": normalized_ids,
             "kept_label_count_summary": summarize_label_counts(counts),
             "source_split_counts": dict(
-                sorted(Counter(str(record["source_split"]) for record in records).items())
+                sorted(
+                    Counter(str(record["source_split"]) for record in records).items()
+                )
             ),
         }
     return summary
@@ -606,7 +654,7 @@ def _leakage_summary(split_summary: dict[str, dict[str, object]]) -> dict[str, o
     scene_overlap: dict[str, list[str]] = {}
     frame_overlap: dict[str, list[str]] = {}
     for i, left in enumerate(split_names):
-        for right in split_names[i + 1:]:
+        for right in split_names[i + 1 :]:
             key = f"{left}-{right}"
             left_scenes = set(split_summary[left]["scene_ids"])
             right_scenes = set(split_summary[right]["scene_ids"])
@@ -640,8 +688,7 @@ def sanity_check_stage2(
         "duplicate_sources": duplicate_sources,
         "copy_collisions": collisions,
         "dimension_summary": {
-            cls: summarize_dimensions(paths)
-            for cls, paths in all_images.items()
+            cls: summarize_dimensions(paths) for cls, paths in all_images.items()
         },
     }
     if scene_split_summary is not None:
@@ -726,7 +773,9 @@ def _prepare_detection_dataset(
     records, discovery = _discover_detection_records(pklot_dir, stage1_mode=stage1_mode)
     source_summaries: dict[str, dict[str, object]] = {"pklot": discovery}
     if stage1_mode and parking_space_dir is not None:
-        extra_records, extra_discovery = _discover_parking_space_detection_records(parking_space_dir)
+        extra_records, extra_discovery = _discover_parking_space_detection_records(
+            parking_space_dir
+        )
         records.extend(extra_records)
         records.sort(key=lambda item: str(item["image_path"]))
         source_summaries["parking_space_dataset"] = extra_discovery
@@ -744,7 +793,9 @@ def _prepare_detection_dataset(
     audit = _detection_audit(records)
 
     _write_detection_dataset(records_by_split, out_dir=out_dir)
-    _write_detection_yaml(out_dir, yaml_path, names=["space"] if stage1_mode else ["free", "occupied"])
+    _write_detection_yaml(
+        out_dir, yaml_path, names=["space"] if stage1_mode else ["free", "occupied"]
+    )
 
     report = {
         "track": "stage1" if stage1_mode else "single_model",
@@ -791,7 +842,9 @@ def prepare_stage1(
     test_ratio: float = 0.15,
     seed: int = 42,
 ) -> None:
-    print(f"\n[Stage 1] Building scene-held-out full-frame slot detector dataset -> {out_dir}/")
+    print(
+        f"\n[Stage 1] Building scene-held-out full-frame slot detector dataset -> {out_dir}/"
+    )
     report = _prepare_detection_dataset(
         pklot_dir,
         out_dir,
@@ -802,7 +855,9 @@ def prepare_stage1(
         test_ratio=test_ratio,
         seed=seed,
     )
-    print(f"  total       : {report['images_kept_total']} images  {report['boxes_kept_total']} boxes")
+    print(
+        f"  total       : {report['images_kept_total']} images  {report['boxes_kept_total']} boxes"
+    )
     print(f"  yaml        : {yaml_path}")
     print(f"  report      : {out_dir / DETECTION_REPORT}")
 
@@ -816,7 +871,9 @@ def prepare_single_model_detection(
     test_ratio: float = 0.15,
     seed: int = 42,
 ) -> None:
-    print(f"\n[Single Model] Building scene-held-out occupancy detection baseline -> {out_dir}/")
+    print(
+        f"\n[Single Model] Building scene-held-out occupancy detection baseline -> {out_dir}/"
+    )
     report = _prepare_detection_dataset(
         pklot_dir,
         out_dir,
@@ -827,7 +884,9 @@ def prepare_single_model_detection(
         test_ratio=test_ratio,
         seed=seed,
     )
-    print(f"  total       : {report['images_kept_total']} images  {report['boxes_kept_total']} boxes")
+    print(
+        f"  total       : {report['images_kept_total']} images  {report['boxes_kept_total']} boxes"
+    )
     print(f"  yaml        : {yaml_path}")
     print(f"  report      : {out_dir / DETECTION_REPORT}")
 
@@ -895,7 +954,11 @@ def prepare_stage2_from_roi_annotations(args: argparse.Namespace) -> None:
     invalid_polygons = 0
     missing_images: list[str] = []
 
-    patch_cache = Path(args.patch_cache) if args.patch_cache else source_root / "stage2_patch_cache"
+    patch_cache = (
+        Path(args.patch_cache)
+        if args.patch_cache
+        else source_root / "stage2_patch_cache"
+    )
     patch_cache.mkdir(parents=True, exist_ok=True)
     print(f"\n[Stage 2] Cropping ROI patches from annotations.json -> {patch_cache}/")
 
@@ -913,7 +976,9 @@ def prepare_stage2_from_roi_annotations(args: argparse.Namespace) -> None:
             )
 
         split_counts = {"free": 0, "occupied": 0}
-        for file_name, polygons, occupancies in zip(file_names, rois_list, occupancy_list):
+        for file_name, polygons, occupancies in zip(
+            file_names, rois_list, occupancy_list
+        ):
             image_path = images_dir / str(file_name)
             if not image_path.exists():
                 missing_images.append(str(file_name))
@@ -931,7 +996,12 @@ def prepare_stage2_from_roi_annotations(args: argparse.Namespace) -> None:
                 if box_line is None:
                     invalid_polygons += 1
                     continue
-                target = patch_cache / split_name / class_name / f"{normalized_stem}__{index:04d}.jpg"
+                target = (
+                    patch_cache
+                    / split_name
+                    / class_name
+                    / f"{normalized_stem}__{index:04d}.jpg"
+                )
                 target.parent.mkdir(parents=True, exist_ok=True)
                 _crop_patch(image_path, box_line, target)
                 if target.exists():
@@ -982,7 +1052,9 @@ def prepare_stage2_from_roi_annotations(args: argparse.Namespace) -> None:
     for split_name in ("train", "val", "test"):
         counts = {cls: len(paths) for cls, paths in combined[split_name].items()}
         print(f"  {split_name:5s}: {counts}")
-    print(f"  pklot_test : {{'free': {len(combined['test']['free'])}, 'occupied': {len(combined['test']['occupied'])}}}")
+    print(
+        f"  pklot_test : {{'free': {len(combined['test']['free'])}, 'occupied': {len(combined['test']['occupied'])}}}"
+    )
     print(f"  report     : {report_path}")
 
 
@@ -995,7 +1067,12 @@ def collect_roboflow_patches(root: Path, patch_output: Path) -> dict[str, list[P
         image_path = Path(str(record["image_path"]))
         for index, line in enumerate(record["label_lines"]):
             class_name = "free" if line.startswith("0 ") else "occupied"
-            target = patch_output / split_name / class_name / f"{record['normalized_stem']}__{index:04d}.jpg"
+            target = (
+                patch_output
+                / split_name
+                / class_name
+                / f"{record['normalized_stem']}__{index:04d}.jpg"
+            )
             target.parent.mkdir(parents=True, exist_ok=True)
             _crop_patch(image_path, line, target)
             if target.exists():
@@ -1003,7 +1080,9 @@ def collect_roboflow_patches(root: Path, patch_output: Path) -> dict[str, list[P
 
     for split_name in ("train", "val", "test"):
         split_counts = {
-            class_name: len(list((patch_output / split_name / class_name).glob("*.jpg")))
+            class_name: len(
+                list((patch_output / split_name / class_name).glob("*.jpg"))
+            )
             for class_name in ("free", "occupied")
         }
         if any(split_counts.values()):
@@ -1071,7 +1150,9 @@ def _resolve_cnr_relative_path(root: Path, rel_path: str) -> Path | None:
     return None
 
 
-def collect_cnrpark_patches(root: Path) -> tuple[dict[str, list[Path]], dict[str, dict[str, list[Path]]]]:
+def collect_cnrpark_patches(
+    root: Path,
+) -> tuple[dict[str, list[Path]], dict[str, dict[str, list[Path]]]]:
     labels_dir = root / "LABELS"
     weather_map = _empty_weather_map()
     if labels_dir.exists():
@@ -1085,7 +1166,11 @@ def collect_cnrpark_patches(root: Path) -> tuple[dict[str, list[Path]], dict[str
                 if label not in {"0", "1"}:
                     continue
                 image_path = _resolve_cnr_relative_path(root, rel_path)
-                if image_path is None or image_path.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
+                if image_path is None or image_path.suffix.lower() not in {
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                }:
                     continue
                 class_name = "free" if label == "0" else "occupied"
                 previous = labeled_paths.get(image_path)
@@ -1124,7 +1209,10 @@ def copy_weather_flat(
                 if target.exists():
                     collisions[f"{weather}/{class_name}"] += 1
                     stem, suffix = target.stem, target.suffix
-                    target = target_dir / f"{stem}__{abs(hash(str(src))) & 0xFFFFFF:06x}{suffix}"
+                    target = (
+                        target_dir
+                        / f"{stem}__{abs(hash(str(src))) & 0xFFFFFF:06x}{suffix}"
+                    )
                 shutil.copy2(src, target)
     return dict(collisions)
 
@@ -1136,12 +1224,18 @@ def prepare_stage2(args: argparse.Namespace) -> None:
 
     validate_split_ratios(args.val_ratio, args.test_ratio)
     pklot_dir = Path(args.pklot_dir)
-    patch_cache = Path(args.patch_cache) if args.patch_cache else pklot_dir.parent / f"{pklot_dir.name}_patches"
+    patch_cache = (
+        Path(args.patch_cache)
+        if args.patch_cache
+        else pklot_dir.parent / f"{pklot_dir.name}_patches"
+    )
     stage2_output = Path(args.stage2_output)
 
     records, discovery = _discover_detection_records(pklot_dir, stage1_mode=False)
     if not records:
-        raise SystemExit("No PKLot patches were created. Check the Roboflow export layout and labels.")
+        raise SystemExit(
+            "No PKLot patches were created. Check the Roboflow export layout and labels."
+        )
     records_by_split = assign_scene_splits(
         records,
         val_ratio=args.val_ratio,
@@ -1149,16 +1243,27 @@ def prepare_stage2(args: argparse.Namespace) -> None:
         seed=args.seed,
     )
 
-    pklot_splits = {"train": {"free": [], "occupied": []}, "val": {"free": [], "occupied": []}, "test": {"free": [], "occupied": []}}
+    pklot_splits = {
+        "train": {"free": [], "occupied": []},
+        "val": {"free": [], "occupied": []},
+        "test": {"free": [], "occupied": []},
+    }
     patch_cache.mkdir(parents=True, exist_ok=True)
-    print(f"\n[Stage 2] Cropping PKLot patches with inherited scene holdout -> {patch_cache}/")
+    print(
+        f"\n[Stage 2] Cropping PKLot patches with inherited scene holdout -> {patch_cache}/"
+    )
     for split_name, split_records in records_by_split.items():
         split_counts = {"free": 0, "occupied": 0}
         for record in split_records:
             image_path = Path(str(record["image_path"]))
             for index, line in enumerate(record["label_lines"]):
                 class_name = "free" if line.startswith("0 ") else "occupied"
-                target = patch_cache / split_name / class_name / f"{record['normalized_stem']}__{index:04d}.jpg"
+                target = (
+                    patch_cache
+                    / split_name
+                    / class_name
+                    / f"{record['normalized_stem']}__{index:04d}.jpg"
+                )
                 target.parent.mkdir(parents=True, exist_ok=True)
                 _crop_patch(image_path, line, target)
                 if target.exists():
@@ -1169,7 +1274,11 @@ def prepare_stage2(args: argparse.Namespace) -> None:
             f"{split_counts['occupied']:7d} occupied"
         )
 
-    cnrpark_splits = {"train": {"free": [], "occupied": []}, "val": {"free": [], "occupied": []}, "test": {"free": [], "occupied": []}}
+    cnrpark_splits = {
+        "train": {"free": [], "occupied": []},
+        "val": {"free": [], "occupied": []},
+        "test": {"free": [], "occupied": []},
+    }
     cnr_source_root: Path | None = None
     cnr_images = {"free": [], "occupied": []}
     cnr_weather = _empty_weather_map()
@@ -1178,7 +1287,9 @@ def prepare_stage2(args: argparse.Namespace) -> None:
         if not cnr_source_root.exists():
             raise SystemExit(f"CNRPark directory not found: {cnr_source_root}")
         cnr_images, cnr_weather = collect_cnrpark_patches(cnr_source_root)
-        print(f"\n[Stage 2] Collected CNRPark patches: free={len(cnr_images['free'])} occupied={len(cnr_images['occupied'])}")
+        print(
+            f"\n[Stage 2] Collected CNRPark patches: free={len(cnr_images['free'])} occupied={len(cnr_images['occupied'])}"
+        )
         if any(cnr_images.values()):
             cnrpark_splits = stratified_split(
                 cnr_images,
@@ -1191,10 +1302,9 @@ def prepare_stage2(args: argparse.Namespace) -> None:
     for split in ("train", "val", "test"):
         combined[split] = {}
         for class_name in ("free", "occupied"):
-            combined[split][class_name] = (
-                pklot_splits[split].get(class_name, []) +
-                cnrpark_splits[split].get(class_name, [])
-            )
+            combined[split][class_name] = pklot_splits[split].get(
+                class_name, []
+            ) + cnrpark_splits[split].get(class_name, [])
 
     print(f"\n[Stage 2] Writing combined dataset -> {stage2_output}/")
     collisions = copy_images(combined, stage2_output, source_root=patch_cache)
@@ -1220,10 +1330,16 @@ def prepare_stage2(args: argparse.Namespace) -> None:
 
     all_images = {
         "free": (
-            pklot_splits["train"]["free"] + pklot_splits["val"]["free"] + pklot_splits["test"]["free"] + cnr_images["free"]
+            pklot_splits["train"]["free"]
+            + pklot_splits["val"]["free"]
+            + pklot_splits["test"]["free"]
+            + cnr_images["free"]
         ),
         "occupied": (
-            pklot_splits["train"]["occupied"] + pklot_splits["val"]["occupied"] + pklot_splits["test"]["occupied"] + cnr_images["occupied"]
+            pklot_splits["train"]["occupied"]
+            + pklot_splits["val"]["occupied"]
+            + pklot_splits["test"]["occupied"]
+            + cnr_images["occupied"]
         ),
     }
     split_summary = _split_scene_summary(records_by_split)
@@ -1239,7 +1355,9 @@ def prepare_stage2(args: argparse.Namespace) -> None:
         report_path=stage2_output / SANITY_REPORT,
         scene_split_summary={
             "source": "pklot_scene_holdout",
-            "scene_counts": {split: split_summary[split]["scene_count"] for split in split_summary},
+            "scene_counts": {
+                split: split_summary[split]["scene_count"] for split in split_summary
+            },
             "leakage_checks": _leakage_summary(split_summary),
             "duplicates_removed": discovery["duplicates_removed"],
         },
@@ -1266,7 +1384,9 @@ def prepare_stage2(args: argparse.Namespace) -> None:
 def weather_split_paths(root: Path) -> dict[str, Path]:
     paths = {name: root / name for name in ("sunny", "cloudy", "rainy")}
     if not all(path.exists() for path in paths.values()):
-        raise SystemExit(f"Per-weather evaluation requested but weather splits are unavailable. {WEATHER_CONVENTION}")
+        raise SystemExit(
+            f"Per-weather evaluation requested but weather splits are unavailable. {WEATHER_CONVENTION}"
+        )
     return paths
 
 
@@ -1282,7 +1402,9 @@ def main() -> None:
         raise SystemExit(f"No Roboflow train/valid/test splits found in {pklot_dir}")
     parking_space_dir = Path(args.parking_space_dir) if args.parking_space_dir else None
     if parking_space_dir is not None and not parking_space_dir.exists():
-        raise SystemExit(f"Parking Space Detection Dataset directory not found: {parking_space_dir}")
+        raise SystemExit(
+            f"Parking Space Detection Dataset directory not found: {parking_space_dir}"
+        )
 
     if args.stage1:
         prepare_stage1(

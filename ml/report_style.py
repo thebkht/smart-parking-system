@@ -15,10 +15,10 @@ from matplotlib.colors import LinearSegmentedColormap
 
 # --- Architecture palette (HTML hex from architecture.tex) -----------------
 FREE_GREEN = "#1A7A4A"  # \definecolor{free}
-OCC_RED = "#C0392B"     # \definecolor{occ}
-PURPLE = "#8E44AD"      # \definecolor{pp}
-CYAN = "#2E9BC0"        # \definecolor{cy}
-MAGENTA = "#C0399B"     # \definecolor{mg}
+OCC_RED = "#C0392B"  # \definecolor{occ}
+PURPLE = "#8E44AD"  # \definecolor{pp}
+CYAN = "#2E9BC0"  # \definecolor{cy}
+MAGENTA = "#C0399B"  # \definecolor{mg}
 
 INK = "#2B2B2B"
 GRID = "#B9C2C9"

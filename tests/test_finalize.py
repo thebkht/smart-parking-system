@@ -1,4 +1,3 @@
-import json
 import sys
 from pathlib import Path
 
@@ -14,7 +13,13 @@ def write_csv(path: Path, header: str, row: str) -> None:
 def test_stage2_inventory_counts_split_images(tmp_path):
     for split in ("train", "val", "test"):
         for class_name in ("free", "occupied"):
-            path = tmp_path / "stage2_data" / split / class_name / f"{split}_{class_name}.jpg"
+            path = (
+                tmp_path
+                / "stage2_data"
+                / split
+                / class_name
+                / f"{split}_{class_name}.jpg"
+            )
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"jpg")
 
@@ -71,15 +76,28 @@ def test_required_artifact_checks_mark_missing_items(tmp_path):
 def test_write_markdown_emits_summary_file(tmp_path):
     manifest = {
         "datasets": {
-            "stage1": {"splits": {"train": {"images_kept": 1, "boxes_kept": 2, "scene_count": 3}}},
+            "stage1": {
+                "splits": {
+                    "train": {"images_kept": 1, "boxes_kept": 2, "scene_count": 3}
+                }
+            },
             "stage2": {"splits": {"val": {"free": 4, "occupied": 5}}},
-            "stage2_weather": {"present": True, "splits": {"sunny": {"free": 2, "occupied": 3}}},
+            "stage2_weather": {
+                "present": True,
+                "splits": {"sunny": {"free": 2, "occupied": 3}},
+            },
             "pklot_test": {"present": True, "free": 6, "occupied": 7},
             "cnrpark_test": {"present": False},
         },
         "checkpoints": {
-            "stage1_s": {"present": True, "path": "runs/stage1_det/yolov8s_stage1/weights/best.pt"},
-            "stage1_m": {"present": False, "path": "runs/stage1_det/yolov8m_stage1/weights/best.pt"},
+            "stage1_s": {
+                "present": True,
+                "path": "runs/stage1_det/yolov8s_stage1/weights/best.pt",
+            },
+            "stage1_m": {
+                "present": False,
+                "path": "runs/stage1_det/yolov8m_stage1/weights/best.pt",
+            },
             "stage2": {
                 "n": {"present": True, "path": "n.pt"},
                 "s": {"present": True, "path": "s.pt"},
@@ -111,7 +129,7 @@ def test_latest_csv_row_tolerates_legacy_spaced_csv(tmp_path):
     csv_path = tmp_path / "stage2_cross_dataset.csv"
     csv_path.write_text(
         "model         , dataset     , threshold, top1_accuracy, precision, recall, f1 , sample_count, support_free, support_occupied, confusion_matrix\n"
-        "yolov8n_stage2, cnrpark_test,       0.5,        0.8983,     0.974, 0.8364, 0.9,        21746,         9849,            11897, \"[[9583, 266], [1946, 9951]]\"\n",
+        'yolov8n_stage2, cnrpark_test,       0.5,        0.8983,     0.974, 0.8364, 0.9,        21746,         9849,            11897, "[[9583, 266], [1946, 9951]]"\n',
         encoding="utf-8",
     )
 
@@ -135,10 +153,7 @@ def test_latest_csv_row_tolerates_legacy_spaced_csv(tmp_path):
 def test_best_csv_row_selects_highest_metric(tmp_path):
     csv_path = tmp_path / "stage2_threshold_sweep.csv"
     csv_path.write_text(
-        "model,f1,threshold\n"
-        "a,0.81,0.3\n"
-        "a,0.92,0.1\n"
-        "a,0.88,0.5\n",
+        "model,f1,threshold\n" "a,0.81,0.3\n" "a,0.92,0.1\n" "a,0.88,0.5\n",
         encoding="utf-8",
     )
 
@@ -148,11 +163,15 @@ def test_best_csv_row_selects_highest_metric(tmp_path):
 
 
 def test_collect_checkpoints_prefers_acpds_stage2_layout(tmp_path):
-    checkpoint = tmp_path / "runs" / "acpds_cls" / "yolov8s_stage2" / "weights" / "best.pt"
+    checkpoint = (
+        tmp_path / "runs" / "acpds_cls" / "yolov8s_stage2" / "weights" / "best.pt"
+    )
     checkpoint.parent.mkdir(parents=True, exist_ok=True)
     checkpoint.write_bytes(b"pt")
 
     manifest = finalize.collect_checkpoints(tmp_path / "runs", tmp_path / "artifacts")
 
     assert manifest["stage2"]["s"]["present"] is True
-    assert manifest["stage2"]["s"]["path"].endswith("runs/acpds_cls/yolov8s_stage2/weights/best.pt")
+    assert manifest["stage2"]["s"]["path"].endswith(
+        "runs/acpds_cls/yolov8s_stage2/weights/best.pt"
+    )

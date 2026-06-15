@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Two-stage edge inference for the v3 smart parking pipeline.
+"""Two-stage edge inference for the smart parking pipeline.
 
 Default path:
   static camera -> fixed ROIs -> crop each spot -> YOLOv8-cls -> smoothing -> JSON
@@ -57,8 +57,8 @@ DEFAULT_STAGE1_FILTER_MODE = "bounds"
 DEFAULT_STAGE1_CONFIDENCE = 0.4
 DEFAULT_STAGE1_POSTPROCESS_TYPE = "nmm"
 DEFAULT_STAGE1_MATCH_THRESHOLD = 0.3
-DEFAULT_CAMERA_READ_RETRY_LIMIT = 30        # was 10 — give ~6s before giving up
-DEFAULT_CAMERA_REOPEN_LIMIT = 5             # was 3 — more reopen attempts before fallback
+DEFAULT_CAMERA_READ_RETRY_LIMIT = 30  # was 10 — give ~6s before giving up
+DEFAULT_CAMERA_REOPEN_LIMIT = 5  # was 3 — more reopen attempts before fallback
 DEFAULT_BUILTIN_CAMERA_LABEL = "built-in"
 DEFAULT_IPHONE_CAMERA_LABEL = "iphone"
 DEFAULT_CAMERA_PROBE_MISS_STREAK_LIMIT = 2
@@ -87,7 +87,7 @@ def load_config(config_path: Path) -> dict:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the v3 smart parking edge pipeline. Fixed ROIs remain the "
+            "Run the smart parking edge pipeline. Fixed ROIs remain the "
             "static-camera path; --stage1-detector enables a parking-space "
             "detector for full-frame localization."
         )
@@ -125,7 +125,9 @@ def parse_args() -> argparse.Namespace:
             "Useful when Stage 2 domain-shifts badly (e.g. steep overhead angle)."
         ),
     )
-    parser.add_argument("--device", default=None, help="Inference device. Default from config.")
+    parser.add_argument(
+        "--device", default=None, help="Inference device. Default from config."
+    )
     parser.add_argument("--backend-url", default=DEFAULT_BACKEND_URL)
     parser.add_argument(
         "--backend-timeout",
@@ -301,7 +303,9 @@ def resolve_settings(args: argparse.Namespace, cfg: dict) -> argparse.Namespace:
     if args.smooth_n is None:
         args.smooth_n = post_cfg.get("smoothing_window", DEFAULT_SMOOTH_N)
     if args.frame_interval is None:
-        args.frame_interval = input_cfg.get("frame_interval_ms", DEFAULT_FRAME_INTERVAL_MS)
+        args.frame_interval = input_cfg.get(
+            "frame_interval_ms", DEFAULT_FRAME_INTERVAL_MS
+        )
     if args.post_interval is None:
         args.post_interval = input_cfg.get("post_interval_s", DEFAULT_POST_INTERVAL_S)
     if args.log_dir is None:
@@ -321,9 +325,7 @@ def resolve_settings(args: argparse.Namespace, cfg: dict) -> argparse.Namespace:
             "jpeg_quality", DEFAULT_STREAM_JPEG_QUALITY
         )
     if args.stream_max_width == DEFAULT_STREAM_MAX_WIDTH:
-        args.stream_max_width = stream_cfg.get(
-            "max_width", DEFAULT_STREAM_MAX_WIDTH
-        )
+        args.stream_max_width = stream_cfg.get("max_width", DEFAULT_STREAM_MAX_WIDTH)
     if args.stage2_threshold is None:
         args.stage2_threshold = post_cfg.get(
             "classifier_threshold", DEFAULT_STAGE2_THRESHOLD
@@ -337,12 +339,18 @@ def resolve_settings(args: argparse.Namespace, cfg: dict) -> argparse.Namespace:
     if args.stage1_sahi:
         args.stage1_sahi = stage1_cfg.get("use_sahi", True)
     if args.stage1_min_box_area is None:
-        args.stage1_min_box_area = stage1_cfg.get("min_box_area", DEFAULT_STAGE1_MIN_BOX_AREA)
+        args.stage1_min_box_area = stage1_cfg.get(
+            "min_box_area", DEFAULT_STAGE1_MIN_BOX_AREA
+        )
     if args.stage1_filter_mode is None:
-        args.stage1_filter_mode = stage1_cfg.get("filter_mode", DEFAULT_STAGE1_FILTER_MODE)
-    args.stage1_postprocess_type = str(
-        stage1_cfg.get("postprocess_type", DEFAULT_STAGE1_POSTPROCESS_TYPE)
-    ).strip().lower()
+        args.stage1_filter_mode = stage1_cfg.get(
+            "filter_mode", DEFAULT_STAGE1_FILTER_MODE
+        )
+    args.stage1_postprocess_type = (
+        str(stage1_cfg.get("postprocess_type", DEFAULT_STAGE1_POSTPROCESS_TYPE))
+        .strip()
+        .lower()
+    )
     args.stage1_match_threshold = float(
         stage1_cfg.get("match_threshold", DEFAULT_STAGE1_MATCH_THRESHOLD)
     )
@@ -433,10 +441,14 @@ def geometry_to_box(corners: np.ndarray) -> SpotBox:
 
 
 def geometries_to_boxes(geometries: SpotGeometries) -> Dict[str, SpotBox]:
-    return {spot_id: geometry_to_box(corners) for spot_id, corners in geometries.items()}
+    return {
+        spot_id: geometry_to_box(corners) for spot_id, corners in geometries.items()
+    }
 
 
-def load_spot_geometries(config_path: Path, backend_url: str = "http://127.0.0.1:8000") -> SpotGeometries:
+def load_spot_geometries(
+    config_path: Path, backend_url: str = "http://127.0.0.1:8000"
+) -> SpotGeometries:
     rois = fetch_rois_from_backend(backend_url)
     if rois:
         return rois
@@ -444,9 +456,13 @@ def load_spot_geometries(config_path: Path, backend_url: str = "http://127.0.0.1
     return normalize_spot_geometries(cfg.get("rois"))
 
 
-def load_rois(config_path: Path, backend_url: str = "http://127.0.0.1:8000") -> Dict[str, Tuple[int, int, int, int]]:
+def load_rois(
+    config_path: Path, backend_url: str = "http://127.0.0.1:8000"
+) -> Dict[str, Tuple[int, int, int, int]]:
     """Legacy box view over spot geometries for tests and ROI-only code paths."""
-    return geometries_to_boxes(load_spot_geometries(config_path, backend_url=backend_url))
+    return geometries_to_boxes(
+        load_spot_geometries(config_path, backend_url=backend_url)
+    )
 
 
 def _normalize_points(raw_points: Any, label: str) -> np.ndarray:
@@ -467,7 +483,9 @@ def load_perspective_transform(cfg: dict) -> Optional[PerspectiveTransform]:
     if not perspective_cfg:
         return None
 
-    source_points = _normalize_points(perspective_cfg.get("source_points"), "preprocess.perspective.source_points")
+    source_points = _normalize_points(
+        perspective_cfg.get("source_points"), "preprocess.perspective.source_points"
+    )
     destination_points_raw = perspective_cfg.get("destination_points")
     output_size_raw = perspective_cfg.get("output_size")
 
@@ -486,12 +504,19 @@ def load_perspective_transform(cfg: dict) -> Optional[PerspectiveTransform]:
             max_y = int(np.ceil(float(destination_points[:, 1].max())))
             output_size = (max_x, max_y)
         else:
-            if not isinstance(output_size_raw, (list, tuple)) or len(output_size_raw) != 2:
-                raise ValueError("preprocess.perspective.output_size must be [width, height].")
+            if (
+                not isinstance(output_size_raw, (list, tuple))
+                or len(output_size_raw) != 2
+            ):
+                raise ValueError(
+                    "preprocess.perspective.output_size must be [width, height]."
+                )
             output_size = (int(output_size_raw[0]), int(output_size_raw[1]))
     else:
         if not isinstance(output_size_raw, (list, tuple)) or len(output_size_raw) != 2:
-            raise ValueError("preprocess.perspective.output_size must be [width, height].")
+            raise ValueError(
+                "preprocess.perspective.output_size must be [width, height]."
+            )
         width, height = (int(output_size_raw[0]), int(output_size_raw[1]))
         destination_points = np.array(
             [[0, 0], [width - 1, 0], [width - 1, height - 1], [0, height - 1]],
@@ -547,8 +572,11 @@ class SmoothingBuffer:
 # Core ML helpers
 # ---------------------------------------------------------------------------
 
+
 def _is_coreml(model_path: str) -> bool:
-    return str(model_path).endswith(".mlpackage") or str(model_path).endswith(".mlmodel")
+    return str(model_path).endswith(".mlpackage") or str(model_path).endswith(
+        ".mlmodel"
+    )
 
 
 def _load_coreml(model_path: str) -> Any:
@@ -612,6 +640,7 @@ def _classify_coreml(
 # Stage 1 / Stage 2 model loading & inference
 # ---------------------------------------------------------------------------
 
+
 def get_spot_boxes(
     frame: np.ndarray,
     fixed_rois: Dict[str, Tuple[int, int, int, int]],
@@ -630,18 +659,23 @@ def get_spot_boxes(
     if not use_stage1_detector:
         return fixed_rois
     if stage1_model is None:
-        raise ValueError("Stage 1 parking-space detector requested but no model was loaded.")
+        raise ValueError(
+            "Stage 1 parking-space detector requested but no model was loaded."
+        )
 
     # Stage 1 is always a YOLO .pt — Core ML only applies to stage 2
     yolo_device = device if device != "mps" else "cpu"
-    lot_mask = roi_bounds(fixed_rois) if fixed_rois and fixed_rois != DEFAULT_ROIS else None
+    lot_mask = (
+        roi_bounds(fixed_rois) if fixed_rois and fixed_rois != DEFAULT_ROIS else None
+    )
     roi_boxes = list(fixed_rois.values()) if fixed_rois else []
 
     if use_sahi:
         try:
             from sahi import AutoDetectionModel
             from sahi.predict import get_sliced_prediction
-            import tempfile, os
+            import tempfile
+            import os
 
             sahi_model = AutoDetectionModel.from_pretrained(
                 model_type="ultralytics",
@@ -731,7 +765,9 @@ def clip_box(
     return x1, y1, x2, y2
 
 
-def roi_bounds(rois: Dict[str, Tuple[int, int, int, int]]) -> Optional[Tuple[int, int, int, int]]:
+def roi_bounds(
+    rois: Dict[str, Tuple[int, int, int, int]]
+) -> Optional[Tuple[int, int, int, int]]:
     if not rois:
         return None
     return (
@@ -747,7 +783,9 @@ def box_area(box: Tuple[int, int, int, int]) -> int:
     return max(0, x2 - x1) * max(0, y2 - y1)
 
 
-def box_iou(box_a: Tuple[int, int, int, int], box_b: Tuple[int, int, int, int]) -> float:
+def box_iou(
+    box_a: Tuple[int, int, int, int], box_b: Tuple[int, int, int, int]
+) -> float:
     ax1, ay1, ax2, ay2 = box_a
     bx1, by1, bx2, by2 = box_b
     inter_x1 = max(ax1, bx1)
@@ -776,7 +814,9 @@ def _box_center(box: Tuple[int, int, int, int]) -> Tuple[float, float]:
     return ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
 
 
-def _merge_boxes(boxes: Iterable[Tuple[int, int, int, int]]) -> Tuple[int, int, int, int]:
+def _merge_boxes(
+    boxes: Iterable[Tuple[int, int, int, int]]
+) -> Tuple[int, int, int, int]:
     box_list = list(boxes)
     return (
         min(box[0] for box in box_list),
@@ -819,7 +859,11 @@ def _should_merge_stage1_boxes(
     center_dy = abs(acy - bcy)
     width_gate = max(8.0, median_width * 0.35)
     height_gate = max(8.0, median_height * 0.35)
-    if horizontal_overlap >= 0.55 and center_dx <= width_gate and center_dy <= height_gate:
+    if (
+        horizontal_overlap >= 0.55
+        and center_dx <= width_gate
+        and center_dy <= height_gate
+    ):
         return True
     if vertical_overlap >= 0.8 and center_dx <= width_gate * 0.6:
         return True
@@ -960,7 +1004,9 @@ def classify_patch(
 
     # Core ML path — model is a ct.models.MLModel, not a YOLO instance
     if device == "coreml":
-        return _classify_coreml(model, patch, imgsz=128, threshold=threshold, class_names={})
+        return _classify_coreml(
+            model, patch, imgsz=128, threshold=threshold, class_names={}
+        )
 
     # Stage 2 was trained on 128x128 warped patches; pass the aligned patch directly.
     result = model(patch, device=device, verbose=False)[0]
@@ -1006,8 +1052,19 @@ def annotate_frame(
         thickness = 1
         (tw, th), baseline = cv2.getTextSize(label, font, font_scale, thickness)
         tx, ty = x1, y1 - 6
-        cv2.rectangle(annotated, (tx - 1, ty - th - 1), (tx + tw + 1, ty + baseline), color, -1)
-        cv2.putText(annotated, label, (tx, ty), font, font_scale, text_color, thickness, cv2.LINE_AA)
+        cv2.rectangle(
+            annotated, (tx - 1, ty - th - 1), (tx + tw + 1, ty + baseline), color, -1
+        )
+        cv2.putText(
+            annotated,
+            label,
+            (tx, ty),
+            font,
+            font_scale,
+            text_color,
+            thickness,
+            cv2.LINE_AA,
+        )
     return annotated
 
 
@@ -1042,8 +1099,26 @@ def dump_warp_samples(
         canvas = np.zeros((128, 256, 3), dtype=np.uint8)
         canvas[:, :128] = rect_vis
         canvas[:, 128:] = quad_warp
-        cv2.putText(canvas, "rect", (6, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-        cv2.putText(canvas, "warp", (134, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(
+            canvas,
+            "rect",
+            (6, 16),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            canvas,
+            "warp",
+            (134, 16),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (255, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
 
         filename = f"{Path(source_name).stem}__{spot_id}.jpg"
         cv2.imwrite(str(output_dir / filename), canvas)
@@ -1059,18 +1134,23 @@ def maybe_dump_warp_samples(
     source_name: str,
     limit: int = 5,
 ) -> bool:
-    return dump_warp_samples(
-        frame,
-        spot_geometries,
-        output_dir,
-        source_name=source_name,
-        limit=limit,
-    ) > 0
+    return (
+        dump_warp_samples(
+            frame,
+            spot_geometries,
+            output_dir,
+            source_name=source_name,
+            limit=limit,
+        )
+        > 0
+    )
 
 
 def log_result(payload: Dict[str, Any], log_dir: Path, log_format: str) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"parking_log_{datetime.now().strftime('%Y-%m-%d')}.{log_format}"
+    log_path = (
+        log_dir / f"parking_log_{datetime.now().strftime('%Y-%m-%d')}.{log_format}"
+    )
     if log_format == "json":
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(payload) + "\n")
@@ -1119,7 +1199,9 @@ def write_latest_frame(
     return True
 
 
-def _resolve_video_output_path(save_annotated: Optional[str], default_name: str) -> Optional[Path]:
+def _resolve_video_output_path(
+    save_annotated: Optional[str], default_name: str
+) -> Optional[Path]:
     if not save_annotated:
         return None
     output_path = Path(save_annotated)
@@ -1183,7 +1265,9 @@ def create_video_writer(
     return writer, opened_path, partial_path, selected_fourcc
 
 
-def finalize_video_output(partial_path: Optional[Path], final_path: Optional[Path]) -> None:
+def finalize_video_output(
+    partial_path: Optional[Path], final_path: Optional[Path]
+) -> None:
     if partial_path is None or final_path is None or not partial_path.exists():
         return
     final_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1193,7 +1277,6 @@ def finalize_video_output(partial_path: Optional[Path], final_path: Optional[Pat
 def post_payload(payload: Dict[str, Any], backend_url: str, timeout: float) -> None:
     response = requests.post(backend_url, json=payload, timeout=timeout)
     response.raise_for_status()
-
 
 
 def get_spot_boxes_with_scores(
@@ -1225,7 +1308,8 @@ def get_spot_boxes_with_scores(
         try:
             from sahi import AutoDetectionModel
             from sahi.predict import get_sliced_prediction
-            import tempfile, os as _os
+            import tempfile
+            import os as _os
 
             sahi_model = AutoDetectionModel.from_pretrained(
                 model_type="ultralytics",
@@ -1236,11 +1320,15 @@ def get_spot_boxes_with_scores(
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
                 tmp_path = tmp.name
             import cv2 as _cv2
+
             _cv2.imwrite(tmp_path, frame)
             result = get_sliced_prediction(
-                tmp_path, sahi_model,
-                slice_height=slice_size, slice_width=slice_size,
-                overlap_height_ratio=overlap, overlap_width_ratio=overlap,
+                tmp_path,
+                sahi_model,
+                slice_height=slice_size,
+                slice_width=slice_size,
+                overlap_height_ratio=overlap,
+                overlap_width_ratio=overlap,
                 verbose=0,
             )
             _os.unlink(tmp_path)
@@ -1249,27 +1337,39 @@ def get_spot_boxes_with_scores(
                 kept = filter_stage1_box(
                     frame.shape,
                     (int(b.minx), int(b.miny), int(b.maxx), int(b.maxy)),
-                    lot_mask=lot_mask, roi_boxes=roi_boxes_list,
-                    min_box_area=min_box_area, filter_mode=filter_mode,
+                    lot_mask=lot_mask,
+                    roi_boxes=roi_boxes_list,
+                    min_box_area=min_box_area,
+                    filter_mode=filter_mode,
                 )
                 if kept is not None:
-                    raw_candidates.append((kept, float(getattr(pred.score, "value", 1.0))))
+                    raw_candidates.append(
+                        (kept, float(getattr(pred.score, "value", 1.0)))
+                    )
         except ImportError:
             print("SAHI not installed; falling back to standard inference.")
             use_sahi = False
 
     if not use_sahi:
         results = stage1_model(
-            frame, device=yolo_device, verbose=False,
-            imgsz=stage1_imgsz, conf=DEFAULT_STAGE1_CONFIDENCE,
+            frame,
+            device=yolo_device,
+            verbose=False,
+            imgsz=stage1_imgsz,
+            conf=DEFAULT_STAGE1_CONFIDENCE,
         )[0]
-        raw_boxes  = results.boxes.xyxy.cpu().numpy()
-        raw_scores = results.boxes.conf.cpu().numpy() if results.boxes.conf is not None else None
+        raw_boxes = results.boxes.xyxy.cpu().numpy()
+        raw_scores = (
+            results.boxes.conf.cpu().numpy() if results.boxes.conf is not None else None
+        )
         for idx, box in enumerate(raw_boxes):
             kept = filter_stage1_box(
-                frame.shape, tuple(box.astype(int)),
-                lot_mask=lot_mask, roi_boxes=roi_boxes_list,
-                min_box_area=min_box_area, filter_mode=filter_mode,
+                frame.shape,
+                tuple(box.astype(int)),
+                lot_mask=lot_mask,
+                roi_boxes=roi_boxes_list,
+                min_box_area=min_box_area,
+                filter_mode=filter_mode,
             )
             if kept is not None:
                 score = float(raw_scores[idx]) if raw_scores is not None else 1.0
@@ -1292,6 +1392,7 @@ def get_spot_boxes_with_scores(
 
     return spot_boxes, spot_scores
 
+
 def run_pipeline(
     frame: np.ndarray,
     fixed_geometries: SpotGeometries,
@@ -1302,8 +1403,12 @@ def run_pipeline(
     last_confidences: Optional[Dict[str, float]] = None,  # ← add this
 ) -> Tuple[Dict[str, Any], SpotGeometries]:
     stage1_only = getattr(args, "stage1_only", False)
-    stage1_postprocess_type = getattr(args, "stage1_postprocess_type", DEFAULT_STAGE1_POSTPROCESS_TYPE)
-    stage1_match_threshold = getattr(args, "stage1_match_threshold", DEFAULT_STAGE1_MATCH_THRESHOLD)
+    stage1_postprocess_type = getattr(
+        args, "stage1_postprocess_type", DEFAULT_STAGE1_POSTPROCESS_TYPE
+    )
+    stage1_match_threshold = getattr(
+        args, "stage1_match_threshold", DEFAULT_STAGE1_MATCH_THRESHOLD
+    )
     fixed_rois = geometries_to_boxes(fixed_geometries)
 
     if stage1_only and args.stage1_detector and stage1_model is not None:
@@ -1323,11 +1428,17 @@ def run_pipeline(
             fixed_rois=fixed_rois,
         )
         raw_statuses: Dict[str, str] = {
-            sid: ("occupied" if spot_scores.get(sid, 0) >= STAGE1_OCCUPY_THRESHOLD else "free")
+            sid: (
+                "occupied"
+                if spot_scores.get(sid, 0) >= STAGE1_OCCUPY_THRESHOLD
+                else "free"
+            )
             for sid in spot_boxes
         }
         confidences: Dict[str, float] = spot_scores
-        spot_geometries = {spot_id: box_to_corners(box) for spot_id, box in spot_boxes.items()}
+        spot_geometries = {
+            spot_id: box_to_corners(box) for spot_id, box in spot_boxes.items()
+        }
     else:
         if args.stage1_detector:
             spot_boxes = get_spot_boxes(
@@ -1345,7 +1456,9 @@ def run_pipeline(
                 postprocess_type=stage1_postprocess_type,
                 match_threshold=stage1_match_threshold,
             )
-            spot_geometries = {spot_id: box_to_corners(box) for spot_id, box in spot_boxes.items()}
+            spot_geometries = {
+                spot_id: box_to_corners(box) for spot_id, box in spot_boxes.items()
+            }
         else:
             spot_geometries = fixed_geometries
 
@@ -1479,31 +1592,45 @@ def _resolve_macos_iphone_camera(
     return iphone_index, builtin_index
 
 
-def resolve_camera_source(source: str, probe_limit: int = DEFAULT_CAMERA_PROBE_LIMIT) -> int:
+def resolve_camera_source(
+    source: str, probe_limit: int = DEFAULT_CAMERA_PROBE_LIMIT
+) -> int:
     value = str(source).strip()
     if value.isdigit():
         return int(value)
     if value.lower() != "iphone":
-        raise ValueError("Invalid --camera value. Use a numeric index like '0' or 'iphone'.")
+        raise ValueError(
+            "Invalid --camera value. Use a numeric index like '0' or 'iphone'."
+        )
     if platform.system() != "Darwin":
         raise ValueError("The iPhone camera option is supported only on macOS.")
     iphone_index, _builtin_index = _resolve_macos_iphone_camera(probe_limit)
     return iphone_index
 
 
-def resolve_camera_runtime(source: str) -> Tuple[int, Optional[int], Optional[int], Optional[int], str]:
+def resolve_camera_runtime(
+    source: str,
+) -> Tuple[int, Optional[int], Optional[int], Optional[int], str]:
     value = str(source).strip()
     if value.isdigit():
         return int(value), None, None, None, value
     if value.lower() != DEFAULT_IPHONE_CAMERA_LABEL:
-        raise ValueError("Invalid --camera value. Use a numeric index like '0' or 'iphone'.")
+        raise ValueError(
+            "Invalid --camera value. Use a numeric index like '0' or 'iphone'."
+        )
     if platform.system() != "Darwin":
         raise ValueError("The iPhone camera option is supported only on macOS.")
 
     iphone_index, builtin_index = _resolve_macos_iphone_camera()
     backend = _macos_camera_backend()
     fallback_backend = backend if builtin_index is not None else None
-    return iphone_index, backend, builtin_index, fallback_backend, DEFAULT_IPHONE_CAMERA_LABEL
+    return (
+        iphone_index,
+        backend,
+        builtin_index,
+        fallback_backend,
+        DEFAULT_IPHONE_CAMERA_LABEL,
+    )
 
 
 def handoff_to_builtin_camera(index: Optional[int], backend: Optional[int]) -> None:
@@ -1519,7 +1646,6 @@ def handoff_to_builtin_camera(index: Optional[int], backend: Optional[int]) -> N
 
 
 def run_inference(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int:
-    import glob
 
     input_path = Path(args.image)
     if not input_path.exists():
@@ -1549,13 +1675,17 @@ def run_inference(args: argparse.Namespace, fixed_geometries: SpotGeometries) ->
         if frame is None:
             print(f"Warning: OpenCV could not read image, skipping: {image_path}")
             continue
-        frame = apply_perspective_transform(frame, getattr(args, "perspective_transform", None))
+        frame = apply_perspective_transform(
+            frame, getattr(args, "perspective_transform", None)
+        )
 
         # Reset smoothing buffer per image in batch mode so frames don't bleed together
         if len(image_paths) > 1:
             smooth_buf.reset()
 
-        payload, spot_geometries = run_pipeline(frame, fixed_geometries, stage1_model, stage2_model, smooth_buf, args)
+        payload, spot_geometries = run_pipeline(
+            frame, fixed_geometries, stage1_model, stage2_model, smooth_buf, args
+        )
 
         print(f"\n--- {image_path.name} ---")
         print(json.dumps(payload, indent=2))
@@ -1572,7 +1702,9 @@ def run_inference(args: argparse.Namespace, fixed_geometries: SpotGeometries) ->
                 out_file = save_dir if save_dir.suffix else save_dir / image_path.name
             cv2.imwrite(
                 str(out_file),
-                annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"]),
+                annotate_frame(
+                    frame, payload["spots"], spot_geometries, payload["confidence"]
+                ),
             )
             print(f"Annotated image saved to: {out_file}")
         if args.dump_warp_samples:
@@ -1593,15 +1725,15 @@ def run_inference(args: argparse.Namespace, fixed_geometries: SpotGeometries) ->
 
     return 0
 
-import threading
-import queue
 
 def run_camera(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int:
     stage1_model, stage2_model = create_models(args)
     smooth_buf = SmoothingBuffer(window=args.smooth_n)
     latest_frame_path = Path(args.latest_frame_path)
     video_writer: Optional[cv2.VideoWriter] = None
-    output_video_path = _resolve_video_output_path(args.save_annotated, "annotated_camera.mp4")
+    output_video_path = _resolve_video_output_path(
+        args.save_annotated, "annotated_camera.mp4"
+    )
     video_partial_path: Optional[Path] = None
     video_final_path: Optional[Path] = None
 
@@ -1634,13 +1766,23 @@ def run_camera(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> in
                 time.sleep(0.05)
                 continue
             consecutive_failures = 0
-            frame = apply_perspective_transform(frame, getattr(args, "perspective_transform", None))
+            frame = apply_perspective_transform(
+                frame, getattr(args, "perspective_transform", None)
+            )
 
             started_at = time.perf_counter()
             payload, spot_geometries = run_pipeline(
-                frame, fixed_geometries, stage1_model, stage2_model, smooth_buf, args, last_confidences
+                frame,
+                fixed_geometries,
+                stage1_model,
+                stage2_model,
+                smooth_buf,
+                args,
+                last_confidences,
             )
-            annotated = annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"])
+            annotated = annotate_frame(
+                frame, payload["spots"], spot_geometries, payload["confidence"]
+            )
             if args.dump_warp_samples and not warp_dumped:
                 warp_dumped = maybe_dump_warp_samples(
                     frame,
@@ -1657,7 +1799,12 @@ def run_camera(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> in
                 if video_writer is None:
                     frame_height, frame_width = annotated.shape[:2]
                     fps = 1000.0 / max(1, int(args.frame_interval))
-                    video_writer, video_final_path, video_partial_path, selected_fourcc = create_video_writer(
+                    (
+                        video_writer,
+                        video_final_path,
+                        video_partial_path,
+                        selected_fourcc,
+                    ) = create_video_writer(
                         output_video_path,
                         (frame_width, frame_height),
                         fps,
@@ -1749,13 +1896,23 @@ def run_video(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int
                     continue
                 break
 
-            frame = apply_perspective_transform(frame, getattr(args, "perspective_transform", None))
+            frame = apply_perspective_transform(
+                frame, getattr(args, "perspective_transform", None)
+            )
 
             started_at = time.perf_counter()
             payload, spot_geometries = run_pipeline(
-                frame, fixed_geometries, stage1_model, stage2_model, smooth_buf, args, last_confidences
+                frame,
+                fixed_geometries,
+                stage1_model,
+                stage2_model,
+                smooth_buf,
+                args,
+                last_confidences,
             )
-            annotated = annotate_frame(frame, payload["spots"], spot_geometries, payload["confidence"])
+            annotated = annotate_frame(
+                frame, payload["spots"], spot_geometries, payload["confidence"]
+            )
             if args.dump_warp_samples and not warp_dumped:
                 warp_dumped = maybe_dump_warp_samples(
                     frame,
@@ -1771,7 +1928,12 @@ def run_video(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int
             if output_video_path is not None:
                 if video_writer is None:
                     frame_height, frame_width = annotated.shape[:2]
-                    video_writer, video_final_path, video_partial_path, selected_fourcc = create_video_writer(
+                    (
+                        video_writer,
+                        video_final_path,
+                        video_partial_path,
+                        selected_fourcc,
+                    ) = create_video_writer(
                         output_video_path,
                         (frame_width, frame_height),
                         source_fps,
@@ -1817,11 +1979,16 @@ def run_video(args: argparse.Namespace, fixed_geometries: SpotGeometries) -> int
             cv2.destroyAllWindows()
     return 0
 
+
 def main() -> None:
     args = parse_args()
     cfg = load_config(Path(args.config))
     args = resolve_settings(args, cfg)
-    backend_base = args.backend_url.rsplit("/", 1)[0] if args.backend_url.endswith("/update") else args.backend_url
+    backend_base = (
+        args.backend_url.rsplit("/", 1)[0]
+        if args.backend_url.endswith("/update")
+        else args.backend_url
+    )
     fixed_geometries = load_spot_geometries(Path(args.config), backend_url=backend_base)
     if not fixed_geometries:
         fixed_geometries = normalize_spot_geometries(cfg.get("rois"))
@@ -1840,10 +2007,11 @@ def main() -> None:
             print(f"Using camera index {args.camera} with AVFoundation backend.")
         else:
             print(f"Using camera index {args.camera}.")
-        if args.requested_camera == DEFAULT_IPHONE_CAMERA_LABEL and args.fallback_camera is not None:
-            print(
-                f"Built-in camera fallback is ready on index {args.fallback_camera}."
-            )
+        if (
+            args.requested_camera == DEFAULT_IPHONE_CAMERA_LABEL
+            and args.fallback_camera is not None
+        ):
+            print(f"Built-in camera fallback is ready on index {args.fallback_camera}.")
         raise SystemExit(run_camera(args, fixed_geometries))
     if args.video is not None:
         raise SystemExit(run_video(args, fixed_geometries))

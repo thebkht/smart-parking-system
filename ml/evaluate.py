@@ -16,7 +16,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sklearn.metrics import accuracy_score, confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    precision_recall_fscore_support,
+)
 from ultralytics import YOLO
 import yaml
 
@@ -35,7 +39,9 @@ def parse_args() -> argparse.Namespace:
         description="Evaluate Stage 1, Stage 2, or single-model smart parking tracks."
     )
     parser.add_argument("--weights", help="Path to model checkpoint (.pt or .onnx).")
-    parser.add_argument("--data", default=None, help="Stage 1 YAML or Stage 2 dataset root.")
+    parser.add_argument(
+        "--data", default=None, help="Stage 1 YAML or Stage 2 dataset root."
+    )
     parser.add_argument("--imgsz", type=int, default=128)
     parser.add_argument(
         "--batch",
@@ -46,8 +52,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="mps")
     parser.add_argument("--log-dir", default=DEFAULT_LOG_DIR)
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--stage1", action="store_true", help="Evaluate a Stage 1 detector.")
-    mode.add_argument("--stage2", action="store_true", help="Evaluate a Stage 2 classifier.")
+    mode.add_argument(
+        "--stage1", action="store_true", help="Evaluate a Stage 1 detector."
+    )
+    mode.add_argument(
+        "--stage2", action="store_true", help="Evaluate a Stage 2 classifier."
+    )
     mode.add_argument(
         "--single-model",
         action="store_true",
@@ -112,7 +122,10 @@ def print_rows(rows: list[dict], title: str) -> None:
         return
     print(f"\n{title}")
     headers = list(rows[0].keys())
-    widths = {header: max(len(header), max(len(str(row.get(header, ""))) for row in rows)) for header in headers}
+    widths = {
+        header: max(len(header), max(len(str(row.get(header, ""))) for row in rows))
+        for header in headers
+    }
     template = "  ".join(f"{{:<{widths[header]}}}" for header in headers)
     print(template.format(*headers))
     print("  ".join("-" * widths[header] for header in headers))
@@ -219,7 +232,7 @@ def stage2_probabilities(
     effective_batch = stage2_inference_batch(weights, batch)
 
     for start in range(0, len(samples), effective_batch):
-        chunk = samples[start:start + effective_batch]
+        chunk = samples[start : start + effective_batch]
         results = model(
             [str(image_path) for image_path, _expected in chunk],
             device=device,
@@ -240,7 +253,9 @@ def stage2_inference_batch(weights: str, requested_batch: int) -> int:
 
 def occupied_probability(result) -> float:
     names = {int(k): v for k, v in result.names.items()}
-    occupied_index = next((idx for idx, name in names.items() if name == "occupied"), None)
+    occupied_index = next(
+        (idx for idx, name in names.items() if name == "occupied"), None
+    )
     if occupied_index is None:
         top1 = int(result.probs.top1)
         top1_conf = float(result.probs.top1conf)
@@ -362,7 +377,9 @@ def evaluate_single_model(args: argparse.Namespace) -> None:
         print_rows(scene_rows, "Single-Model Holdout Scene Summary")
 
 
-def evaluate_stage2(weights: str, dataset_dir: Path, args: argparse.Namespace, label: str) -> dict[str, object]:
+def evaluate_stage2(
+    weights: str, dataset_dir: Path, args: argparse.Namespace, label: str
+) -> dict[str, object]:
     metrics = classify_dataset(
         weights,
         dataset_dir,
@@ -412,7 +429,9 @@ def evaluate_compare(args: argparse.Namespace) -> None:
             if not Path(weights).exists():
                 print(f"Skipping missing checkpoint: {weights}")
                 continue
-            row = evaluate_stage2(weights, dataset_dir, args, f"{root.name}/{args.split}")
+            row = evaluate_stage2(
+                weights, dataset_dir, args, f"{root.name}/{args.split}"
+            )
             row["size_mb"] = round(Path(weights).stat().st_size / 1_048_576, 2)
             rows.append(row)
         print_rows(rows, "Stage 2 Model Comparison")
@@ -420,9 +439,19 @@ def evaluate_compare(args: argparse.Namespace) -> None:
         write_json({"mode": "stage2_compare", "rows": rows}, args.output_json)
         return
 
-    data_yaml = stage1_data(args.data) if mode == "stage1" else single_model_data(args.data)
-    title = "Stage 1 Detection Comparison" if mode == "stage1" else "Single-Model Detection Comparison"
-    filename = "stage1_model_comparison.csv" if mode == "stage1" else "single_model_comparison.csv"
+    data_yaml = (
+        stage1_data(args.data) if mode == "stage1" else single_model_data(args.data)
+    )
+    title = (
+        "Stage 1 Detection Comparison"
+        if mode == "stage1"
+        else "Single-Model Detection Comparison"
+    )
+    filename = (
+        "stage1_model_comparison.csv"
+        if mode == "stage1"
+        else "single_model_comparison.csv"
+    )
     rows = []
     for weights in args.compare:
         if not Path(weights).exists():
@@ -433,7 +462,10 @@ def evaluate_compare(args: argparse.Namespace) -> None:
             data=data_yaml,
             split=args.split,
             device=args.device,
-            imgsz=max(args.imgsz, DEFAULT_STAGE1_IMGSZ if mode == "stage1" else DEFAULT_DETECT_IMGSZ),
+            imgsz=max(
+                args.imgsz,
+                DEFAULT_STAGE1_IMGSZ if mode == "stage1" else DEFAULT_DETECT_IMGSZ,
+            ),
             verbose=False,
         ).results_dict
         rows.append(
@@ -468,7 +500,9 @@ def evaluate_per_weather(args: argparse.Namespace) -> None:
     if not args.weights:
         raise SystemExit("--weights is required for per-weather evaluation.")
     root = stage2_root(args.data)
-    weather_names = tuple(label.strip() for label in str(args.weather_labels).split(",") if label.strip())
+    weather_names = tuple(
+        label.strip() for label in str(args.weather_labels).split(",") if label.strip()
+    )
     if not weather_names:
         raise SystemExit("--weather-labels must include at least one split name.")
     rows = []
@@ -503,7 +537,11 @@ def evaluate_threshold_sweep(args: argparse.Namespace) -> None:
         threshold = round(step / 100, 2)
         metrics = classify_probabilities(probabilities, threshold=threshold)
         row = {
-            "model": Path(args.weights).parent.parent.name if Path(args.weights).exists() else Path(args.weights).name,
+            "model": (
+                Path(args.weights).parent.parent.name
+                if Path(args.weights).exists()
+                else Path(args.weights).name
+            ),
             "dataset": f"{root.name}/{args.split}",
             "threshold": threshold,
             "top1_accuracy": metrics["top1_accuracy"],
@@ -540,19 +578,28 @@ def main() -> None:
         return
     if args.cross_dataset:
         if mode != "stage2":
-            raise SystemExit("--cross-dataset is only supported for Stage 2 classification.")
+            raise SystemExit(
+                "--cross-dataset is only supported for Stage 2 classification."
+            )
         evaluate_cross_dataset(args)
         return
     if args.per_weather:
         if mode != "stage2":
-            raise SystemExit("--per-weather is only supported for Stage 2 classification.")
+            raise SystemExit(
+                "--per-weather is only supported for Stage 2 classification."
+            )
         evaluate_per_weather(args)
         return
     if not args.weights:
         raise SystemExit("--weights is required unless using --compare")
     if mode == "stage2":
         root = stage2_root(args.data)
-        row = evaluate_stage2(args.weights, eval_split_dir(root, args.split), args, f"{root.name}/{args.split}")
+        row = evaluate_stage2(
+            args.weights,
+            eval_split_dir(root, args.split),
+            args,
+            f"{root.name}/{args.split}",
+        )
         print_rows([row], "Stage 2 Classification Evaluation")
         append_csv([row], Path(args.log_dir), "stage2_evaluation.csv")
         write_json({"mode": "stage2", "rows": [row]}, args.output_json)
@@ -560,13 +607,21 @@ def main() -> None:
     if mode == "single_model":
         evaluate_single_model(args)
         write_json(
-            {"mode": "single_model", "rows": [latest_csv_row(Path(args.log_dir) / "single_model_evaluation.csv")]},
+            {
+                "mode": "single_model",
+                "rows": [
+                    latest_csv_row(Path(args.log_dir) / "single_model_evaluation.csv")
+                ],
+            },
             args.output_json,
         )
         return
     evaluate_stage1(args)
     write_json(
-        {"mode": "stage1", "rows": [latest_csv_row(Path(args.log_dir) / "stage1_evaluation.csv")]},
+        {
+            "mode": "stage1",
+            "rows": [latest_csv_row(Path(args.log_dir) / "stage1_evaluation.csv")],
+        },
         args.output_json,
     )
 

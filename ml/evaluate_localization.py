@@ -17,10 +17,22 @@ from ml.localize import localize_query
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate localization queries against labeled spot references.")
-    parser.add_argument("--queries", required=True, help="JSON file describing query images and expected spot ids.")
-    parser.add_argument("--references", required=True, help="Reference manifest JSON or labeled reference directory.")
-    parser.add_argument("--output-json", default=None, help="Optional JSON output path.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate localization queries against labeled spot references."
+    )
+    parser.add_argument(
+        "--queries",
+        required=True,
+        help="JSON file describing query images and expected spot ids.",
+    )
+    parser.add_argument(
+        "--references",
+        required=True,
+        help="Reference manifest JSON or labeled reference directory.",
+    )
+    parser.add_argument(
+        "--output-json", default=None, help="Optional JSON output path."
+    )
     parser.add_argument("--output-csv", default=None, help="Optional CSV output path.")
     parser.add_argument("--ratio-threshold", type=float, default=0.75)
     parser.add_argument("--min-matches", type=int, default=8)
@@ -42,7 +54,9 @@ def load_queries(path: Path) -> list[dict[str, str]]:
         image = str(item.get("image", "")).strip()
         expected_spot_id = str(item.get("expected_spot_id", "")).strip()
         if not image or not expected_spot_id:
-            raise SystemExit(f"Each query entry must include image and expected_spot_id: {item!r}")
+            raise SystemExit(
+                f"Each query entry must include image and expected_spot_id: {item!r}"
+            )
         queries.append({"image": image, "expected_spot_id": expected_spot_id})
     return queries
 
@@ -92,7 +106,11 @@ def evaluate_queries(args: argparse.Namespace) -> dict[str, Any]:
         "accuracy": round(correct / len(rows), 4) if rows else 0.0,
         "top_k_correct_count": top_k_correct,
         "top_k_accuracy": round(top_k_correct / len(rows), 4) if rows else 0.0,
-        "avg_elapsed_ms": round(sum(elapsed_values) / len(elapsed_values), 2) if elapsed_values else 0.0,
+        "avg_elapsed_ms": (
+            round(sum(elapsed_values) / len(elapsed_values), 2)
+            if elapsed_values
+            else 0.0
+        ),
         "rows": rows,
     }
     return summary

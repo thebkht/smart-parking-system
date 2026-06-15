@@ -161,9 +161,7 @@ def plot_pr_curve(
     op_recall = tp / (tp + fn) if (tp + fn) else 0.0
 
     fig, ax = plt.subplots(figsize=(6.2, 5.0))
-    ax.plot(
-        recall, precision, color=CYAN, lw=2, label=f"YOLOv8n-cls (AP={ap:.4f})"
-    )
+    ax.plot(recall, precision, color=CYAN, lw=2, label=f"YOLOv8n-cls (AP={ap:.4f})")
     ax.scatter(
         [op_recall],
         [op_precision],
