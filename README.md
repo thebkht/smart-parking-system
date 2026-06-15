@@ -1,32 +1,59 @@
 # Smart Parking System
 
-Edge-based smart parking system using ACPDS quadrilateral pooling, `YOLOv8-cls`, FastAPI, and `Find My Car` product flows.
-The canonical project definition is [docs/prd.md](docs/prd.md). This README summarizes the current `v6` direction.
+> Edge-based parking occupancy detection with a two-stage vision pipeline, a FastAPI backend, and web + mobile apps — including a photo-based **Find My Car** feature.
 
-**Platform split (final):** Owner Setup → web only · Live Occupancy Map → both · Find My Car → mobile only. Mobile map renders spot quadrilaterals at exact image coordinates with pinch-to-zoom via `react-native-svg` + `react-native-gesture-handler`.
+Smart Parking System detects whether each parking space is **occupied** or **free** from a single overhead camera, entirely on the edge device. Instead of streaming raw video, the edge node sends a few hundred bytes of JSON to the backend — a ~99.9% bandwidth reduction versus H.264 video. The promoted classifier (`YOLOv8n-cls`, 2.83 MB) reaches **97.72% accuracy** on the held-out, unseen-lot ACPDS test split while being ~9× smaller than the dataset paper's ResNet50 baseline.
+
+The canonical project definition lives in [`docs/prd.md`](docs/prd.md).
+
+---
+
+## Features
+
+- **Two-stage occupancy detection** — parking-space quadrilaterals → perspective warp → `YOLOv8-cls` → temporal smoothing.
+- **Edge-first** — only compact occupancy JSON leaves the device; raw video stays local.
+- **Owner setup (web)** — upload lot photos, run Structure-from-Motion server-side to build a bird's-eye map and extract spot polygons, then correct spot labels inline.
+- **Live occupancy map (web + mobile)** — real-time green/red spot coloring with free/occupied/total counts.
+- **Find My Car (mobile)** — match a driver's photo to a parking spot with SIFT + FLANN + RANSAC; manage per-spot reference photos through the API.
+- **Optional auth** — opt-in bearer-token authentication that protects owner routes and scopes Find My Car sessions to their owner.
+- **Reproducible ML** — `make` targets for dataset extraction, training, evaluation, export (ONNX / Core ML INT8), and benchmarking.
 
 ---
 
 ## Architecture
 
-Current pipeline:
-
 ```
 parking-space quadrilaterals → perspective warp → YOLOv8-cls → temporal smoothing → JSON → FastAPI
 ```
 
-Key points:
+- **Stage 1** loads parking-space quadrilaterals from `ACPDS` annotations (or SfM-generated layouts for new cameras).
+- **Stage 2** classifies each perspective-corrected `128×128` patch as `occupied` or `free`.
+- The same published layout drives the edge runtime, the web map, and the mobile map, so all three stay consistent by construction.
 
-- Stage 1 uses parking-space quadrilaterals from `ACPDS` annotations or future `SfM` layout generation
-- Stage 2 classifies each perspective-corrected `128×128` patch as `occupied` or `free`
-- only compact occupancy JSON is sent to the backend; raw video stays on the edge device
-- the broader product scope includes owner setup, occupancy map views, and `Find My Car`
+| Platform | Owner Setup | Live Occupancy Map | Find My Car |
+| -------- | ----------- | ------------------ | ----------- |
+| Web      | ✅          | ✅                 | —           |
+| Mobile   | —           | ✅                 | ✅          |
+
+The web map renders spot quadrilaterals at exact image coordinates with Leaflet; the mobile map uses coordinate-accurate SVG polygons with pinch-to-zoom and pan (`react-native-svg` + `react-native-gesture-handler`).
 
 ---
 
-## ML Status
+## Screenshots
 
-Stage 2 classifier has reached production quality. **No further ML training is planned.**
+| Owner setup (web) | Live occupancy (web) |
+| --- | --- |
+| ![Owner setup](outputs/figures/ui_owner_setup_layout.png) | ![Live occupancy map](outputs/figures/ui_web_map.png) |
+
+| Live occupancy (mobile) | Find My Car (mobile) |
+| --- | --- |
+| ![Mobile map](outputs/figures/ui_mobile_map.png) | ![Find My Car](outputs/figures/ui_find_my_car.png) |
+
+---
+
+## Results
+
+Stage 2 classifier on the ACPDS splits. `yolov8n_stage2` is the promoted checkpoint.
 
 | Model          | Split    | Accuracy   | Precision | Recall | F1     | Size (MB) |
 | -------------- | -------- | ---------- | --------- | ------ | ------ | --------- |
@@ -37,302 +64,43 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 | yolov8s_stage2 | Test     | 0.9691     | 0.9745    | 0.9488 | 0.9615 | 9.78      |
 | yolov8m_stage2 | Test     | 0.9738     | 0.9846    | 0.9504 | 0.9672 | 30.22     |
 
-`yolov8n-cls` (2.83 MB) is the promoted checkpoint. It beats both larger variants on test accuracy while being 9× smaller than the ResNet50 paper baseline (25.6M params). Remaining work is evaluation depth and report writing — not retraining.
+Larger variants did not improve test accuracy — the bottleneck is patch quality (partial vehicles, border artifacts after warp, label ambiguity), not model capacity. Quadrilateral warp pooling beats a bounding-square crop by +1.34 pp test accuracy. Inference runs at 155–858 FPS across PyTorch / ONNX / Core ML INT8 backends. The full analysis is in the [technical report](outputs/smart-parking-system-report.pdf).
 
 ---
 
-## Team & Task Assignments
+## Tech stack
 
-### [@thebkht](https://github.com/thebkht) — ML lead
-
-> Owns the critical path: dataset, patch extraction, training, and SfM layout AI.
-
-**Week 5**
-
-- [x] Download ACPDS via `github.com/martin-marek/parking-space-occupancy`
-- [x] Write `ml/extract_patches.py` — `order_corners()` + `warpPerspective` to `datasets/acpds_stage2/`
-- [x] Run `validate_patches()` on 20 samples before training — save `validation_report.json` + `validation_samples/`
-- [x] Train `YOLOv8n-cls` on `datasets/acpds_stage2/` with validation gate + promoted checkpoint at `acpds_cls/weights/best.pt`
-- [x] Implement SfM pipeline (`ml/sfm_layout.py`) → generate `artifacts/layout_sample/bev_map.png` + `layout.json`
-- [x] **Deliver** `acpds_cls/weights/best.pt` + validated sample patches + `map_sample.json` to [@abdusattormv](https://github.com/abdusattormv)
-- [x] **Deliver** SfM script + BEV map image + layout JSON to [@mirzayv](https://github.com/mirzayv)
-
-**Week 6**
-
-- [x] Train `YOLOv8s-cls` and `YOLOv8m-cls` on ACPDS — the promoted `YOLOv8n-cls` checkpoint still leads the checked-in Week 6 test comparison at `0.9772`, with `s=0.9691` and `m=0.9738`
-- [x] Run INT8 quantization on `YOLOv8n-cls` — generated `artifacts/models/best_int8.onnx` and `artifacts/models/best.mlpackage`
-- [x] Implement SIFT car localization (`cv2.SIFT_create()` + FLANN matcher)
-- [x] Write Dataset section of report
-
-**Next week: process show**
-
-- [x] Val vs test accuracy gap analysis — `logs/week7/val_test_gap.json` documents the ~0.5–1.25pp generalization delta across n/s/m and ties it to unique-lot distribution shift rather than classic overfitting
-- [x] Per-weather accuracy breakdown — ACPDS test split is now bucketed into sunny / overcast / low-light luminance tertiles with results saved to `logs/week7/stage2_acpds_weather.json`
-- [x] Pooling method (a) vs (b) comparison — `logs/week7/pooling_comparison.json` shows quad warps at `0.9772` test accuracy versus `0.9638` for bounding-square pooling (`-1.34 pp`) on the same YOLOv8n Stage 2 setup
-- [x] **Fix edge runtime quad warp** — `edge/detect.py` now preserves polygons end-to-end and classifies `warpPerspective(128×128)` patches; visual QA samples are saved under `logs/week7/warp_comparison/`
-- [x] Write Stage 1 and Layout AI sections of technical report
-
-**Two weeks later: final submission**
-
-- [x] Finalize all accuracy tables and figures — see ML Status table above (test results confirmed)
-- [x] Present ACPDS justification, quad pooling, and ML pipeline in class
-- [x] **Update `docs/final-artifact-summary.md` and `docs/final-runbook.md`** — both now describe the canonical ACPDS quadrilateral warp + `YOLOv8n-cls` demo path and the current backend/mobile contract
+- **ML / edge:** Python, Ultralytics YOLOv8, OpenCV, ONNX Runtime, Core ML
+- **Backend:** FastAPI, SQLite
+- **Web:** Vite + React, Leaflet, Tailwind CSS
+- **Mobile:** React Native (Expo), `react-native-svg`, `react-native-gesture-handler`
 
 ---
 
-### [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) — ML / research
+## Repository structure
 
-> Owns evaluation depth, model comparison, literature context, and the report-side interpretation of the promoted `yolov8n-cls` checkpoint. No further retraining is planned on his track; the remaining work is figures, tables, localization evaluation depth, and final write-up consistency.
-
-**Week 5**
-
-- [x] Write Related Work section — ACPDS paper (`arXiv:2107.12207`), PKLot, YOLOv8, SfM / visual localization
-
-**Week 6**
-
-- [x] Build ResNet50 vs YOLOv8 comparison table (accuracy + parameter count + FPS)
-- [x] Run confidence threshold sweep on trained `YOLOv8n-cls`
-- [x] Test SIFT localization accuracy on 10+ sample ACPDS photos
-- [x] Write Stage 2 section of report — architecture, training config, training curves
-
-**Next week: process show**
-
-- [x] Write the final evaluation narrative around the saved Week 6/7 checkpoints — promoted `yolov8n-cls` at `0.9772` test accuracy / `0.9715` F1, the small `n/s/m` spread, and the conclusion that patch quality is the main bottleneck rather than model capacity
-- [x] Confusion matrix + PR curve for `yolov8n_stage2` on the test split — explain the expected occupied→free miss pattern in terms of partial vehicles, border regions after warp, and low-information patches
-- [x] Full model comparison table — fill in `n` / `s` / `m` / export rows vs the ResNet50 paper baselines with accuracy, F1, parameter count, model size, and backend/export notes
-- [x] Localization accuracy table — `samples/localization_refs/query_set.night_overhead.json` now evaluates `21` labeled same-lot night queries, including three reference-frame sanity checks, with `1.000` top-1 / `1.000` top-3 accuracy; tracked summary in `samples/localization_refs/localize_eval.night_overhead.md`
-- [x] Write Find My Car and Evaluation sections of technical report
-
-**Two weeks later: final submission**
-
-- [x] Write Discussion section — `\section{Discussion}` in `outputs/smart-parking-system-report.tex` (compiled into `smart-parking-system-report.pdf`, §5) covers what worked (n beats larger models, quad warp beats rect crop), limitations (patch-quality bottleneck, label ambiguity, night-only localization set), and production considerations
-- [x] Review full report for consistency across all sections — report + `docs/final-artifact-summary.md`, `docs/final-runbook.md`, `backend/README.md` aligned on ACPDS v6, canonical `/map`, SfM-backed `/layout`, SIFT-only Find My Car
-- [ ] Present Related Work and Stage 2 model findings in class
-- [x] **Generate confusion matrix figure and PR curve plot as image files** — `ml/make_report_figures.py` (`make figures`) scores the promoted `yolov8n-cls` checkpoint on the ACPDS test split and writes `artifacts/figures/confusion_matrix.png` (TN=877, FP=8, FN=26, TP=579) and `artifacts/figures/pr_curve.png` (AP=0.9945)
-- [x] **Assemble final model comparison table** — merge `n/s/m` test results plus export/backend notes into one report-ready table; keep the conclusion explicit that larger variants did not beat the promoted checkpoint
+```
+edge/        Edge inference pipeline (detect.py) and soak tests
+backend/     FastAPI app, SQLite schema, API (see backend/README.md)
+frontend/    React web app (src/) and React Native mobile app (mobile/)
+ml/          Training, evaluation, export, SfM layout, localization scripts
+docs/        Canonical PRD, diagrams, runbooks
+samples/     Sample images and localization references
+outputs/     Technical report (LaTeX source + PDF) and figures
+tests/       Backend, edge, and ML tests
+scripts/     End-to-end smoke test
+```
 
 ---
 
-### [@abdusattormv](https://github.com/abdusattormv) — Edge / backend
+## Getting started
 
-> Owns `detect.py`, FastAPI, all benchmarks, and the report's system sections.
+### Prerequisites
 
-**Week 5**
+- Python 3.9+
+- Node.js 18+ (for the web and mobile apps)
 
-- [x] Refactor `detect.py` to load quad polygon ROIs from `GET /map` at startup — no hardcoded `FIXED_ROIS`
-- [x] Add temporal smoothing (majority vote over N frames)
-- [x] Implement all 7 FastAPI endpoints + full SQLite schema (`log`, `layout`, `spot_references`, `park_sessions`)
-- [x] FPS benchmark: pre-trained classifier at `128×128` on MPS and CPU
-
-**Week 6**
-
-- [x] Integrate `acpds_cls/weights/best.pt` from [@thebkht](https://github.com/thebkht) into `detect.py`
-- [x] Full pipeline end-to-end: camera → Stage 1 → warp → Stage 2 → JSON → API
-- [x] FPS benchmark across all backends: MPS / CPU / ONNX FP32 / ONNX INT8
-- [x] Bandwidth measurement and comparison vs H.264 streaming
-- [x] Write System Architecture and Inference Pipeline sections of report
-
-**Next week: process show**
-
-- [x] **Add `POST /park` endpoint** — accept a driver photo, call `ml/localize.py` SIFT matching against stored `spot_references`, insert a row into `park_sessions` table with `spot_id` + `similarity_score`, return `session_id`
-- [x] **Add `GET /find/{session_id}` endpoint** — look up session in `park_sessions`, return `spot_id` + corner coordinates from the `layout` table; return 404 if session not found
-- [x] **Resolve `POST /layout` vs `POST /map` naming** — pick one canonical name, update the route in `backend/main.py`, notify [@mirzayv](https://github.com/mirzayv) so frontend fetch path matches, document final contract in `backend/README.md`
-- [x] **Fix `GET /status` response shape** — currently returns `{ spots, confidence, timestamp }`; confirm this is the final shape and document it in `backend/README.md` so [@mirzayv](https://github.com/mirzayv) can update the frontend parser to read `response.spots`
-- [x] Final FPS + latency table (all backends: MPS / CPU / ONNX FP32 / ONNX INT8)
-- [x] Bandwidth savings analysis — expected >99% vs raw H.264; use the measurement script from PRD §8.3 and include actual measured numbers
-- [x] System stability test — 30-minute continuous run with no crashes; log CPU usage, memory, and FPS stability; save output to `logs/stability_test.json`
-- [x] Write Edge Benchmarks section of technical report
-
-**Two weeks later: final submission**
-
-- [x] **Fix duplicate `POST /park` handler** — there are two handlers for the same path in `backend/main.py`; the first returns `501` and sits before the real multipart handler, blocking the Find My Car flow end-to-end; remove the stub and confirm the multipart handler is the only route for that path
-- [x] **Wire real owner setup into `POST /layout`** — multipart image uploads now run SfM server-side (`ml/sfm_layout.generate_layout`) to build the BEV map + spot polygons and persist the layout
-- [x] **Add owner-setup fallback path** — SfM failure returns `422`; the app falls back to manual polygon submission via `POST /map` (JSON `LayoutPayload`), plus a `PATCH /spots/{id}` label-correction step
-- [x] **Align `edge/stability_test.py` with the live quad-geometry path** — it still uses fixed ROI boxes while the runtime path loads quadrilaterals from `/map`; update the soak test so the 30-minute stability claim matches production behavior
-- [x] **Add backend happy-path tests for PRD endpoints** — cover `/map`, `/sessions`, `/park`, and `/find/{session_id}` in `tests/test_backend.py`, not just invalid-shape `/map` inputs
-- [x] **Fix backend test/runtime dependency for multipart uploads** — `tests/test_backend.py` currently fails at import because `python-multipart` is missing for the `/park` `UploadFile` route; add the dependency and verify backend tests run green
-- [x] **Document or implement the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or correct the docs so frontend/backend contracts are unambiguous
-- [x] **Decide whether to keep SIFT-only Find My Car or add the MobileNetV3 upgrade path** — PRD marks MobileNetV3 embeddings as the optional upgrade; record the final backend-side decision in docs/report and implement it only if it stays in scope
-- [x] **Compile full report PDF** — final two-column report compiled to `outputs/smart-parking-system-report.pdf` (11 pages, all sections); LaTeX source at `outputs/smart-parking-system-report.tex`
-- [x] Run live occupancy detection demo in class
-- [x] Present pipeline architecture and benchmark results
-
----
-
-### [@mirzayv](https://github.com/mirzayv) — App / frontend
-
-> Owns all three app screens, React Native mobile, and final report submission.
-
-**Week 5**
-
-- [x] Scaffold React app (Vite + React): 3 screens with routing
-- [x] Build Leaflet.js map component: render 2D layout + quadrilateral polygon overlays per spot
-
-**Week 6**
-
-- [x] Owner setup screen: photo upload → `POST /layout` → spinner → display BEV map with polygon overlays
-- [x] Live occupancy map screen: poll `GET /status` every 2–5 s → color spots green / red in real time
-- [x] Integrate BEV map image from [@thebkht](https://github.com/thebkht) into the owner setup flow
-
-**Next week: process show**
-
-- [x] **Fix `GET /status` response parser** — backend returns `{ spots, confidence, timestamp }`; update frontend to read `response.spots` before coloring polygons and updating free/occupied count in the header
-- [x] **Fix `POST /layout` call** — align to the canonical name once [@abdusattormv](https://github.com/abdusattormv) resolves the contract, then update the fetch path and `backend/README.md`
-- [x] **Remove mock fallbacks from Find My Car** — replace fake `session_id` generation and random spot fallback with the real `POST /park` → store `session_id` → `GET /find/{session_id}` flow once [@abdusattormv](https://github.com/abdusattormv) ships the endpoints
-- [x] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
-- [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
-- [x] React Native (Expo) wrapper — native camera/photo-picker access for the same Owner Setup, Live Occupancy, and Find My Car demo screens
-- [x] Write App section of technical report — platform split, tech stacks (web: Leaflet; mobile: SVG+gestures), Find My Car flow — covered in the report's Application description section
-
-**Two weeks later: final submission**
-
-- [x] Write Abstract, Conclusion, and References — all present in `outputs/smart-parking-system-report.pdf`; the abstract includes the public repo link
-- [ ] Submit technical report via email before deadline
-- [x] Run live demo in class — web: Owner Setup + Live Map; mobile: Live Map + Find My Car
-- [x] **Platform split implemented** — Owner Setup web-only; Find My Car mobile-only; Live Map on both
-- [x] **Mobile coordinate-accurate SVG map** — `LotMap.js` renders quad polygons at exact coordinates with pinch/pan
-- [x] **Fix `GET /status` parser and Find My Car frontend** — web and mobile clients read `response.spots` and use the real `POST /park` → `GET /find/{session_id}` flow
-- [x] **Verify `POST /layout` fetch path** matches the canonical backend route — `/layout` is a documented compatibility alias over the `/map` layout contract
-- [x] **API env config** — web: `VITE_API_BASE`; mobile: `EXPO_PUBLIC_API_BASE` with auto-detect fallback
-
----
-
-## Next Week: Process Show Priority Order
-
-| Priority | Task                                              | Owner                                                                                     | Blocks               |
-| -------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------- |
-| 1        | `POST /park` + `GET /find/{session_id}` endpoints | [@abdusattormv](https://github.com/abdusattormv)                                          | Find My Car frontend |
-| 2        | Fix `GET /status` response shape                  | [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv) | Live map screen      |
-| 3        | Fix `POST /layout` vs `POST /map` contract        | [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv) | Owner setup screen   |
-| 4        | Wire Find My Car frontend end-to-end              | [@mirzayv](https://github.com/mirzayv)                                                    | Demo                 |
-| 5        | Switch map rendering to Leaflet                   | [@mirzayv](https://github.com/mirzayv)                                                    | Demo                 |
-| 6        | Fix edge runtime quad warp at inference           | [@thebkht](https://github.com/thebkht)                                                    | PRD consistency      |
-| 7        | Confusion matrix + full comparison table          | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)                                | Report               |
-| 8        | Val/test gap + per-weather breakdown              | [@thebkht](https://github.com/thebkht)                                                    | Report               |
-| 9        | All report sections                               | All                                                                                       | Final submission     |
-
----
-
-## Two Weeks Later: Final Submission Priority Order
-
-| Priority | Task                                                                    | Owner                                                      | Blocks                                                                     |
-| -------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1        | Fix duplicate `POST /park` handler                                      | [@abdusattormv](https://github.com/abdusattormv)           | Complete                                                                   |
-| 2        | Fix `GET /status` parser in frontend                                    | [@mirzayv](https://github.com/mirzayv)                     | Complete                                                                   |
-| 3        | Wire Find My Car frontend end-to-end                                    | [@mirzayv](https://github.com/mirzayv)                     | Complete                                                                   |
-| 4        | Document Expo mobile demo flow                                          | [@mirzayv](https://github.com/mirzayv)                     | Complete — see `frontend/README.md`                                        |
-| 5        | Generate confusion matrix + PR curve figures                            | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report figures                                                             |
-| 6        | Assemble final model comparison table                                   | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report table                                                               |
-| 7        | Write Discussion section                                                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report                                                                     |
-| 8        | Localization accuracy (21 labeled night-overhead photos)                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Complete — see `samples/localization_refs/localize_eval.night_overhead.md` |
-| 9        | Update `docs/final-artifact-summary.md` + `docs/final-runbook.md` to v6 | [@thebkht](https://github.com/thebkht)                     | Complete                                                                   |
-| 10       | Write Abstract, Conclusion, References, App section                     | [@mirzayv](https://github.com/mirzayv)                     | Complete — in `outputs/smart-parking-system-report.pdf`                    |
-| 11       | Finalize accuracy tables + figures for presentation                     | [@thebkht](https://github.com/thebkht)                     | Presentation                                                               |
-| 12       | Compile full report PDF                                                 | [@abdusattormv](https://github.com/abdusattormv)           | Complete — `outputs/smart-parking-system-report.pdf`                       |
-
----
-
-## What’s Left According to the PRD
-
-The core system exists in the repo, but the PRD is still not fully satisfied. The biggest remaining gaps are integration and product completeness rather than model training.
-
-- **Owner setup runs SfM server-side** — `POST /layout` with image uploads invokes `ml/sfm_layout.generate_layout` to build the BEV map + spot polygons and persist the layout, matching the PRD `4-5 photos -> SfM -> store map + spot polygons` flow — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- **Owner correction/fallback flow is in place** — SfM failure returns `422` and the app falls back to manual polygon submission via `POST /map`; the `PATCH /spots/{id}` label-correction step lets owners rename spots after generation — owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
-- **Live map frontend is aligned with the backend contract** — web and mobile clients read `response.spots` and scope counts to the active layout's spot IDs — owner: [@mirzayv](https://github.com/mirzayv)
-- **Find My Car frontend uses the real backend path** — web and mobile clients call `POST /park`, store `session_id`, then call `GET /find/{session_id}` — owner: [@mirzayv](https://github.com/mirzayv)
-- **Reference-photo management is productized** — `POST /spots/{id}/references` persists per-spot photos under `artifacts/spot_references/`; `POST /park` matches against the managed dir with `samples/localization_refs/` as fallback — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- **Stability verification does not yet match the live runtime path** — the checked-in stability harness still uses fixed ROI boxes instead of the `/map`-driven quadrilateral geometry contract used by `edge/detect.py` — owner: [@abdusattormv](https://github.com/abdusattormv)
-- **Backend happy-path coverage is in place** — `/map`, `/layout`, `/sessions`, `/park`, and `/find/{session_id}` success cases are covered in `tests/test_backend.py` — owner: [@abdusattormv](https://github.com/abdusattormv)
-- **Backend multipart dependency is declared and verified** — `/park` has `python-multipart` available through `requirements.txt`, and the focused backend/edge tests pass — owner: [@abdusattormv](https://github.com/abdusattormv)
-- **Docs are normalized for the final demo contract** — `/map` is canonical, `/layout` is the frontend compatibility alias, and the ACPDS quadrilateral path is the report-facing architecture — owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
-- **React Native/mobile scope is in** — Expo wrapper is present for the same three demo screens and documented in `frontend/README.md` — owner: [@mirzayv](https://github.com/mirzayv)
-
-### Short Priority View
-
-**Before the process show**
-
-1. Fix frontend `/status` parsing. Complete.
-   Owner: [@mirzayv](https://github.com/mirzayv)
-2. Replace Find My Car frontend mock fallbacks with the real backend flow. Complete.
-   Owner: [@mirzayv](https://github.com/mirzayv)
-3. Add backend happy-path tests and install `python-multipart`. Complete.
-   Owner: [@abdusattormv](https://github.com/abdusattormv)
-4. Align the stability test with the quadrilateral `/map` path.
-   Owner: [@abdusattormv](https://github.com/abdusattormv)
-5. Decide whether owner setup will be shown as a real integrated flow or as a documented prototype.
-   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht) + [@mirzayv](https://github.com/mirzayv)
-
-**Before final submission**
-
-1. Wire the real owner setup flow into `/layout`. Complete — SfM runs server-side.
-   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-2. Add owner fallback/correction behavior. Complete — `422` → manual `POST /map`; `PATCH /spots/{id}` label correction.
-   Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
-3. Keep report-facing docs aligned with the final `/map` + `/layout` compatibility contract if backend behavior changes again.
-   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
-4. Decide SIFT-only vs MobileNetV3 upgrade scope for Find My Car. Complete — SIFT-only is final scope.
-   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
-5. Run the Expo demo on a phone using the Mac LAN IP in `frontend/mobile/api.js`.
-   Owner: [@mirzayv](https://github.com/mirzayv)
-
----
-
-## Remaining Gap Checklist
-
-### 🔴 Must fix before demo
-
-- [x] **Fix `GET /status` response parser** (`frontend/src/App.jsx`) — frontend reads the whole object as spot states instead of `response.spots`; live map is broken — [@mirzayv](https://github.com/mirzayv)
-- [x] **Wire Find My Car frontend end-to-end** — replace fake session IDs and random-spot fallback with real `POST /park` → `GET /find/{session_id}` flow — [@mirzayv](https://github.com/mirzayv)
-- [x] **Add backend happy-path tests for PRD endpoints** — `/park`, `/find/{session_id}`, `/sessions`, `/layout`, and `/map` success paths are covered in `tests/test_backend.py` — [@abdusattormv](https://github.com/abdusattormv)
-- [x] **Fix backend multipart dependency and run tests green** — `python-multipart` is declared in `requirements.txt`, and `.venv/bin/python -m pytest tests/test_backend.py tests/test_edge.py -q` passes — [@abdusattormv](https://github.com/abdusattormv)
-
-### 🟡 Should fix for PRD compliance
-
-- [x] **Wire real owner setup into `POST /layout`** — multipart image uploads now invoke SfM server-side (`ml/sfm_layout.generate_layout`) to build the BEV map + spot polygons and persist the layout — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- [x] **Add owner-setup fallback path** — SfM failure returns `422`; the app falls back to manual polygon submission via `POST /map`, plus the `PATCH /spots/{id}` label-correction step — [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
-- [x] **Owner setup: polygon label-correction step** — `SpotLabelsEditor` in `frontend/src/App.jsx` lets owners rename spots after generation (persisted via `PATCH /spots/{id}`, reflected on the Leaflet map); labels-only by design, geometry stays read-only — [@mirzayv](https://github.com/mirzayv)
-- [x] **Align `edge/stability_test.py` with the live quad-geometry path** — the checked-in stability harness still builds fixed ROI boxes, while the production runtime loads quadrilaterals from `/map`; the soak test should exercise the same geometry contract as `edge/detect.py` — [@abdusattormv](https://github.com/abdusattormv)
-- [x] **Reference-photo management for Find My Car** — `POST /spots/{id}/references` persists per-spot photos under `artifacts/spot_references/` (tracked in `spot_reference_images`); `POST /park` matches against the managed dir and falls back to `samples/localization_refs/` only when empty — [@abdusattormv](https://github.com/abdusattormv)
-- [x] **Resolve the `GET /layout` contract explicitly** — `backend/main.py` exposes `GET /layout` as an alias for `GET /map`, and `backend/README.md` documents `/map` as canonical — [@abdusattormv](https://github.com/abdusattormv)
-- [x] **Decide whether Find My Car stays SIFT-only** — decision recorded in `docs/final-artifact-summary.md`: SIFT-only is the final scope (21/21 top-1/top-3 on the labeled night-overhead set, CPU-only, no training); MobileNetV3 stays a documented optional upgrade and is out of scope for this submission — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- [x] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
-- [x] **Resolve doc inconsistencies on canonical routes and architecture** — `docs/final-artifact-summary.md`, `docs/final-runbook.md`, and `backend/README.md` now agree on ACPDS v6, canonical `/map`, and `/layout` compatibility aliases — [@thebkht](https://github.com/thebkht)
-- [x] **Add frontend tests for three PRD screens and API contracts** — Vitest suite (`cd frontend && npm test`, 19 tests): `src/__tests__/layout.test.js` (Owner Setup map contract), `src/__tests__/occupancy.test.js` (Live Map `/status` parsing + layout-scoped counts), `mobile/__tests__/findMyCar.test.js` (Find My Car `/park` → `/find/{id}` contract) — [@mirzayv](https://github.com/mirzayv)
-- [x] **Decide React Native in/out and update all docs** — Expo wrapper is built and documented as part of the final demo path — [@mirzayv](https://github.com/mirzayv)
-
-### 🟢 Nice to have
-
-- [x] **End-to-end smoke-test script** — `scripts/smoke_test.py` (`make smoke-test`) drives the full PRD path in-process against the real app + real SIFT localizer using an isolated in-memory DB: owner setup (`POST /map`) → map persistence (`GET /map`) → edge update (`POST /update`) → live map (`GET /status`) → park (`POST /park`) → find (`GET /find/{id}`), with a PASS/FAIL line per stage
-- [x] **React Native / Expo wrapper** — native camera/photo-picker access for the Owner Setup, Live Occupancy, and Find My Car demo screens — [@mirzayv](https://github.com/mirzayv)
-- [x] **Auth and session ownership model** — opt-in bearer-token auth (`AUTH_ENABLED=1`): `POST /auth/register` issues tokens, owner-mutating routes require them, and Find My Car sessions are scoped to their owner via a `user_id` on `park_sessions`. Off by default so the class demo runs token-free
-- [x] **Run one full green local verification pass** — `make test` is green (128 backend/edge/ML pytest + 19 frontend Vitest), `backend.main` imports and serves (`/health` via TestClient in the smoke test), and a representative `make edge EDGE_ARGS="--image samples/photo_2026-04-23 21.29.16.jpeg --device cpu"` produces a full 12-spot occupancy JSON payload. Fixed 2 non-hermetic edge tests that read a live backend instead of the config file (`load_*` now accepts `backend_url=None`)
-
----
-
-## Handoff Points
-
-| When                    | From                                                       | To                                               | Deliverable                                                                             |
-| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| End of Week 5           | [@thebkht](https://github.com/thebkht)                     | [@abdusattormv](https://github.com/abdusattormv) | `acpds_cls/weights/best.pt` + validated sample patches                                  |
-| End of Week 5           | [@thebkht](https://github.com/thebkht)                     | [@mirzayv](https://github.com/mirzayv)           | SfM pipeline script + BEV map image                                                     |
-| Before the process show | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | [@thebkht](https://github.com/thebkht)           | Localization accuracy results (feeds the process-show narrative and evaluation section) |
-| End of next week        | [@abdusattormv](https://github.com/abdusattormv)           | [@mirzayv](https://github.com/mirzayv)           | `POST /park` + `GET /find/{id}` live → unblocks Find My Car frontend                    |
-| Before final submission | All                                                        | [@mirzayv](https://github.com/mirzayv)           | All report sections → compile + submit                                                  |
-
----
-
-## Repo Layout
-
-- [`docs/prd.md`](docs/prd.md) — canonical PRD (v6)
-- [`docs/prd-diagrams.md`](docs/prd-diagrams.md) — architecture and comparison diagrams
-- [`edge/detect.py`](edge/detect.py) — edge inference pipeline
-- [`backend/main.py`](backend/main.py) — FastAPI backend
-- [`ml/`](ml) — training, evaluation, export, and benchmarking scripts
-- [`samples/`](samples) — sample images and videos
-
----
-
-## Setup
+### Install
 
 ```bash
 python3 -m venv .venv
@@ -341,22 +109,14 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Windows PowerShell:
-
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-Cross-platform with `make`:
+Or with `make`:
 
 ```bash
-make install
+make install        # runtime deps
+make install-dev    # + dev/test deps
 ```
 
-Quick environment check:
+Verify the environment:
 
 ```bash
 python -c "import cv2, ultralytics, yaml; print('env ok')"
@@ -364,258 +124,165 @@ python -c "import cv2, ultralytics, yaml; print('env ok')"
 
 ---
 
-## Common Commands
+## Usage
 
-Run the backend:
-
-```bash
-make backend
-```
-
-Run edge inference on an image:
+### Backend
 
 ```bash
-make edge EDGE_ARGS="--image samples/photo_2026-04-23 21.29.16.jpeg"
+make backend        # uvicorn on 0.0.0.0:8000 (API docs at /docs)
 ```
 
-Run live camera inference:
+### Edge inference
 
 ```bash
-make edge EDGE_ARGS="--camera 0"
+make edge EDGE_ARGS="--image 'samples/photo_2026-04-23 21.29.16.jpeg'"
+make edge EDGE_ARGS="--camera 0"          # live camera
+make edge EDGE_ARGS="--image <path> --post"   # also POST to the backend
 ```
 
-Prepare, validate, and train the Week 5 ACPDS classifier:
+### Web app
 
 ```bash
-make prepare-stage2 ACPDS_ROOT=/path/to/acpds PREP_STAGE2_ARGS="--run-validation --validation-status passed"
-make validate-stage2 ACPDS_ROOT=/path/to/acpds VALIDATE_STAGE2_ARGS="--validation-status passed"
-make train-stage2 STAGE2_VARIANT=n
+cd frontend
+npm install
+npm run dev
 ```
 
-Evaluate a trained classifier:
+### Mobile app (Expo)
 
 ```bash
-make evaluate-stage2
+cd frontend
+npm install
+npx expo start
 ```
 
-Generate a Week 5 BEV layout sample for App handoff:
-
-```bash
-make layout-sample
-```
-
-Run tests:
-
-```bash
-make test
-```
+See [`frontend/README.md`](frontend/README.md) for screen descriptions and device setup.
 
 ---
 
-## Week 5 Process
+## API overview
 
-Use this sequence for [`@thebkht`](https://github.com/thebkht)'s ACPDS milestone.
+Full reference: [`backend/README.md`](backend/README.md). Key endpoints:
 
-1. Extract ACPDS patches into `datasets/acpds_stage2/`.
-2. Review 20 validation samples and mark the validation report as `passed`.
-3. Train `YOLOv8n-cls` and promote the selected checkpoint to `acpds_cls/weights/best.pt`.
-4. Evaluate the promoted checkpoint on the ACPDS split.
-5. Generate the BEV sample package for App.
+| Method | Route | Purpose |
+| ------ | ----- | ------- |
+| `POST` | `/update` | Edge node posts an occupancy payload |
+| `GET`  | `/status` | Latest occupancy snapshot (read `response.spots`) |
+| `POST` | `/map` (alias `/layout`) | Publish a layout (JSON), or upload photos to run SfM server-side |
+| `GET`  | `/map` / `/map/background` | Layout + bird's-eye background image |
+| `PATCH`| `/spots/{id}` | Rename a spot label (owner correction) |
+| `POST`/`GET` | `/spots/{id}/references` | Manage per-spot Find My Car reference photos |
+| `POST` | `/park` | Localize a driver photo, return a `session_id` |
+| `GET`  | `/find/{session_id}` | Resolve a session to a spot + corner coordinates |
+| `POST` | `/auth/register` | Issue a bearer token (when `AUTH_ENABLED`) |
 
-Recommended commands:
-
-```bash
-make prepare-stage2 ACPDS_ROOT=/path/to/acpds PREP_STAGE2_ARGS="--run-validation"
-make validate-stage2 ACPDS_ROOT=/path/to/acpds VALIDATE_STAGE2_ARGS="--validation-status passed"
-make train-stage2 STAGE2_VARIANT=n
-make evaluate-stage2
-make layout-sample
-```
-
-Direct CLI equivalents:
-
-```bash
-python ml/extract_patches.py --dataset-root /path/to/acpds --output datasets/acpds_stage2 --run-validation
-python ml/extract_patches.py --dataset-root /path/to/acpds --output datasets/acpds_stage2 --validate-only --validation-status passed
-python ml/train.py --stage2 --variant n --data datasets/acpds_stage2 --device mps
-python ml/evaluate.py --stage2 --weights acpds_cls/weights/best.pt --data datasets/acpds_stage2 --split test --device mps
-python ml/sfm_layout.py --images samples --output artifacts/layout_sample
-```
-
-Expected outputs:
-
-- `datasets/acpds_stage2/dataset_report.json`
-- `datasets/acpds_stage2/patch_index.json`
-- `datasets/acpds_stage2/validation_report.json`
-- `datasets/acpds_stage2/validation_samples/`
-- `datasets/acpds_stage2/map_sample.json`
-- `acpds_cls/weights/best.pt`
-- `artifacts/layout_sample/bev_map.png`
-- `artifacts/layout_sample/layout.json`
-
-Week 5 handoff package:
-
-- Edge: `acpds_cls/weights/best.pt`, `datasets/acpds_stage2/validation_samples/`, `datasets/acpds_stage2/validation_report.json`, `datasets/acpds_stage2/map_sample.json`
-- App: `ml/sfm_layout.py`, `artifacts/layout_sample/bev_map.png`, `artifacts/layout_sample/layout.json`
-
-Notes:
-
-- Stage 2 training is gated by `datasets/acpds_stage2/validation_report.json` with `status: "passed"`.
-- `acpds_cls/weights/best.pt` is promoted automatically only for the Week 5 `YOLOv8n-cls` handoff path; `s` and `m` stay as comparison runs unless `--promote-stage2` is passed explicitly.
-- The ACPDS split from the manifest is authoritative; this workflow does not rebuild train/val/test randomly.
-
-## Week 6 Process
-
-Use this sequence for the Week 6 Stage 2 comparison and export milestone.
-
-1. Run the `s` and `m` comparison workflow against the existing ACPDS Stage 2 dataset.
-2. Review `val` and `test` outputs for `n`, `s`, and `m`; do not overwrite `acpds_cls/weights/best.pt`.
-3. Export the promoted Week 5 `n` checkpoint into ONNX FP32, ONNX INT8, and Core ML INT8 artifacts.
-4. Evaluate the exported ONNX artifact on the ACPDS `val` and `test` splits.
-5. Use the combined results to update the report and decide whether the bottleneck is model capacity or patch quality.
-
-Recommended commands:
-
-```bash
-make week6-stage2 DEVICE=mps
-make week6-export
-```
-
-Direct CLI equivalents:
-
-```bash
-python ml/train.py --stage2 --variant s --device mps
-python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8s_stage2/weights/best.pt --split val --device mps --output-json logs/week6/stage2_s_val.json
-python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8s_stage2/weights/best.pt --split test --device mps --output-json logs/week6/stage2_s_test.json
-python ml/train.py --stage2 --variant m --device mps
-python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8m_stage2/weights/best.pt --split val --device mps --output-json logs/week6/stage2_m_val.json
-python ml/evaluate.py --stage2 --weights runs/acpds_cls/yolov8m_stage2/weights/best.pt --split test --device mps --output-json logs/week6/stage2_m_test.json
-python ml/evaluate.py --stage2 --split val --device mps --output-json logs/week6/stage2_compare_val.json --compare acpds_cls/weights/best.pt runs/acpds_cls/yolov8s_stage2/weights/best.pt runs/acpds_cls/yolov8m_stage2/weights/best.pt
-python ml/evaluate.py --stage2 --split test --device mps --output-json logs/week6/stage2_compare_test.json --compare acpds_cls/weights/best.pt runs/acpds_cls/yolov8s_stage2/weights/best.pt runs/acpds_cls/yolov8m_stage2/weights/best.pt
-python ml/export.py --weights acpds_cls/weights/best.pt --imgsz 128 --summary-json artifacts/models/export_summary.json
-python ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split val --device cpu --output-json logs/week6/stage2_export_onnx_val.json
-python ml/evaluate.py --stage2 --weights artifacts/models/best.onnx --split test --device cpu --output-json logs/week6/stage2_export_onnx_test.json
-```
-
-Expected outputs:
-
-- `runs/acpds_cls/yolov8s_stage2/weights/best.pt`
-- `runs/acpds_cls/yolov8m_stage2/weights/best.pt`
-- `models/stage2_s_report.json`
-- `models/stage2_m_report.json`
-- `logs/week6/stage2_s_val.json`
-- `logs/week6/stage2_s_test.json`
-- `logs/week6/stage2_m_val.json`
-- `logs/week6/stage2_m_test.json`
-- `logs/week6/stage2_compare_val.json`
-- `logs/week6/stage2_compare_test.json`
-- `artifacts/models/best.pt`
-- `artifacts/models/best.onnx`
-- `artifacts/models/best_int8.onnx`
-- `artifacts/models/best.mlpackage`
-- `artifacts/models/export_summary.json`
-- `logs/week6/stage2_export_onnx_val.json`
-- `logs/week6/stage2_export_onnx_test.json`
-
-Observed Week 6 comparison result:
-
-- `yolov8n-cls`: test accuracy `0.9772`, F1 `0.9715`, size `2.83 MB`
-- `yolov8s-cls`: test accuracy `0.9691`, F1 `0.9615`, size `9.78 MB`
-- `yolov8m-cls`: test accuracy `0.9738`, F1 `0.9672`, size `30.22 MB`
-
-`yolov8n-cls` is the promoted checkpoint. Larger variants did not improve test accuracy. The bottleneck is Stage 2 patch quality (partial vehicles, thick border regions after perspective warp, low-information crops, label ambiguity) — not model capacity. No further retraining is planned.
-
-Notes:
-
-- `acpds_cls/weights/best.pt` remains the Week 5 handoff checkpoint unless `--promote-stage2` is passed explicitly.
-- Exported classifier artifacts are evaluated with batch size `1` in `ml/evaluate.py`.
-- Exported ONNX weights must be loaded with `task="classify"` during evaluation to avoid detection-style NMS postprocessing.
-
-Run SIFT localization against either a manifest JSON or a per-spot reference directory:
-
-```bash
-make localize-car LOCALIZE_ARGS="--query samples/query.jpg --references samples/localization_refs --output logs/localize_result.json"
-```
-
-Evaluate multiple labeled localization queries:
-
-```bash
-python ml/evaluate_localization.py --queries samples/localization_refs/query_set.night_overhead.json --references samples/localization_refs/labeled --output-json logs/localize_eval.json --output-csv logs/localize_eval.csv
-```
-
-Supported reference layouts:
-
-```text
-samples/localization_refs/
-  spot_1/
-    a.jpg
-    b.jpg
-  spot_2/
-    a.jpg
-```
-
-or:
+Occupancy payload contract:
 
 ```json
 {
-  "spot_1": ["refs/spot_1/a.jpg", "refs/spot_1/b.jpg"],
-  "spot_2": "refs/spot_2/a.jpg"
-}
-```
-
-Starter sample references are available under [samples/localization_refs](samples/localization_refs). The current checked-in evaluation set is [query_set.night_overhead.json](samples/localization_refs/query_set.night_overhead.json): `21` labeled same-lot night-overhead queries, including the three labeled reference timestamps as sanity-check queries, scored `21/21` top-1 correct and `21/21` top-3 correct, with average runtime `536.18 ms`, summarized in [localize_eval.night_overhead.md](samples/localization_refs/localize_eval.night_overhead.md). Regenerated machine outputs are still written to `logs/localize_eval.json` and `logs/localize_eval.csv`.
-
----
-
-## Dataset Direction
-
-The current PRD centers the project on `ACPDS`:
-
-- 293 full parking-lot images captured at ~12 m height (GoPro on telescoping pole)
-- 11,236 parking-space annotations as quadrilateral polygons
-- unique parking lots for train / val / test splits — true generalization by design
-- 48% occupied / 52% free — near-balanced, no class weighting needed
-- MIT license — dataset, code, and pretrained weights
-
-This replaces the older repo story that emphasized PKLot/CNRPark and fixed ROI demos.
-When there is a mismatch between older docs and [`docs/prd.md`](docs/prd.md), follow the PRD.
-
----
-
-## Payload Contract
-
-```json
-{
-  "spots": {
-    "spot_1": "free",
-    "spot_2": "occupied"
-  },
-  "confidence": {
-    "spot_1": 0.91,
-    "spot_2": 0.84
-  },
+  "spots": { "spot_1": "free", "spot_2": "occupied" },
+  "confidence": { "spot_1": 0.91, "spot_2": 0.84 },
   "timestamp": "2026-04-21T00:00:00Z"
 }
 ```
 
----
+### Configuration
 
-## Public Release Policy
-
-- code, configs, metrics, and reproducible commands stay in the repo
-- trained weights do not get committed into git history
-- dataset archives, extracted datasets, runtime databases, and generated logs stay out of git
-
-Model publishing guidance is in [`MODEL_LICENSE.md`](MODEL_LICENSE.md).
-
----
-
-## Docs
-
-- [`docs/README.md`](docs/README.md)
-- [`docs/prd.md`](docs/prd.md)
-- [`docs/prd-diagrams.md`](docs/prd-diagrams.md)
-- [`edge/README.md`](edge/README.md)
-- [`backend/README.md`](backend/README.md)
+| Variable | Where | Purpose |
+| -------- | ----- | ------- |
+| `VITE_API_BASE` | web | Backend base URL (default `http://localhost:8000`) |
+| `EXPO_PUBLIC_API_BASE` | mobile | Backend base URL (auto-detected in Expo Go) |
+| `EXPO_PUBLIC_API_TOKEN` | mobile | Bearer token, only when the backend runs with auth |
+| `AUTH_ENABLED` | backend | Set to `1` to require bearer tokens on owner routes |
 
 ---
+
+## Reproducing the ML pipeline
+
+The promoted checkpoint is already production-quality; these commands reproduce it from ACPDS.
+
+```bash
+# 1. Extract perspective-warped patches + validate
+make prepare-stage2 ACPDS_ROOT=/path/to/acpds PREP_STAGE2_ARGS="--run-validation"
+make validate-stage2 ACPDS_ROOT=/path/to/acpds VALIDATE_STAGE2_ARGS="--validation-status passed"
+
+# 2. Train, evaluate, export
+make train-stage2 STAGE2_VARIANT=n
+make evaluate-stage2
+make week6-export          # ONNX FP32 / INT8 + Core ML INT8
+
+# 3. Generate a sample BEV layout, run SIFT localization
+make layout-sample
+make localize-car LOCALIZE_ARGS="--query samples/query.jpg --references samples/localization_refs --output logs/localize_result.json"
+```
+
+Direct CLI equivalents and expected outputs are documented in [`docs/`](docs/) and inline in the `ml/` scripts.
+
+---
+
+## Testing
+
+```bash
+make test                  # backend + edge + ML (pytest)
+cd frontend && npm test    # web + mobile contract tests (Vitest)
+make smoke-test            # end-to-end PRD path, in-process, in-memory DB
+```
+
+---
+
+## Documentation
+
+- [`docs/prd.md`](docs/prd.md) — canonical product requirements (v6)
+- [`docs/prd-diagrams.md`](docs/prd-diagrams.md) — architecture and comparison diagrams
+- [`edge/README.md`](edge/README.md) — edge pipeline
+- [`backend/README.md`](backend/README.md) — full API reference and schema
+- [`frontend/README.md`](frontend/README.md) — web + mobile apps
+- [`outputs/smart-parking-system-report.pdf`](outputs/smart-parking-system-report.pdf) — technical report
+
+---
+
+## Dataset
+
+This project centers on **ACPDS** (Action-Centric Parking Dataset for Occupancy):
+
+- 293 full parking-lot images captured at ~12 m height
+- 11,236 parking-space annotations as quadrilateral polygons
+- unique parking lots across train / val / test splits — true generalization by design
+- ~48% occupied / 52% free — near-balanced
+- MIT licensed
+
+ACPDS is not redistributed in this repository; download it from the [original project](https://github.com/martin-marek/parking-space-occupancy) (paper: [arXiv:2107.12207](https://arxiv.org/abs/2107.12207)).
+
+---
+
+## Publishing policy
+
+To keep the public tree safe to share:
+
+- code, configs, metrics, and reproducible commands stay in the repo;
+- trained weights are **not** committed to git history (publish as release assets after checking redistribution terms);
+- dataset archives, extracted datasets, runtime databases, and generated logs stay out of git.
+
+See [`MODEL_LICENSE.md`](MODEL_LICENSE.md) for model-weight and dataset redistribution guidance.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR:
+
+1. Run `make test` and `cd frontend && npm test` — both should be green.
+2. Run `make lint` (Python) and `npm run lint` (frontend).
+3. Keep changes aligned with [`docs/prd.md`](docs/prd.md); call out any mismatch rather than silently changing scope.
+
+---
+
+## License
+
+The source code in this repository is released for public and educational use. Model weights and datasets carry separate redistribution terms — see [`MODEL_LICENSE.md`](MODEL_LICENSE.md). Add a top-level `LICENSE` file before redistributing.
+
+---
+
+## Acknowledgments
+
+Built by a four-person team: [@thebkht](https://github.com/thebkht), [@OtabekSadriddinov](https://github.com/OtabekSadriddinov), [@abdusattormv](https://github.com/abdusattormv), and [@mirzayv](https://github.com/mirzayv). Dataset by Martin Marek et al. ([ACPDS](https://github.com/martin-marek/parking-space-occupancy)).
