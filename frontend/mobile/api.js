@@ -38,7 +38,14 @@ function logError(error) {
   });
 }
 
+// Optional bearer token — only needed when the backend runs with AUTH_ENABLED.
+export const API_TOKEN = process.env.EXPO_PUBLIC_API_TOKEN ?? null;
+
 api.interceptors.request.use((config) => {
+  if (API_TOKEN) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${API_TOKEN}`;
+  }
   console.log("[api] request", {
     method: config.method?.toUpperCase(),
     url: requestUrl(config),

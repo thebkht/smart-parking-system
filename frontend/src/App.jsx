@@ -1,6 +1,7 @@
 import LeafletMap from "./LeafletMap";
 import { normalizeLayout } from "./layout";
 import { parseStatus, countOccupancy } from "./occupancy";
+import { spotLabel, applyLabelEdit } from "./labels";
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
@@ -178,6 +179,15 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Attach the owner bearer token (when present) so mutating routes work if the
+// backend has AUTH_ENABLED. No-op for the default token-less demo.
+api.interceptors.request.use((config) => {
+  const token =
+    typeof localStorage !== "undefined" ? localStorage.getItem("spp_token") : null;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 // ---------------------------------------------------------------------------
 // StatusDot
 // ---------------------------------------------------------------------------
@@ -207,6 +217,138 @@ function Spinner() {
 }
 
 // ---------------------------------------------------------------------------
+// AuthControls — optional owner sign-in (used when backend AUTH_ENABLED)
+// ---------------------------------------------------------------------------
+function AuthControls() {
+  const [username, setUsername] = useState("");
+  const [token, setToken] = useState(() =>
+    typeof localStorage !== "undefined" ? localStorage.getItem("spp_token") : null,
+  );
+  const [err, setErr] = useState(null);
+
+  const register = async () => {
+    setErr(null);
+    if (!username) return;
+    try {
+      const { data } = await api.post("/auth/register", { username });
+      localStorage.setItem("spp_token", data.token);
+      setToken(data.token);
+    } catch (e) {
+      setErr(
+        e?.response?.status === 409
+          ? "Username taken — reuse your existing token."
+          : "Could not register (is auth enabled on the backend?).",
+      );
+    }
+  };
+
+  const signOut = () => {
+    localStorage.removeItem("spp_token");
+    setToken(null);
+  };
+
+  if (token) {
+    return (
+      <div className="flex items-center gap-2 mb-4 text-sm text-stone-500">
+        <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+        Signed in as owner
+        <button
+          onClick={signOut}
+          className="text-xs px-2 py-0.5 rounded-md border border-stone-200 hover:bg-stone-50 cursor-pointer"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-2">
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Owner username (optional)"
+          className="text-sm border border-stone-300 rounded-md px-2 py-1"
+        />
+        <button
+          onClick={register}
+          className="text-xs px-2.5 py-1 rounded-md border border-stone-300 bg-white hover:bg-stone-50 cursor-pointer"
+        >
+          Get owner token
+        </button>
+      </div>
+      {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SpotLabelsEditor — owner correction step (labels only)
+// ---------------------------------------------------------------------------
+function SpotLabelsEditor({ layout, setLayout }) {
+  const [drafts, setDrafts] = useState(() =>
+    Object.fromEntries(layout.spots.map((s) => [s.spot_id, spotLabel(s)])),
+  );
+  const [savingId, setSavingId] = useState(null);
+  const [savedId, setSavedId] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const save = async (spotId) => {
+    setSavingId(spotId);
+    setSavedId(null);
+    setErr(null);
+    try {
+      await api.patch(`/spots/${spotId}`, { label: drafts[spotId] });
+      setLayout(applyLabelEdit(layout, spotId, drafts[spotId]));
+      setSavedId(spotId);
+    } catch {
+      setErr(`Could not save ${spotId}. Is the backend running?`);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <div className="mt-5 border border-stone-200 rounded-xl p-4">
+      <p className="text-sm font-medium text-stone-800 mb-3">
+        Correct spot labels
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {layout.spots.map((spot) => (
+          <div key={spot.spot_id} className="flex items-center gap-2">
+            <span className="text-xs font-mono text-stone-400 w-16 shrink-0">
+              {spot.spot_id}
+            </span>
+            <input
+              value={drafts[spot.spot_id] ?? ""}
+              onChange={(e) =>
+                setDrafts((d) => ({ ...d, [spot.spot_id]: e.target.value }))
+              }
+              className="flex-1 min-w-0 text-sm border border-stone-300 rounded-md px-2 py-1"
+            />
+            <button
+              onClick={() => save(spot.spot_id)}
+              disabled={savingId === spot.spot_id}
+              className="text-xs px-2.5 py-1 rounded-md border border-stone-300 bg-white
+                         hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-40"
+            >
+              {savedId === spot.spot_id ? "Saved" : "Save"}
+            </button>
+          </div>
+        ))}
+      </div>
+      {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
+    </div>
+  );
+}
+
+SpotLabelsEditor.propTypes = {
+  layout: layoutShape,
+  setLayout: PropTypes.func.isRequired,
+};
+
+// ---------------------------------------------------------------------------
 // OwnerSetup
 // ---------------------------------------------------------------------------
 function OwnerSetup({ layout, setLayout }) {
@@ -225,33 +367,42 @@ function OwnerSetup({ layout, setLayout }) {
   };
 
   const submit = async () => {
-  if (files.length < 4) {
-    setError("Upload at least 4 photos for reliable SfM.");
-    return;
-  }
-  setStep("processing");
-  setError(null);
-
-  const form = new FormData();
-  files.forEach((f) => form.append("images", f));
-
-  try {
-    // POST /layout returns stored map if SfM not wired yet
-    const { data } = await api.post("/layout", form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    setLayout(normalizeLayout(data, { apiBase: API_BASE }));
-  } catch {
-    // Backend has no stored layout — try GET /map as fallback
-    try {
-      const { data } = await api.get("/map");
-      setLayout(normalizeLayout(data, { apiBase: API_BASE }));
-    } catch {
-      setLayout(normalizeLayout(MOCK_LAYOUT));
+    if (files.length < 4) {
+      setError("Upload at least 4 photos for reliable SfM.");
+      return;
     }
-  }
-  setStep("done");
-};
+    setStep("processing");
+    setError(null);
+
+    const form = new FormData();
+    files.forEach((f) => form.append("images", f));
+
+    try {
+      // POST /layout runs SfM server-side and returns the stored layout.
+      const { data } = await api.post("/layout", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setLayout(normalizeLayout(data, { apiBase: API_BASE }));
+      setStep("done");
+    } catch (err) {
+      if (err?.response?.status === 422) {
+        // SfM could not build a usable layout — fall back to manual entry.
+        setError(
+          "SfM could not build a layout from these photos. Submit spot polygons manually (POST /map) or load the sample handoff below.",
+        );
+        setStep("ready");
+        return;
+      }
+      // Backend unreachable / other error — show the last stored layout if any.
+      try {
+        const { data } = await api.get("/map");
+        setLayout(normalizeLayout(data, { apiBase: API_BASE }));
+      } catch {
+        setLayout(normalizeLayout(MOCK_LAYOUT));
+      }
+      setStep("done");
+    }
+  };
 
   const reset = () => {
     setFiles([]);
@@ -262,6 +413,7 @@ function OwnerSetup({ layout, setLayout }) {
 
   return (
     <div className="max-w-2xl mx-auto">
+      <AuthControls />
       <p className="text-base text-stone-500 mb-5 leading-relaxed">
         Upload 4–5 overlapping photos of your parking lot. The SfM pipeline will
         compute a bird&apos;s-eye-view layout and extract spot polygons
@@ -356,6 +508,7 @@ function OwnerSetup({ layout, setLayout }) {
             </span>
           </div>
           <LeafletMap layout={layout} />
+          <SpotLabelsEditor layout={layout} setLayout={setLayout} />
           <div className="flex gap-3 mt-3 items-center">
             <button
               onClick={reset}

@@ -129,8 +129,8 @@ export default function LeafletMap({
         smoothFactor: 1,
       }).addTo(map);
 
-      // Label tooltip (permanent, no interaction)
-      const label = spot.spot_id.replace("spot_", "P");
+      // Label tooltip (permanent, no interaction) — prefer the owner-set label.
+      const label = spot.label ?? spot.spot_id.replace("spot_", "P");
       const tooltip = L.tooltip({
         permanent: true,
         direction: "center",
