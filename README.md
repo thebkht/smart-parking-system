@@ -105,8 +105,8 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 **Two weeks later: final submission**
 
-- [ ] Write Discussion section — cover what worked (n beats larger models, quad warp beats rect crop), limitations (patch quality bottleneck, label ambiguity, localization sample size), and production considerations
-- [ ] Review full report for consistency across all sections before [@mirzayv](https://github.com/mirzayv) compiles
+- [x] Write Discussion section — `\section{Discussion}` in `outputs/smart-parking-system-report.tex` (compiled into `smart-parking-system-report.pdf`, §5) covers what worked (n beats larger models, quad warp beats rect crop), limitations (patch-quality bottleneck, label ambiguity, night-only localization set), and production considerations
+- [x] Review full report for consistency across all sections — report + `docs/final-artifact-summary.md`, `docs/final-runbook.md`, `backend/README.md` aligned on ACPDS v6, canonical `/map`, SfM-backed `/layout`, SIFT-only Find My Car
 - [ ] Present Related Work and Stage 2 model findings in class
 - [x] **Generate confusion matrix figure and PR curve plot as image files** — `ml/make_report_figures.py` (`make figures`) scores the promoted `yolov8n-cls` checkpoint on the ACPDS test split and writes `artifacts/figures/confusion_matrix.png` (TN=877, FP=8, FN=26, TP=579) and `artifacts/figures/pr_curve.png` (AP=0.9945)
 - [x] **Assemble final model comparison table** — merge `n/s/m` test results plus export/backend notes into one report-ready table; keep the conclusion explicit that larger variants did not beat the promoted checkpoint
@@ -146,8 +146,8 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 **Two weeks later: final submission**
 
 - [x] **Fix duplicate `POST /park` handler** — there are two handlers for the same path in `backend/main.py`; the first returns `501` and sits before the real multipart handler, blocking the Find My Car flow end-to-end; remove the stub and confirm the multipart handler is the only route for that path
-- [ ] **Wire real owner setup into `POST /layout`** — PRD says owner setup is `4-5 photos -> SfM -> store map + spot polygons`; current backend only aliases `/layout` to `/map` and stores precomputed layout JSON instead of invoking the SfM flow
-- [ ] **Add owner-setup fallback path** — if SfM fails, support the PRD fallback where the app can continue with manual polygon submission/correction instead of a hard failure
+- [x] **Wire real owner setup into `POST /layout`** — multipart image uploads now run SfM server-side (`ml/sfm_layout.generate_layout`) to build the BEV map + spot polygons and persist the layout
+- [x] **Add owner-setup fallback path** — SfM failure returns `422`; the app falls back to manual polygon submission via `POST /map` (JSON `LayoutPayload`), plus a `PATCH /spots/{id}` label-correction step
 - [x] **Align `edge/stability_test.py` with the live quad-geometry path** — it still uses fixed ROI boxes while the runtime path loads quadrilaterals from `/map`; update the soak test so the 30-minute stability claim matches production behavior
 - [x] **Add backend happy-path tests for PRD endpoints** — cover `/map`, `/sessions`, `/park`, and `/find/{session_id}` in `tests/test_backend.py`, not just invalid-shape `/map` inputs
 - [x] **Fix backend test/runtime dependency for multipart uploads** — `tests/test_backend.py` currently fails at import because `python-multipart` is missing for the `/park` `UploadFile` route; add the dependency and verify backend tests run green
@@ -236,11 +236,11 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 
 The core system exists in the repo, but the PRD is still not fully satisfied. The biggest remaining gaps are integration and product completeness rather than model training.
 
-- **Owner setup is still a prototype path** — the PRD expects `4-5 photos -> SfM -> store map + spot polygons`, but the backend currently accepts precomputed layout JSON rather than running the SfM flow end-to-end — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- **Owner correction/fallback flow is incomplete** — the PRD expects polygon correction plus a fallback when SfM fails; the current app mostly previews the result and does not expose a full correction workflow — owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
+- **Owner setup runs SfM server-side** — `POST /layout` with image uploads invokes `ml/sfm_layout.generate_layout` to build the BEV map + spot polygons and persist the layout, matching the PRD `4-5 photos -> SfM -> store map + spot polygons` flow — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- **Owner correction/fallback flow is in place** — SfM failure returns `422` and the app falls back to manual polygon submission via `POST /map`; the `PATCH /spots/{id}` label-correction step lets owners rename spots after generation — owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
 - **Live map frontend is aligned with the backend contract** — web and mobile clients read `response.spots` and scope counts to the active layout's spot IDs — owner: [@mirzayv](https://github.com/mirzayv)
 - **Find My Car frontend uses the real backend path** — web and mobile clients call `POST /park`, store `session_id`, then call `GET /find/{session_id}` — owner: [@mirzayv](https://github.com/mirzayv)
-- **Reference-photo management is not productized** — localization currently reads from a fixed sample folder instead of a real per-spot reference management flow — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- **Reference-photo management is productized** — `POST /spots/{id}/references` persists per-spot photos under `artifacts/spot_references/`; `POST /park` matches against the managed dir with `samples/localization_refs/` as fallback — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 - **Stability verification does not yet match the live runtime path** — the checked-in stability harness still uses fixed ROI boxes instead of the `/map`-driven quadrilateral geometry contract used by `edge/detect.py` — owner: [@abdusattormv](https://github.com/abdusattormv)
 - **Backend happy-path coverage is in place** — `/map`, `/layout`, `/sessions`, `/park`, and `/find/{session_id}` success cases are covered in `tests/test_backend.py` — owner: [@abdusattormv](https://github.com/abdusattormv)
 - **Backend multipart dependency is declared and verified** — `/park` has `python-multipart` available through `requirements.txt`, and the focused backend/edge tests pass — owner: [@abdusattormv](https://github.com/abdusattormv)
@@ -264,58 +264,13 @@ The core system exists in the repo, but the PRD is still not fully satisfied. Th
 
 **Before final submission**
 
-1. Wire the real owner setup flow into `/layout`, or explicitly narrow the documented scope.
+1. Wire the real owner setup flow into `/layout`. Complete — SfM runs server-side.
    Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-2. Add owner fallback/correction behavior.
+2. Add owner fallback/correction behavior. Complete — `422` → manual `POST /map`; `PATCH /spots/{id}` label correction.
    Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
 3. Keep report-facing docs aligned with the final `/map` + `/layout` compatibility contract if backend behavior changes again.
    Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
-4. Decide SIFT-only vs MobileNetV3 upgrade scope for Find My Car.
-   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
-5. Run the Expo demo on a phone using the Mac LAN IP in `frontend/mobile/api.js`.
-   Owner: [@mirzayv](https://github.com/mirzayv)
-
----
-
-## What’s Left According to the PRD
-
-The core system exists in the repo, but the PRD is still not fully satisfied. The biggest remaining gaps are integration and product completeness rather than model training.
-
-- **Owner setup is still a prototype path** — the PRD expects `4-5 photos -> SfM -> store map + spot polygons`, but the backend currently accepts precomputed layout JSON rather than running the SfM flow end-to-end — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- **Owner correction/fallback flow is incomplete** — the PRD expects polygon correction plus a fallback when SfM fails; the current app mostly previews the result and does not expose a full correction workflow — owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
-- **Live map frontend is not yet aligned with the backend contract** — `/status` returns `{ spots, confidence, timestamp }`, but the frontend still treats the whole response as the occupancy map — owner: [@mirzayv](https://github.com/mirzayv)
-- **Find My Car frontend is not yet using the real backend path** — backend `/park` and `/find/{id}` exist, but the frontend still falls back to generated session IDs and random spot selection — owner: [@mirzayv](https://github.com/mirzayv)
-- **Reference-photo management is not productized** — localization currently reads from a fixed sample folder instead of a real per-spot reference management flow — owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- **Stability verification does not yet match the live runtime path** — the checked-in stability harness still uses fixed ROI boxes instead of the `/map`-driven quadrilateral geometry contract used by `edge/detect.py` — owner: [@abdusattormv](https://github.com/abdusattormv)
-- **Backend happy-path coverage is still missing** — `/map`, `/sessions`, `/park`, and `/find/{session_id}` success cases are not fully tested — owner: [@abdusattormv](https://github.com/abdusattormv)
-- **Backend multipart dependency is still missing** — `/park` needs `python-multipart`, and backend tests do not currently run clean without it — owner: [@abdusattormv](https://github.com/abdusattormv)
-- **Docs are not fully normalized to the final contract** — route naming and architecture notes still disagree in places, especially around `/layout` vs `/map` — owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
-- **React Native/mobile scope is still undecided** — the web app exists, but the PRD still mentions a mobile app that is not clearly either completed or formally dropped — owner: [@mirzayv](https://github.com/mirzayv)
-
-### Short Priority View
-
-**Before the process show**
-
-1. Fix frontend `/status` parsing. Complete.
-   Owner: [@mirzayv](https://github.com/mirzayv)
-2. Replace Find My Car frontend mock fallbacks with the real backend flow. Complete.
-   Owner: [@mirzayv](https://github.com/mirzayv)
-3. Add backend happy-path tests and install `python-multipart`. Complete.
-   Owner: [@abdusattormv](https://github.com/abdusattormv)
-4. Align the stability test with the quadrilateral `/map` path.
-   Owner: [@abdusattormv](https://github.com/abdusattormv)
-5. Decide whether owner setup will be shown as a real integrated flow or as a documented prototype.
-   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht) + [@mirzayv](https://github.com/mirzayv)
-
-**Before final submission**
-
-1. Wire the real owner setup flow into `/layout`, or explicitly narrow the documented scope.
-   Owners: [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-2. Add owner fallback/correction behavior.
-   Owners: [@mirzayv](https://github.com/mirzayv) + [@abdusattormv](https://github.com/abdusattormv)
-3. Keep report-facing docs aligned with the final `/map` + `/layout` compatibility contract if backend behavior changes again.
-   Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
-4. Decide SIFT-only vs MobileNetV3 upgrade scope for Find My Car.
+4. Decide SIFT-only vs MobileNetV3 upgrade scope for Find My Car. Complete — SIFT-only is final scope.
    Owners: [@thebkht](https://github.com/thebkht) + [@abdusattormv](https://github.com/abdusattormv) + [@OtabekSadriddinov](https://github.com/OtabekSadriddinov)
 5. Run the Expo demo on a phone using the Mac LAN IP in `frontend/mobile/api.js`.
    Owner: [@mirzayv](https://github.com/mirzayv)
@@ -333,11 +288,11 @@ The core system exists in the repo, but the PRD is still not fully satisfied. Th
 
 ### 🟡 Should fix for PRD compliance
 
-- [ ] **Wire real owner setup into `POST /layout`** — PRD says owner setup is `4-5 photos -> SfM -> store map + spot polygons`; current backend aliases `/layout` to `/map` and stores precomputed layout JSON instead of invoking the SfM flow — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
-- [ ] **Add owner-setup fallback path** — if SfM fails, support the PRD fallback where the app can continue with manual polygon submission/correction instead of hard-failing the flow — [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
-- [ ] **Owner setup: polygon label-correction step** — PRD owner flow requires editing/relabelling spot polygons after layout generation; `frontend/src/App.jsx:347` only previews the map with no edit workflow — [@mirzayv](https://github.com/mirzayv)
+- [x] **Wire real owner setup into `POST /layout`** — multipart image uploads now invoke SfM server-side (`ml/sfm_layout.generate_layout`) to build the BEV map + spot polygons and persist the layout — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
+- [x] **Add owner-setup fallback path** — SfM failure returns `422`; the app falls back to manual polygon submission via `POST /map`, plus the `PATCH /spots/{id}` label-correction step — [@abdusattormv](https://github.com/abdusattormv) + [@mirzayv](https://github.com/mirzayv)
+- [x] **Owner setup: polygon label-correction step** — `SpotLabelsEditor` in `frontend/src/App.jsx` lets owners rename spots after generation (persisted via `PATCH /spots/{id}`, reflected on the Leaflet map); labels-only by design, geometry stays read-only — [@mirzayv](https://github.com/mirzayv)
 - [x] **Align `edge/stability_test.py` with the live quad-geometry path** — the checked-in stability harness still builds fixed ROI boxes, while the production runtime loads quadrilaterals from `/map`; the soak test should exercise the same geometry contract as `edge/detect.py` — [@abdusattormv](https://github.com/abdusattormv)
-- [ ] **Reference-photo management for Find My Car** — PRD implies per-spot stored references; backend currently reads a fixed local sample folder rather than persisting uploaded references per spot in the DB — [@abdusattormv](https://github.com/abdusattormv)
+- [x] **Reference-photo management for Find My Car** — `POST /spots/{id}/references` persists per-spot photos under `artifacts/spot_references/` (tracked in `spot_reference_images`); `POST /park` matches against the managed dir and falls back to `samples/localization_refs/` only when empty — [@abdusattormv](https://github.com/abdusattormv)
 - [x] **Resolve the `GET /layout` contract explicitly** — `backend/main.py` exposes `GET /layout` as an alias for `GET /map`, and `backend/README.md` documents `/map` as canonical — [@abdusattormv](https://github.com/abdusattormv)
 - [x] **Decide whether Find My Car stays SIFT-only** — decision recorded in `docs/final-artifact-summary.md`: SIFT-only is the final scope (21/21 top-1/top-3 on the labeled night-overhead set, CPU-only, no training); MobileNetV3 stays a documented optional upgrade and is out of scope for this submission — [@abdusattormv](https://github.com/abdusattormv) + [@thebkht](https://github.com/thebkht)
 - [x] **Write frontend README** — `frontend/README.md` is still the default Vite template; add setup instructions, env vars, screen descriptions, and how to connect to the backend — [@mirzayv](https://github.com/mirzayv)
@@ -349,7 +304,7 @@ The core system exists in the repo, but the PRD is still not fully satisfied. Th
 
 - [x] **End-to-end smoke-test script** — `scripts/smoke_test.py` (`make smoke-test`) drives the full PRD path in-process against the real app + real SIFT localizer using an isolated in-memory DB: owner setup (`POST /map`) → map persistence (`GET /map`) → edge update (`POST /update`) → live map (`GET /status`) → park (`POST /park`) → find (`GET /find/{id}`), with a PASS/FAIL line per stage
 - [x] **React Native / Expo wrapper** — native camera/photo-picker access for the Owner Setup, Live Occupancy, and Find My Car demo screens — [@mirzayv](https://github.com/mirzayv)
-- [ ] **Auth and session ownership model** — no auth, multi-user handling, or session ownership is present; acceptable for a class demo but absent from a fuller product interpretation
+- [x] **Auth and session ownership model** — opt-in bearer-token auth (`AUTH_ENABLED=1`): `POST /auth/register` issues tokens, owner-mutating routes require them, and Find My Car sessions are scoped to their owner via a `user_id` on `park_sessions`. Off by default so the class demo runs token-free
 - [x] **Run one full green local verification pass** — `make test` is green (128 backend/edge/ML pytest + 19 frontend Vitest), `backend.main` imports and serves (`/health` via TestClient in the smoke test), and a representative `make edge EDGE_ARGS="--image samples/photo_2026-04-23 21.29.16.jpeg --device cpu"` produces a full 12-spot occupancy JSON payload. Fixed 2 non-hermetic edge tests that read a live backend instead of the config file (`load_*` now accepts `backend_url=None`)
 
 ---
