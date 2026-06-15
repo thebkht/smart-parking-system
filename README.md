@@ -307,7 +307,7 @@ If you use this project, please cite it. Metadata lives in [`CITATION.cff`](CITA
 
 ```bibtex
 @misc{smart_parking_system_2026,
-  author = {Ganijon, Bakhtiyor and Sadriddinov, Otabek and Mamatov, Sattor and Mirzayev, Komronkhon},
+  author = {Ganijon, Bakhtiyor and Sadriddinov, Otabek and Mamatov, Sattor and Mirzaev, Komronkhon},
   title  = {Smart Parking System},
   year   = {2026},
   version = {1.0.0},
