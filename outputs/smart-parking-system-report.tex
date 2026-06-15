@@ -334,10 +334,20 @@ edge device posts occupancy to \texttt{POST /update} and clients read it
 from \texttt{GET /status}; the lot layout is published with
 \texttt{POST /map} (alias \texttt{/layout}) and served from
 \texttt{GET /map}, with \texttt{GET /map/background} returning the
-bird's-eye-view backdrop. The \emph{Find My Car} flow adds
+bird's-eye-view backdrop. Owner setup uploads photos to
+\texttt{POST /layout}, which runs the Structure-from-Motion pass
+\emph{server-side} to build the bird's-eye map and extract spot polygons;
+if it cannot produce a usable layout it returns \texttt{422} and the app
+falls back to manual polygon submission via \texttt{POST /map}. A
+\texttt{PATCH /spots/\{id\}} route lets the owner correct spot labels after
+generation. The \emph{Find My Car} flow adds
 \texttt{POST /park} (upload a driver photo, run localization, store a
 session) and \texttt{GET /find/\{session\_id\}} (return the matched spot
-and its corner coordinates). The same published layout drives the edge
+and its corner coordinates), with per-spot reference photos managed through
+\texttt{POST /spots/\{id\}/references}. Owner-mutating routes can be
+protected by optional bearer-token authentication
+(\texttt{AUTH\_ENABLED}), which also scopes \emph{Find My Car} sessions to
+their owner. The same published layout drives the edge
 runtime, the web map, and the mobile map, so all three stay consistent by
 construction.
 
@@ -754,6 +764,60 @@ lacks a \texttt{ConvInteger} implementation), so the Core ML INT8 export
 \end{table}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Discussion}
+\label{sec:discussion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{What worked}
+
+Two design choices drove the result. First, the smallest classifier won:
+\texttt{yolov8n-cls} reaches $97.72\%$ test accuracy, ahead of
+\texttt{yolov8s} ($96.91\%$) and \texttt{yolov8m} ($97.38\%$)
+(Table~\ref{tab:testcompare}), while being roughly $9\times$ smaller in
+parameters than the ResNet50 paper baseline. Capacity was not the
+constraint, so the $2.83$\,MB nano checkpoint is the one we promoted and
+deployed. Second, quadrilateral perspective-warp pooling beat the simpler
+bounding-square crop by $+1.34$\,pp test accuracy ($97.72\%$ vs.\ $96.38\%$;
+Table~\ref{tab:poolcompare}). Both effects reproduce on the held-out test
+lots, and the pooling gain has a direct physical explanation: the warp
+removes perspective distortion and excludes neighbouring vehicles that a
+loose rectangle would include.
+
+\subsection{Limitations}
+
+The dominant limitation is \emph{patch quality}, not model capacity. The
+test-split confusion matrix (Section~\ref{sec:results}, Table~\ref{tab:cmmetrics})
+shows the residual error is concentrated in $26$ occupied$\rightarrow$free
+misses out of $605$ occupied patches: these are predominantly partially
+visible vehicles and thin border fragments introduced by the warp, exactly
+the cases where larger variants do not help. The validation-to-test drop is
+small ($-0.55$\,pp accuracy for the nano model) and consistent across
+\texttt{n/s/m} (Table~\ref{tab:valtestgap}), which points to distribution
+shift across ACPDS's unique-lot splits rather than overfitting. Robustness
+degrades gracefully with light: accuracy falls monotonically from sunny to
+low-light ($\sim$$2.3$\,pp; Table~\ref{tab:weather}), where the model
+becomes conservative --- recall drops while precision stays high --- rather
+than failing outright. Two scope limits remain. The \emph{Find My Car}
+localization evaluation, while perfect on its set ($21/21$ top-1;
+Section~\ref{sec:fmc-eval}), uses a small, single-condition (night-overhead)
+query set, so the headline number should not be read as all-weather
+accuracy. And label ambiguity in borderline patches caps the achievable
+ceiling for any classifier on this data.
+
+\subsection{Production considerations}
+
+The deployed path has ample operating margin. The Core ML INT8 export runs
+at $858$\,FPS ($1.2$\,ms per patch; Table~\ref{tab:speed}), about
+$300\times$ the $\sim$$0.5$\,Hz reporting cadence, and the edge node sends
+only compact occupancy JSON, a $\sim$$99.9\%$ bandwidth reduction versus
+H.264 video (Section~\ref{sec:backend}). Temporal smoothing absorbs
+per-frame flicker, and a 30-minute soak test on the live quadrilateral path
+completed without crashes. On the product side, \emph{Find My Car} ships
+SIFT-only: it is training-free, CPU-only, and sufficient for the evaluated
+set; MobileNetV3 embeddings remain a documented optional upgrade for
+broader lighting robustness rather than a requirement for this submission.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Application description}
 \label{sec:product}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -766,15 +830,20 @@ ships on both.
 
 \subsection{Owner setup (web)}
 
-The owner uploads reference photos of the lot, an SfM pass computes a
-bird's-eye-view layout and extracts quadrilateral spot polygons, and the
-owner publishes the result via \texttt{POST /map}. This is the one-time
-configuration step that every other screen depends on. The screenshot in
-Figure~\ref{fig:ui-owner} shows the web flow driving a sample placeholder
-layout (\texttt{spot\_source: placeholder\_grid}); the quadrilateral
-extraction itself is demonstrated on real ACPDS imagery in
-Figures~\ref{fig:architecture} and~\ref{fig:detection}, and a clean
-end-to-end SfM bird's-eye reconstruction remains future work
+The owner uploads photos of the lot to \texttt{POST /layout}; the backend
+runs the SfM pass server-side to compute a bird's-eye-view layout and
+extract quadrilateral spot polygons, persists it, and returns it for
+preview. If SfM cannot build a usable layout the route returns
+\texttt{422} and the app falls back to manual polygon submission. The owner
+can then correct each spot's label inline (persisted via
+\texttt{PATCH /spots/\{id\}}) before the layout drives every other screen.
+This is the one-time configuration step that every other screen depends on.
+The screenshot in Figure~\ref{fig:ui-owner} shows the web flow driving a
+sample placeholder layout (\texttt{spot\_source: placeholder\_grid}); the
+quadrilateral extraction itself is demonstrated on real ACPDS imagery in
+Figures~\ref{fig:architecture} and~\ref{fig:detection}. The current SfM
+stage uses ORB feature matching with homography blending; a
+higher-fidelity bird's-eye reconstruction remains future work
 (Section~\ref{sec:conclusion}).
 
 \begin{figure}[tbp]
@@ -820,7 +889,9 @@ mirror the web client of Figure~\ref{fig:ui-web-map} against the same
 \subsection{Find My Car (mobile)}
 
 On arrival the driver taps \emph{Park Here}; the app uploads a photo to
-\texttt{POST /park}, which localizes it and returns a \texttt{session\_id}.
+\texttt{POST /park}, which localizes it against the per-spot reference
+photos (managed through \texttt{POST /spots/\{id\}/references}, with the
+bundled sample set as fallback) and returns a \texttt{session\_id}.
 Later the driver taps \emph{Find My Car}; the app calls
 \texttt{GET /find/\{session\_id\}} and highlights the matched spot in amber
 on the map.
@@ -871,19 +942,20 @@ runs at 155--858\,FPS across PyTorch, ONNX, and Core ML INT8 backends,
 hundreds of times faster than the reporting cadence requires.
 
 The full product path is validated automatically: an in-process smoke test
-drives owner setup, map persistence, edge update, live status, and the
-park/find round-trip against the real localizer, and the clients carry
-contract tests for the layout, occupancy-counting, and park/find response
+drives owner setup, map persistence, edge update, live status, the
+park/find round-trip against the real localizer, owner label correction,
+and per-spot reference management, and the clients carry contract tests for
+the layout, occupancy-counting, label-correction, and park/find response
 shapes.
 
 Future work is narrow. Low-light recall is the weakest metric (93.5\,\%),
-and luminance-aware augmentation is the natural remedy. The owner-setup
-flow currently stores a precomputed layout rather than running
-Structure-from-Motion on uploaded photos end-to-end; wiring that, with a
-manual-correction fallback, would complete the configuration story. A
-longer soak test and backend-side filtering of status payloads against the
-published layout (the hardening from Section~\ref{sec:casestudy}) round out
-the remaining engineering work.
+and luminance-aware augmentation is the natural remedy. Owner setup now runs
+Structure-from-Motion on the uploaded photos server-side with a
+manual-correction fallback; the remaining gap is reconstruction fidelity,
+as the current ORB-based bird's-eye stage is coarse and a metric SfM or
+learned homography would sharpen it. A longer soak test and backend-side
+filtering of status payloads against the published layout (the hardening
+from Section~\ref{sec:casestudy}) round out the remaining engineering work.
 
 \newpage
 {\small
