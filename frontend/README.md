@@ -1,6 +1,6 @@
-# SmartParking — Frontend
+# Smart Parking System — Frontend
 
-Web app (Vite + React) and mobile app (Expo + React Native) for the SmartParking v6 system.
+Web app (Vite + React) and mobile app (Expo + React Native) for the Smart Parking System.
 
 **Platform split (final):**
 - **Web** — Owner Setup + Live Occupancy Map

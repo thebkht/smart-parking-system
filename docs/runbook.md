@@ -113,4 +113,4 @@ make finalize
 This generates:
 
 - `artifacts/final_manifest.json`
-- `docs/final-artifact-summary.md`
+- `artifacts/final-artifact-summary.md`

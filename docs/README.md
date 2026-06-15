@@ -1,16 +1,19 @@
 # Docs
 
-Use [docs/prd.md](prd.md) as the canonical project definition.
+Start with [architecture.md](architecture.md) — the canonical architecture
+reference for the project.
 
 Supporting docs:
 
-- [docs/week4-demo.md](week4-demo.md) for the current static-image demo flow
-- [docs/week4-ml-notes.md](week4-ml-notes.md) for Stage 2 ML prep and the single-model comparison baseline
-- [docs/final-runbook.md](final-runbook.md) for the final trained-detector workflow and submission artifact generation
-- [docs/prd-diagrams.md](prd-diagrams.md) for Mermaid architecture diagrams derived from the PRD
-- [edge/README.md](../edge/README.md) for the edge runtime contract
-- [backend/README.md](../backend/README.md) for backend payload persistence
+- [architecture.md](architecture.md) — canonical pipeline, components, and payload contract
+- [prd-diagrams.md](prd-diagrams.md) — Mermaid architecture and approach-evolution diagrams
+- [environment-setup.md](environment-setup.md) — shared `.venv` setup
+- [runbook.md](runbook.md) — trained-detector workflow and end-to-end run
+- [edge_benchmarks.md](edge_benchmarks.md) — edge inference benchmark results
+- [../edge/README.md](../edge/README.md) — edge runtime contract
+- [../backend/README.md](../backend/README.md) — backend API and payload persistence
+- [../ml/README.md](../ml/README.md) — ML pipeline (extract → train → evaluate → export)
 
-Everything in this folder should describe the same canonical v6 architecture:
+Everything in this folder describes the same canonical architecture:
 
 `parking-space quadrilateral pooling -> per-space warp -> YOLOv8-cls -> temporal smoothing -> JSON -> FastAPI`

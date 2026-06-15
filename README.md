@@ -4,7 +4,7 @@
 
 Smart Parking System detects whether each parking space is **occupied** or **free** from a single overhead camera, entirely on the edge device. Instead of streaming raw video, the edge node sends a few hundred bytes of JSON to the backend — a ~99.9% bandwidth reduction versus H.264 video. The promoted classifier (`YOLOv8n-cls`, 2.83 MB) reaches **97.72% accuracy** on the held-out, unseen-lot ACPDS test split while being ~9× smaller than the dataset paper's ResNet50 baseline.
 
-The canonical project definition lives in [`docs/prd.md`](docs/prd.md).
+The canonical architecture reference lives in [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -64,7 +64,7 @@ Stage 2 classifier on the ACPDS splits. `yolov8n_stage2` is the promoted checkpo
 | yolov8s_stage2 | Test     | 0.9691     | 0.9745    | 0.9488 | 0.9615 | 9.78      |
 | yolov8m_stage2 | Test     | 0.9738     | 0.9846    | 0.9504 | 0.9672 | 30.22     |
 
-Larger variants did not improve test accuracy — the bottleneck is patch quality (partial vehicles, border artifacts after warp, label ambiguity), not model capacity. Quadrilateral warp pooling beats a bounding-square crop by +1.34 pp test accuracy. Inference runs at 155–858 FPS across PyTorch / ONNX / Core ML INT8 backends. The full analysis is in the [technical report](outputs/smart-parking-system-report.pdf).
+Larger variants did not improve test accuracy — the bottleneck is patch quality (partial vehicles, border artifacts after warp, label ambiguity), not model capacity. Quadrilateral warp pooling beats a bounding-square crop by +1.34 pp test accuracy. Inference runs at 155–858 FPS across PyTorch / ONNX / Core ML INT8 backends. See [`docs/edge_benchmarks.md`](docs/edge_benchmarks.md) for the full benchmark breakdown.
 
 ---
 
@@ -84,9 +84,9 @@ edge/        Edge inference pipeline (detect.py) and soak tests
 backend/     FastAPI app, SQLite schema, API (see backend/README.md)
 frontend/    React web app (src/) and React Native mobile app (mobile/)
 ml/          Training, evaluation, export, SfM layout, localization scripts
-docs/        Canonical PRD, diagrams, runbooks
+docs/        Architecture, diagrams, runbooks
 samples/     Sample images and localization references
-outputs/     Technical report (LaTeX source + PDF) and figures
+outputs/     UI screenshots used in docs
 tests/       Backend, edge, and ML tests
 scripts/     End-to-end smoke test
 ```
@@ -121,6 +121,22 @@ Verify the environment:
 ```bash
 python -c "import cv2, ultralytics, yaml; print('env ok')"
 ```
+
+### Model weights
+
+Trained weights are **not** committed to git — they are published as
+[GitHub Release](https://github.com/thebkht/smart-parking-system/releases)
+assets. Fetch the promoted Stage 2 classifier into `acpds_cls/weights/`:
+
+```bash
+make fetch-weights
+# or pick a release tag / extra assets:
+RELEASE_TAG=v1.0.0 ASSETS="best.pt best.onnx best_int8.onnx" bash scripts/fetch_weights.sh
+```
+
+The edge runtime and `ml/` scripts default to `acpds_cls/weights/best.pt`
+(`STAGE2_WEIGHTS` in the `Makefile`). See [`MODEL_LICENSE.md`](MODEL_LICENSE.md)
+for redistribution terms.
 
 ---
 
@@ -232,12 +248,12 @@ make smoke-test            # end-to-end PRD path, in-process, in-memory DB
 
 ## Documentation
 
-- [`docs/prd.md`](docs/prd.md) — canonical product requirements (v6)
+- [`docs/architecture.md`](docs/architecture.md) — canonical architecture reference
 - [`docs/prd-diagrams.md`](docs/prd-diagrams.md) — architecture and comparison diagrams
 - [`edge/README.md`](edge/README.md) — edge pipeline
 - [`backend/README.md`](backend/README.md) — full API reference and schema
 - [`frontend/README.md`](frontend/README.md) — web + mobile apps
-- [`outputs/smart-parking-system-report.pdf`](outputs/smart-parking-system-report.pdf) — technical report
+- [`ml/README.md`](ml/README.md) — ML pipeline (extract → train → evaluate → export)
 
 ---
 
@@ -273,13 +289,15 @@ Issues and pull requests are welcome. Before opening a PR:
 
 1. Run `make test` and `cd frontend && npm test` — both should be green.
 2. Run `make lint` (Python) and `npm run lint` (frontend).
-3. Keep changes aligned with [`docs/prd.md`](docs/prd.md); call out any mismatch rather than silently changing scope.
+3. Keep changes aligned with [`docs/architecture.md`](docs/architecture.md); call out any mismatch rather than silently changing scope.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contributor guide.
 
 ---
 
 ## License
 
-The source code in this repository is released for public and educational use. Model weights and datasets carry separate redistribution terms — see [`MODEL_LICENSE.md`](MODEL_LICENSE.md). Add a top-level `LICENSE` file before redistributing.
+The source code in this repository is released under the MIT License — see [`LICENSE.md`](LICENSE.md). Model weights and datasets carry separate redistribution terms — see [`MODEL_LICENSE.md`](MODEL_LICENSE.md).
 
 ---
 

@@ -1,10 +1,10 @@
-# PRD Diagrams
+# Architecture Diagrams
 
-These diagrams are derived from the canonical PRD in [docs/prd.md](prd.md).
+These diagrams accompany the canonical [architecture.md](architecture.md).
 
 ## YOLO Two-Stage Spot Classification
 
-This diagram mirrors the style of the reference image, but matches the actual PRD architecture: quadrilateral pooling followed by per-patch `YOLOv8-cls` inference.
+This diagram shows the architecture: quadrilateral pooling followed by per-patch `YOLOv8-cls` inference.
 
 ```mermaid
 flowchart LR
@@ -51,7 +51,7 @@ flowchart LR
 
 ## Product System Overview
 
-This diagram summarizes the three PRD flows: owner setup, edge inference, and driver-facing `Find My Car`.
+This diagram summarizes the three product flows: owner setup, edge inference, and driver-facing `Find My Car`.
 
 ```mermaid
 flowchart LR
@@ -98,13 +98,13 @@ flowchart LR
     class DB,M shared;
 ```
 
-## v3 vs v6 Comparison
+## Earlier vs Current Approach
 
-This side-by-side diagram shows how the project definition moved from the earlier static-camera, ROI-based flow to the current ACPDS-driven quadrilateral pooling and app-integrated system.
+This side-by-side diagram shows how the project moved from an earlier static-camera, ROI-based flow to the current ACPDS-driven quadrilateral pooling and app-integrated system.
 
 ```mermaid
 flowchart TB
-    subgraph V3["v3 Architecture"]
+    subgraph V3["Earlier — fixed ROIs"]
         V3I["Static Camera Frame"] --> V3R["Fixed ROI Boxes<br/>config.yaml"]
         V3R --> V3C["Rectangular Crop per Spot"]
         V3C --> V3M["YOLOv8-cls"]
@@ -116,7 +116,7 @@ flowchart TB
         V3N5["Dataset story"] --> V3N6["PKLot / CNRPark / static demo baseline"]
     end
 
-    subgraph V6["v6 Architecture"]
+    subgraph V6["Current — quadrilateral pooling"]
         V6I["Parking Lot Image / Live Frame"] --> V6R["ACPDS or SfM Spot Quadrilaterals"]
         V6R --> V6W["order_corners() + warpPerspective<br/>128 x 128 patch per spot"]
         V6W --> V6M["YOLOv8n-cls / s-cls / m-cls"]
@@ -143,10 +143,10 @@ flowchart TB
 
 ## Key Differences
 
-- `v3` uses fixed ROI boxes and rectangular crops for a mostly static-camera occupancy pipeline.
-- `v6` uses ACPDS-style quadrilateral pooling with `order_corners()` and `warpPerspective` before `YOLOv8-cls`.
-- `v3` is mainly an edge inference story; `v6` expands the product to owner setup, app delivery, and `Find My Car`.
-- `v6` also changes the evaluation story to ACPDS unseen-lot generalization rather than a static demo-first framing.
+- The earlier approach used fixed ROI boxes and rectangular crops for a mostly static-camera occupancy pipeline.
+- The current approach uses ACPDS-style quadrilateral pooling with `order_corners()` and `warpPerspective` before `YOLOv8-cls`.
+- The earlier approach was mainly an edge inference story; the current one expands the product to owner setup, app delivery, and `Find My Car`.
+- Evaluation now centers on ACPDS unseen-lot generalization rather than a static demo-first framing.
 
 ## Optional Slide Caption
 

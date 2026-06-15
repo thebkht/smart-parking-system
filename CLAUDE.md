@@ -4,9 +4,9 @@ This file provides repository-specific guidance for coding agents working in thi
 
 ## Canonical Source
 
-Use [docs/prd.md](docs/prd.md) as the canonical project definition.
+Use [docs/architecture.md](docs/architecture.md) as the canonical architecture reference.
 
-Current product direction is `v6`, not the older `v3` summary:
+Current direction:
 
 - primary dataset: `ACPDS`
 - Stage 1 extraction path: quadrilateral parking-space polygons
@@ -14,7 +14,7 @@ Current product direction is `v6`, not the older `v3` summary:
 - pooling method: `order_corners()` + `getPerspectiveTransform()` + `warpPerspective()`
 - product scope: edge occupancy detection + backend + app + `Find My Car`
 
-If another doc conflicts with `docs/prd.md`, treat the PRD as authoritative.
+If another doc conflicts with `docs/architecture.md`, treat it as authoritative.
 
 ## Current Repo Reality
 
@@ -29,10 +29,10 @@ Both `edge/README.md` and `backend/README.md` are current (v6). The edge README 
 
 When editing code or docs:
 
-- prefer the current PRD direction over older ROI-first descriptions
+- prefer the current quadrilateral-pooling direction over older ROI-first descriptions
 - do not assume fixed ROIs are the long-term architecture just because older docs mention them
 - preserve backward-compatible runtime behavior unless the task explicitly changes it
-- call out mismatches between implementation and PRD instead of silently rewriting scope
+- call out mismatches between implementation and the architecture doc instead of silently rewriting scope
 
 ## Project Overview
 
@@ -44,7 +44,7 @@ Smart Parking System is an edge-based parking occupancy project built around a t
 4. temporally smooth status outputs
 5. send compact JSON to the backend instead of raw video
 
-The broader v6 product also includes:
+The broader product also includes:
 
 - owner setup flow for lot layout creation
 - backend persistence and map/status APIs
@@ -115,10 +115,10 @@ Key files:
 
 - [edge/detect.py](edge/detect.py): edge inference pipeline
 - [backend/main.py](backend/main.py): FastAPI backend
-- [docs/prd.md](docs/prd.md): canonical requirements
+- [docs/architecture.md](docs/architecture.md): canonical architecture reference
 - [docs/prd-diagrams.md](docs/prd-diagrams.md): architecture diagrams
 
-Preferred v6 architecture story:
+Preferred architecture story:
 
 `parking-space quadrilaterals -> perspective warp -> YOLOv8-cls -> temporal smoothing -> JSON -> FastAPI`
 
