@@ -13,6 +13,9 @@
 \usepackage{float}
 \usepackage{caption}
 \usepackage{subcaption}
+% Distinguish captions from body text: smaller font with a bold "Figure N:" label.
+\captionsetup{font=small,labelfont=bf,skip=5pt}
+\captionsetup[sub]{font=small,labelfont=bf}
 \usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
 \iccvfinalcopy
 
@@ -59,6 +62,18 @@
 \setcounter{totalnumber}{5}
 \setcounter{dbltopnumber}{3}
 
+% Pack figures at the top of float-only pages instead of vertically
+% justifying them (which inserts large gaps between stacked figures). All
+% slack goes to the bottom; figures keep a fixed separation.
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{12pt plus 0fil}
+\setlength{\@fpbot}{0pt plus 1fil}
+\setlength{\@dblfptop}{0pt}
+\setlength{\@dblfpsep}{12pt plus 0fil}
+\setlength{\@dblfpbot}{0pt plus 1fil}
+\makeatother
+
 \begin{document}
 
 \title{\vspace{-2ex}Smart Parking System --- Final Technical Report\\
@@ -79,6 +94,11 @@ and a Find My Car Application}
 }
 
 \maketitle
+
+% Let columns end naturally instead of stretching inter-paragraph and
+% section glue to justify the page bottom (which opens large vertical gaps
+% on pages that carry a top figure).
+\raggedbottom
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Summary
@@ -191,9 +211,9 @@ patch as occupied or free; the per-spot results are temporally smoothed,
 serialized to JSON, and posted to a FastAPI backend that serves the web
 and mobile clients. The rest of this section describes each stage in turn.
 
-\begin{figure*}[tp]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/architecture.pdf}
+\includegraphics[width=0.95\linewidth]{figures/architecture.pdf}
 \caption{End-to-end system architecture. A lot frame with quadrilateral
 spot annotations is pooled into perspective-corrected $128\times128$
 patches, classified by YOLOv8n-cls, temporally smoothed, and reported as
@@ -213,7 +233,7 @@ crops --- they enable a geometrically correct patch extraction. The ACPDS
 paper compares the two extraction methods, reproduced in
 Figure~\ref{fig:pooling}.
 
-\begin{figure*}[tp]
+\begin{figure*}[t]
 \centering
 \includegraphics[width=0.92\linewidth]{figures/pooling.pdf}
 \caption{Quadrilateral vs.\ square pooling of parking spaces (reproduced
@@ -693,7 +713,7 @@ perspective-corrected input is more valuable to it.
 per-spot reference images, with FLANN matching and RANSAC homography
 verification; the spot with the highest inlier count is the top-1
 prediction and the inlier count is the confidence. It runs on CPU only and
-needs no training. SIFT-only is the final scope for this submission: it
+needs no training. SIFT-only is the final scope of this work: it
 meets the targets without training, so the MobileNetV3 embedding path
 (documented as an optional future upgrade for day/night robustness) is
 intentionally out of scope.
@@ -815,7 +835,7 @@ per-frame flicker, and a 30-minute soak test on the live quadrilateral path
 completed without crashes. On the product side, \emph{Find My Car} ships
 SIFT-only: it is training-free, CPU-only, and sufficient for the evaluated
 set; MobileNetV3 embeddings remain a documented optional upgrade for
-broader lighting robustness rather than a requirement for this submission.
+broader lighting robustness rather than a requirement of this work.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Application description}
@@ -878,7 +898,7 @@ control, and a live connection indicator.}
 
 \begin{figure}[tbp]
 \centering
-\fbox{\includegraphics[width=0.50\linewidth]{figures/ui_mobile_map.png}}
+\fbox{\includegraphics[width=0.65\linewidth]{figures/ui_mobile_map.png}}
 \caption{Mobile live occupancy map (SVG polygons with pinch-to-zoom and
 pan). The 4 / 8 / 12 free / occupied / total summary and per-spot colors
 mirror the web client of Figure~\ref{fig:ui-web-map} against the same
@@ -898,7 +918,7 @@ on the map.
 
 \begin{figure}[tbp]
 \centering
-\fbox{\includegraphics[width=0.50\linewidth]{figures/ui_find_my_car.png}}
+\fbox{\includegraphics[width=0.65\linewidth]{figures/ui_find_my_car.png}}
 \caption{Find My Car (mobile): the driver's overhead photo is matched by
 SIFT feature matching to the published layout (here \texttt{spot\_2},
 similarity score 7.056), and the localized spot is highlighted in amber on
@@ -957,7 +977,6 @@ learned homography would sharpen it. A longer soak test and backend-side
 filtering of status payloads against the published layout (the hardening
 from Section~\ref{sec:casestudy}) round out the remaining engineering work.
 
-\newpage
 {\small
 \bibliographystyle{ieee_fullname}
 \bibliography{references}
