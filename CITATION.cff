@@ -8,9 +8,7 @@ abstract: >-
   photo-based Find My Car feature.
 type: software
 authors:
-  - given-names: Bakhtiyor
-    family-names: Ganijon
-    alias: thebkht
+  - name: "Bakhtiyor Ganijon"
   - given-names: Otabek
     family-names: Sadriddinov
     alias: OtabekSadriddinov

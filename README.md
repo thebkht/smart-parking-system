@@ -306,14 +306,12 @@ The source code in this repository is released under the MIT License — see [`L
 If you use this project, please cite it. Metadata lives in [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository" generates APA/BibTeX from it), or use:
 
 ```bibtex
-@software{Ganijon_Smart_Parking_System_2026,
-author = {Ganijon, Bakhtiyor and Sadriddinov, Otabek and Mamatov, Sattor and Mirzayev, Komronkhon},
-license = {MIT},
-month = jun,
-title = {{Smart Parking System}},
-url = {https://github.com/thebkht/smart-parking-system},
-version = {1.0.0},
-year = {2026}
+@misc{smart_parking_system_2026,
+  author = {Ganijon, Bakhtiyor and Sadriddinov, Otabek and Mamatov, Sattor and Mirzayev, Komronkhon},
+  title  = {Smart Parking System},
+  year   = {2026},
+  version = {1.0.0},
+  url    = {https://github.com/thebkht/smart-parking-system}
 }
 ```
 
