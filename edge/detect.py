@@ -766,7 +766,7 @@ def clip_box(
 
 
 def roi_bounds(
-    rois: Dict[str, Tuple[int, int, int, int]]
+    rois: Dict[str, Tuple[int, int, int, int]],
 ) -> Optional[Tuple[int, int, int, int]]:
     if not rois:
         return None
@@ -815,7 +815,7 @@ def _box_center(box: Tuple[int, int, int, int]) -> Tuple[float, float]:
 
 
 def _merge_boxes(
-    boxes: Iterable[Tuple[int, int, int, int]]
+    boxes: Iterable[Tuple[int, int, int, int]],
 ) -> Tuple[int, int, int, int]:
     box_list = list(boxes)
     return (

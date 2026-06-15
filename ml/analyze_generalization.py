@@ -114,7 +114,7 @@ def predict_patch_entries(
 
 
 def group_test_entries_by_image(
-    patch_index: list[dict[str, Any]]
+    patch_index: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in patch_index:

@@ -25,6 +25,8 @@ Pillow>=12.2.0,<13.0
 
 # Test and formatting tools
 pytest>=9.0.3,<10.0
-black>=26.5.1,<27.0
+# Pinned exactly: formatting must be reproducible across local + CI, and 25.11.0
+# is the last black that still supports Python 3.9 (26.x requires >=3.10).
+black==25.11.0
 ruff>=0.15.15,<1.0
 httpx>=0.28.1,<1.0

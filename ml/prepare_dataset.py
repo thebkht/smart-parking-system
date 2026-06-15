@@ -626,7 +626,7 @@ def _detection_audit(records: list[dict[str, object]]) -> dict[str, object]:
 
 
 def _split_scene_summary(
-    records_by_split: dict[str, list[dict[str, object]]]
+    records_by_split: dict[str, list[dict[str, object]]],
 ) -> dict[str, dict[str, object]]:
     summary: dict[str, dict[str, object]] = {}
     for split, records in records_by_split.items():
