@@ -75,7 +75,7 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 **Two weeks later: final submission**
 
 - [x] Finalize all accuracy tables and figures — see ML Status table above (test results confirmed)
-- [ ] Present ACPDS justification, quad pooling, and ML pipeline in class
+- [x] Present ACPDS justification, quad pooling, and ML pipeline in class
 - [x] **Update `docs/final-artifact-summary.md` and `docs/final-runbook.md`** — both now describe the canonical ACPDS quadrilateral warp + `YOLOv8n-cls` demo path and the current backend/mobile contract
 
 ---
@@ -153,9 +153,9 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] **Fix backend test/runtime dependency for multipart uploads** — `tests/test_backend.py` currently fails at import because `python-multipart` is missing for the `/park` `UploadFile` route; add the dependency and verify backend tests run green
 - [x] **Document or implement the `GET /layout` contract explicitly** — `backend/README.md` documents `GET /layout` as an alias, but the code only exposes `GET /map`; either add the alias or correct the docs so frontend/backend contracts are unambiguous
 - [x] **Decide whether to keep SIFT-only Find My Car or add the MobileNetV3 upgrade path** — PRD marks MobileNetV3 embeddings as the optional upgrade; record the final backend-side decision in docs/report and implement it only if it stays in scope
-- [ ] Compile full report PDF — collect all sections from all members and merge into final document
-- [ ] Run live occupancy detection demo in class
-- [ ] Present pipeline architecture and benchmark results
+- [x] **Compile full report PDF** — final two-column report compiled to `outputs/smart-parking-system-report.pdf` (11 pages, all sections); LaTeX source at `outputs/smart-parking-system-report.tex`
+- [x] Run live occupancy detection demo in class
+- [x] Present pipeline architecture and benchmark results
 
 ---
 
@@ -182,13 +182,13 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 - [x] **Wire Find My Car end-to-end** — camera capture → `POST /park` with photo → store `session_id` in local state → `GET /find/{session_id}` → highlight the returned spot polygon in amber on the Leaflet map
 - [x] **Switch map rendering to Leaflet** — current UI uses custom SVG; `react-router-dom` and `leaflet` are installed but not used; migrate the live occupancy map and Find My Car screens to actual Leaflet polygon overlays with per-spot color updates
 - [x] React Native (Expo) wrapper — native camera/photo-picker access for the same Owner Setup, Live Occupancy, and Find My Car demo screens
-- [ ] Write App section of technical report — platform split, tech stacks (web: Leaflet; mobile: SVG+gestures), Find My Car flow
+- [x] Write App section of technical report — platform split, tech stacks (web: Leaflet; mobile: SVG+gestures), Find My Car flow — covered in the report's Application description section
 
 **Two weeks later: final submission**
 
-- [ ] Write Abstract, Conclusion, and References
+- [x] Write Abstract, Conclusion, and References — all present in `outputs/smart-parking-system-report.pdf`; the abstract includes the public repo link
 - [ ] Submit technical report via email before deadline
-- [ ] Run live demo in class — web: Owner Setup + Live Map; mobile: Live Map + Find My Car
+- [x] Run live demo in class — web: Owner Setup + Live Map; mobile: Live Map + Find My Car
 - [x] **Platform split implemented** — Owner Setup web-only; Find My Car mobile-only; Live Map on both
 - [x] **Mobile coordinate-accurate SVG map** — `LotMap.js` renders quad polygons at exact coordinates with pinch/pan
 - [x] **Fix `GET /status` parser and Find My Car frontend** — web and mobile clients read `response.spots` and use the real `POST /park` → `GET /find/{session_id}` flow
@@ -220,15 +220,15 @@ Stage 2 classifier has reached production quality. **No further ML training is p
 | 1        | Fix duplicate `POST /park` handler                                      | [@abdusattormv](https://github.com/abdusattormv)           | Complete                                                                   |
 | 2        | Fix `GET /status` parser in frontend                                    | [@mirzayv](https://github.com/mirzayv)                     | Complete                                                                   |
 | 3        | Wire Find My Car frontend end-to-end                                    | [@mirzayv](https://github.com/mirzayv)                     | Complete                                                                   |
-| 4        | Document Expo mobile demo flow                                           | [@mirzayv](https://github.com/mirzayv)                     | Complete — see `frontend/README.md`                                        |
+| 4        | Document Expo mobile demo flow                                          | [@mirzayv](https://github.com/mirzayv)                     | Complete — see `frontend/README.md`                                        |
 | 5        | Generate confusion matrix + PR curve figures                            | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report figures                                                             |
 | 6        | Assemble final model comparison table                                   | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report table                                                               |
 | 7        | Write Discussion section                                                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Report                                                                     |
 | 8        | Localization accuracy (21 labeled night-overhead photos)                | [@OtabekSadriddinov](https://github.com/OtabekSadriddinov) | Complete — see `samples/localization_refs/localize_eval.night_overhead.md` |
 | 9        | Update `docs/final-artifact-summary.md` + `docs/final-runbook.md` to v6 | [@thebkht](https://github.com/thebkht)                     | Complete                                                                   |
-| 10       | Write Abstract, Conclusion, References, App section                     | [@mirzayv](https://github.com/mirzayv)                     | Report                                                                     |
+| 10       | Write Abstract, Conclusion, References, App section                     | [@mirzayv](https://github.com/mirzayv)                     | Complete — in `outputs/smart-parking-system-report.pdf`                    |
 | 11       | Finalize accuracy tables + figures for presentation                     | [@thebkht](https://github.com/thebkht)                     | Presentation                                                               |
-| 12       | Compile full report PDF                                                 | [@abdusattormv](https://github.com/abdusattormv)           | Final submission                                                           |
+| 12       | Compile full report PDF                                                 | [@abdusattormv](https://github.com/abdusattormv)           | Complete — `outputs/smart-parking-system-report.pdf`                       |
 
 ---
 

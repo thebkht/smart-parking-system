@@ -103,7 +103,8 @@ a photo-based \emph{Find My Car} feature (SIFT localization, 21/21 top-1
 on the labelled query set). Stage 2 runs at 155--858\,FPS across
 PyTorch, ONNX, and Core ML INT8 backends. The system began as a fixed-ROI
 pipeline that reached 90.9\,\% accuracy; the quadrilateral redesign
-documented here is what lifted it to the academic baseline.
+documented here is what lifted it to the academic baseline. Code is
+available at \url{https://github.com/thebkht/smart-parking-system}.
 \end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -244,13 +245,14 @@ parameters it has roughly $9\times$ fewer weights than the dataset paper's
 ResNet50 (25.6\,M) while taking the identical pooled input, which makes the
 accuracy comparison fair.
 
-\begin{table*}[tp]
+\begin{table}[t]
 \centering\small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrrl}
 \toprule
 \textbf{Variant} & \textbf{Params} & \textbf{Size} & \textbf{Role} \\
 \midrule
-YOLOv8n-cls & 2.7\,M & 2.83\,MB & Primary --- edge deployment \\
+YOLOv8n-cls & 2.7\,M & 2.83\,MB & Primary (edge) \\
 YOLOv8s-cls & 6.4\,M & 9.78\,MB & Comparison \\
 YOLOv8m-cls & 17\,M & 30.22\,MB & Comparison \\
 \bottomrule
@@ -258,7 +260,7 @@ YOLOv8m-cls & 17\,M & 30.22\,MB & Comparison \\
 \caption{Stage 2 classifier variants. All use a $128\times128$
 quadrilateral-pooled input and a binary occupied/free head.}
 \label{tab:variants}
-\end{table*}
+\end{table}
 
 All variants were trained from scratch on quadrilateral-warped ACPDS
 patches with the configuration in Table~\ref{tab:trainconfig}; the
@@ -370,6 +372,20 @@ Table~\ref{tab:results} compares the earlier fixed-ROI baseline with the
 retrained quadrilateral-warp classifiers on the validation lots, including
 a controlled square-crop ablation of the nano variant.
 
+Three findings stand out. First, the accuracy jump from the earlier
+deployment (90.9\,\%) to the current pipeline (98.3\,\%) comes
+overwhelmingly from the input representation, not from model capacity:
+after the warp normalizes perspective and removes neighboring-spot
+pixels, the \emph{smallest} variant wins, and the larger m-variant trails
+it. Second, the square-crop ablation isolates the pooling effect directly:
+98.27\,\% vs.\ 96.59\,\% is a 1.7-point gap on identical data and
+architecture (the square run also converged more slowly and stopped early,
+so this is a lower bound at this budget). Third, training is stable ---
+Figure~\ref{fig:curves} shows smooth loss decay with the accuracy plateau
+reached within roughly 20 epochs, and Figure~\ref{fig:smcurves} shows the
+same for the larger variants --- and the confusion matrix in
+Figure~\ref{fig:qualitative} shows balanced class performance.
+
 \begin{table*}[tp]
 \centering
 \begin{tabular}{llrr}
@@ -396,20 +412,6 @@ like-for-like comparison.}
 \label{tab:results}
 \end{table*}
 
-Three findings stand out. First, the accuracy jump from the earlier
-deployment (90.9\,\%) to the current pipeline (98.3\,\%) comes
-overwhelmingly from the input representation, not from model capacity:
-after the warp normalizes perspective and removes neighboring-spot
-pixels, the \emph{smallest} variant wins, and the larger m-variant trails
-it. Second, the square-crop ablation isolates the pooling effect directly:
-98.27\,\% vs.\ 96.59\,\% is a 1.7-point gap on identical data and
-architecture (the square run also converged more slowly and stopped early,
-so this is a lower bound at this budget). Third, training is stable ---
-Figure~\ref{fig:curves} shows smooth loss decay with the accuracy plateau
-reached within roughly 20 epochs, and Figure~\ref{fig:smcurves} shows the
-same for the larger variants --- and the confusion matrix in
-Figure~\ref{fig:qualitative} shows balanced class performance.
-
 \begin{figure*}[tp]
 \centering
 \includegraphics[width=0.82\linewidth]{figures/yolov8n_results.png}
@@ -424,16 +426,18 @@ top-1 accuracy over 50 epochs.}
 \begin{subfigure}[t]{0.55\textwidth}
   \centering
   \includegraphics[width=\textwidth]{figures/yolov8n_confusion.png}
-  \caption{Normalized confusion matrix.}
+  \caption{Normalized confusion matrix (validation split).}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.40\textwidth}
   \centering
   \includegraphics[width=\textwidth]{figures/yolov8n_val_pred.jpg}
   \caption{Validation-batch predictions.}
 \end{subfigure}
-\caption{YOLOv8n-cls qualitative results. The confusion matrix (a) shows
-balanced performance across the \emph{occupied} and \emph{free} classes;
-(b) shows predicted labels on warped validation patches.}
+\caption{YOLOv8n-cls qualitative results on the \emph{validation} split.
+The confusion matrix (a) shows balanced performance across the
+\emph{occupied} and \emph{free} classes (the held-out \emph{test}-split
+matrix is reported separately in Figure~\ref{fig:cmtest}); (b) shows
+predicted labels on warped validation patches.}
 \label{fig:qualitative}
 \end{figure*}
 
@@ -544,7 +548,9 @@ gives the per-class metrics.
 \begin{figure*}[tp]
 \centering
 \includegraphics[width=0.78\linewidth]{figures/gen_confusion_test.png}
-\caption{YOLOv8n-cls confusion matrix on the test split. Left: raw
+\caption{YOLOv8n-cls confusion matrix on the held-out \emph{test} split
+(distinct from the validation-split matrix in
+Figure~\ref{fig:qualitative}). Left: raw
 counts ($\text{TN}=877$, $\text{FP}=8$, $\text{FN}=26$,
 $\text{TP}=579$). Right: row-normalized. Regenerated directly from the
 promoted checkpoint by \texttt{ml/make\_report\_figures.py}
@@ -845,7 +851,6 @@ episode motivated a hardening recommendation: the backend should filter
 clients receive consistent data by construction.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\FloatBarrier
 \section{Conclusion}
 \label{sec:conclusion}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -880,6 +885,7 @@ longer soak test and backend-side filtering of status payloads against the
 published layout (the hardening from Section~\ref{sec:casestudy}) round out
 the remaining engineering work.
 
+\newpage
 {\small
 \bibliographystyle{ieee_fullname}
 \bibliography{references}
