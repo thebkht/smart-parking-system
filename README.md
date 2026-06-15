@@ -41,12 +41,12 @@ The web map renders spot quadrilaterals at exact image coordinates with Leaflet;
 
 ## Screenshots
 
-| Owner setup (web) | Live occupancy (web) |
-| --- | --- |
+| Owner setup (web)                                         | Live occupancy (web)                                  |
+| --------------------------------------------------------- | ----------------------------------------------------- |
 | ![Owner setup](outputs/figures/ui_owner_setup_layout.png) | ![Live occupancy map](outputs/figures/ui_web_map.png) |
 
-| Live occupancy (mobile) | Find My Car (mobile) |
-| --- | --- |
+| Live occupancy (mobile)                          | Find My Car (mobile)                               |
+| ------------------------------------------------ | -------------------------------------------------- |
 | ![Mobile map](outputs/figures/ui_mobile_map.png) | ![Find My Car](outputs/figures/ui_find_my_car.png) |
 
 ---
@@ -180,17 +180,17 @@ See [`frontend/README.md`](frontend/README.md) for screen descriptions and devic
 
 Full reference: [`backend/README.md`](backend/README.md). Key endpoints:
 
-| Method | Route | Purpose |
-| ------ | ----- | ------- |
-| `POST` | `/update` | Edge node posts an occupancy payload |
-| `GET`  | `/status` | Latest occupancy snapshot (read `response.spots`) |
-| `POST` | `/map` (alias `/layout`) | Publish a layout (JSON), or upload photos to run SfM server-side |
-| `GET`  | `/map` / `/map/background` | Layout + bird's-eye background image |
-| `PATCH`| `/spots/{id}` | Rename a spot label (owner correction) |
-| `POST`/`GET` | `/spots/{id}/references` | Manage per-spot Find My Car reference photos |
-| `POST` | `/park` | Localize a driver photo, return a `session_id` |
-| `GET`  | `/find/{session_id}` | Resolve a session to a spot + corner coordinates |
-| `POST` | `/auth/register` | Issue a bearer token (when `AUTH_ENABLED`) |
+| Method       | Route                      | Purpose                                                          |
+| ------------ | -------------------------- | ---------------------------------------------------------------- |
+| `POST`       | `/update`                  | Edge node posts an occupancy payload                             |
+| `GET`        | `/status`                  | Latest occupancy snapshot (read `response.spots`)                |
+| `POST`       | `/map` (alias `/layout`)   | Publish a layout (JSON), or upload photos to run SfM server-side |
+| `GET`        | `/map` / `/map/background` | Layout + bird's-eye background image                             |
+| `PATCH`      | `/spots/{id}`              | Rename a spot label (owner correction)                           |
+| `POST`/`GET` | `/spots/{id}/references`   | Manage per-spot Find My Car reference photos                     |
+| `POST`       | `/park`                    | Localize a driver photo, return a `session_id`                   |
+| `GET`        | `/find/{session_id}`       | Resolve a session to a spot + corner coordinates                 |
+| `POST`       | `/auth/register`           | Issue a bearer token (when `AUTH_ENABLED`)                       |
 
 Occupancy payload contract:
 
@@ -204,12 +204,12 @@ Occupancy payload contract:
 
 ### Configuration
 
-| Variable | Where | Purpose |
-| -------- | ----- | ------- |
-| `VITE_API_BASE` | web | Backend base URL (default `http://localhost:8000`) |
-| `EXPO_PUBLIC_API_BASE` | mobile | Backend base URL (auto-detected in Expo Go) |
-| `EXPO_PUBLIC_API_TOKEN` | mobile | Bearer token, only when the backend runs with auth |
-| `AUTH_ENABLED` | backend | Set to `1` to require bearer tokens on owner routes |
+| Variable                | Where   | Purpose                                             |
+| ----------------------- | ------- | --------------------------------------------------- |
+| `VITE_API_BASE`         | web     | Backend base URL (default `http://localhost:8000`)  |
+| `EXPO_PUBLIC_API_BASE`  | mobile  | Backend base URL (auto-detected in Expo Go)         |
+| `EXPO_PUBLIC_API_TOKEN` | mobile  | Bearer token, only when the backend runs with auth  |
+| `AUTH_ENABLED`          | backend | Set to `1` to require bearer tokens on owner routes |
 
 ---
 

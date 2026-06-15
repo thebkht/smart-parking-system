@@ -9,6 +9,7 @@ abstract: >-
 type: software
 authors:
   - name: "Bakhtiyor Ganijon"
+    alias: thebkht
   - given-names: Otabek
     family-names: Sadriddinov
     alias: OtabekSadriddinov
@@ -16,7 +17,7 @@ authors:
     family-names: Mamatov
     alias: abdusattormv
   - given-names: Komronkhon
-    family-names: Mirzayev
+    family-names: Mirzaev
     alias: mirzayv
 version: 1.0.0
 date-released: 2026-06-15
