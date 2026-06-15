@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Smart Parking System"
+abstract: >-
+  Edge-based parking occupancy detection with a two-stage vision pipeline
+  (parking-space quadrilaterals, perspective warp, YOLOv8-cls, temporal
+  smoothing), a FastAPI backend, and web + mobile apps including a
+  photo-based Find My Car feature.
+type: software
+authors:
+  - given-names: Bakhtiyor
+    family-names: Ganijon
+    alias: thebkht
+  - given-names: Otabek
+    family-names: Sadriddinov
+    alias: OtabekSadriddinov
+  - given-names: Sattor
+    family-names: Mamatov
+    alias: abdusattormv
+  - given-names: Komronkhon
+    family-names: Mirzayev
+    alias: mirzayv
+version: 1.0.0
+date-released: 2026-06-15
+license: MIT
+repository-code: "https://github.com/thebkht/smart-parking-system"
+url: "https://github.com/thebkht/smart-parking-system"
+keywords:
+  - parking-occupancy-detection
+  - edge-computing
+  - computer-vision
+  - YOLOv8
+  - FastAPI
+  - find-my-car
