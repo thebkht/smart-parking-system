@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -83,6 +84,10 @@ def run() -> None:
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     backend_module.init_db(conn)
     backend_module._conn = conn
+    # Isolated reference dir so uploads never touch artifacts/. Empty at first,
+    # so the initial /park still exercises the samples/ fallback.
+    tmp_refs = tempfile.TemporaryDirectory()
+    backend_module.SPOT_REFERENCE_ROOT = Path(tmp_refs.name)
     client = TestClient(app)
 
     # 1. Owner setup: publish a quadrilateral layout.
@@ -156,6 +161,50 @@ def run() -> None:
         "find: unknown session -> 404", r.status_code == 404, f"status={r.status_code}"
     )
 
+    # 8. Owner correction: rename a spot label, confirm GET /map reflects it.
+    r = client.patch("/spots/spot_1", json={"label": "VIP-1"})
+    _check(
+        "label correction: PATCH /spots/{id}",
+        r.status_code == 200,
+        f"status={r.status_code}",
+    )
+    r = client.get("/map")
+    new_label = next(
+        (s.get("label") for s in r.json().get("spots", []) if s["spot_id"] == "spot_1"),
+        None,
+    )
+    _check(
+        "label correction: GET /map reflects new label",
+        new_label == "VIP-1",
+        f"label={new_label}",
+    )
+
+    # 9. Reference management: upload a per-spot reference, list it, re-park.
+    with QUERY_PHOTO.open("rb") as fh:
+        r = client.post(
+            "/spots/spot_1/references",
+            files=[("photos", (QUERY_PHOTO.name, fh, "image/jpeg"))],
+        )
+    _check(
+        "references: POST /spots/{id}/references",
+        r.status_code == 200 and r.json().get("saved") == 1,
+        f"status={r.status_code} saved={r.json().get('saved')}",
+    )
+    r = client.get("/spots/spot_1/references")
+    _check(
+        "references: GET listing",
+        r.json().get("count") == 1,
+        f"count={r.json().get('count')}",
+    )
+    with QUERY_PHOTO.open("rb") as fh:
+        r = client.post("/park", files={"photo": (QUERY_PHOTO.name, fh, "image/jpeg")})
+    _check(
+        "park (managed refs): localized to spot_1",
+        r.status_code == 200 and r.json().get("spot_id") == "spot_1",
+        f"spot_id={r.json().get('spot_id')}",
+    )
+
+    tmp_refs.cleanup()
     conn.close()
 
 
