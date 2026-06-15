@@ -53,7 +53,7 @@ npm run dev
 
 ### Screens
 
-**Owner Setup** — upload 4–5 overlapping parking lot photos, submit to `POST /layout`, and preview the generated BEV map with spot polygon overlays. Falls back to `GET /map` if SfM is not wired end-to-end.
+**Owner Setup** — upload 4–5 overlapping parking lot photos, submit to `POST /layout` (which runs SfM server-side), and preview the generated BEV map with spot polygon overlays. After generation, a **label-correction step** lets the owner rename each spot (persisted via `PATCH /spots/{id}`); edited labels appear on the map. If SfM cannot build a layout the backend returns `422` and the UI prompts for manual polygon submission (`POST /map`) or loading the sample handoff. When the backend runs with `AUTH_ENABLED`, an optional owner sign-in widget obtains a bearer token (stored in `localStorage` as `spp_token`) that is attached to mutating requests.
 
 **Live Occupancy Map** — polls `GET /status` every 3 seconds and colors each spot polygon green (free) or red (occupied) on a Leaflet map. Shows free/occupied/total counts in the header.
 
@@ -87,6 +87,10 @@ cp .env.example .env.local
 In Expo Go the backend host is **auto-detected** from the Metro bundler IP (`Constants.expoConfig.hostUri`), so you usually don't need this. Set it explicitly only if auto-detection fails or you're pointing at a different machine.
 
 Do **not** use `127.0.0.1` or `localhost` on a physical device — those resolve to the phone itself.
+
+If the backend runs with `AUTH_ENABLED`, set `EXPO_PUBLIC_API_TOKEN` to a bearer
+token (from `POST /auth/register`) and it will be attached to all requests.
+Otherwise leave it unset — the demo runs token-free.
 
 ### Run
 

@@ -125,6 +125,21 @@ Saves the parking lot layout. Accepts spot polygons using either `points` or `co
 { "status": "ok", "spots_saved": 15 }
 ```
 
+#### `POST /layout` with image uploads (owner setup → server-side SfM)
+
+When `POST /layout` receives `multipart/form-data` with one or more `images`
+files, the backend runs the SfM pipeline (`ml/sfm_layout.generate_layout`)
+in-process: it builds a bird's-eye-view canvas, extracts spot polygons, persists
+the layout (same as `POST /map`), writes the BEV to `artifacts/layout_sample/bev_map.png`
+(served by `GET /map/background`), and returns the stored layout.
+
+**Request:** `multipart/form-data` with one or more `images` fields.
+
+**Fallback:** if SfM cannot produce a usable layout (too few/unreadable photos),
+the route responds `422`. The app then falls back to **manual polygon
+submission** via `POST /map` with a precomputed `LayoutPayload` (JSON body) — this
+JSON path is the documented owner-setup fallback.
+
 ---
 
 #### `GET /map` (alias: `GET /layout`)
@@ -161,6 +176,34 @@ Serves `artifacts/layout_sample/bev_map.png` as a PNG image for use as the map b
 
 ---
 
+### Spot Correction & References
+
+#### `PATCH /spots/{spot_id}`
+Owner correction step: rename a spot's label after layout generation. Updates
+`spot_references` and rewrites the latest `layout` row so `GET /map` reflects the
+new label. Geometry is left unchanged.
+
+**Request body:** `{ "label": "VIP-1" }`
+
+**Response:** `{ "spot_id": "spot_1", "label": "VIP-1" }`
+
+> Returns `404` if the spot is unknown.
+
+#### `POST /spots/{spot_id}/references`
+Stores one or more reference photos for a spot under
+`artifacts/spot_references/<spot_id>/` and records them in `spot_reference_images`.
+These per-spot references are what Find My Car (`POST /park`) matches against.
+
+**Request:** `multipart/form-data` with one or more `photos` fields.
+
+**Response:** `{ "spot_id": "spot_1", "saved": 2, "paths": [...] }`
+
+#### `GET /spots/{spot_id}/references`
+Lists stored reference photos for a spot:
+`{ "spot_id": "spot_1", "references": [{"path": ..., "created_at": ...}], "count": 2 }`
+
+---
+
 ### Parking Sessions
 
 #### `GET /sessions?spot_id=spot_1&limit=100`
@@ -186,7 +229,10 @@ Returns recent parking session records. Optionally filter by `spot_id`.
 ### Find My Car (mobile only)
 
 #### `POST /park`
-Accepts a driver photo, runs SIFT feature matching against stored reference images in `samples/localization_refs/`, inserts a row into `park_sessions`, and returns a `session_id` for later lookup.
+Accepts a driver photo, runs SIFT feature matching against the owner-managed
+per-spot references in `artifacts/spot_references/` (falling back to the bundled
+`samples/localization_refs/` when none have been uploaded), inserts a row into
+`park_sessions`, and returns a `session_id` for later lookup.
 
 Used by: **Mobile** — Find My Car screen.
 
@@ -230,10 +276,10 @@ Used by: **Mobile** — Find My Car screen.
 ### Utilities
 
 #### `GET /health`
-Service health check.
+Service health check (also reports whether auth is enforced).
 
 ```json
-{ "status": "ok" }
+{ "status": "ok", "auth_enabled": false }
 ```
 
 #### `GET /stream`
@@ -245,16 +291,38 @@ Serves `logs/latest_frame.jpg` as a multipart MJPEG stream for browser or VLC cl
 
 ---
 
+### Authentication (optional)
+
+Auth is **opt-in** so the demo runs token-free by default. Set `AUTH_ENABLED=1`
+when starting the backend to require bearer tokens on owner-mutating routes
+(`POST /map`, `POST /layout`, `PATCH /spots/{id}`, `POST /spots/{id}/references`)
+and to scope Find My Car sessions to their owner.
+
+#### `POST /auth/register`
+Issues a bearer token for an owner (lightweight, no password).
+
+**Request body:** `{ "username": "owner" }`
+**Response:** `{ "user_id": 1, "username": "owner", "token": "..." }`
+
+Send the token as `Authorization: Bearer <token>` on protected routes. With auth
+on, `POST /park` stamps the session's owner and `GET /find/{session_id}` returns
+`404` for sessions owned by a different user. Read-only routes (`GET /status`,
+`GET /map`) stay public.
+
+---
+
 ## Database Schema
 
-SQLite database at `parking.db` with four tables:
+SQLite database at `parking.db`:
 
 | Table | Purpose |
 |---|---|
 | `log` | Full occupancy payload snapshots from edge |
 | `layout` | Parking lot layout snapshots (quad polygons) |
-| `spot_references` | Per-spot polygon coordinates |
-| `park_sessions` | Per-spot occupancy history + Find My Car sessions |
+| `spot_references` | Per-spot polygon coordinates + label |
+| `spot_reference_images` | Per-spot Find My Car reference photo paths |
+| `park_sessions` | Per-spot occupancy history + Find My Car sessions (with optional `user_id`) |
+| `users` | Owner accounts + bearer tokens (when auth is enabled) |
 
 ---
 
