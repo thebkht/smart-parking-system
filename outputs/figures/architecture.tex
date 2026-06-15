@@ -1,0 +1,66 @@
+\documentclass[border=4pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, fit, backgrounds}
+
+\definecolor{free}{HTML}{1A7A4A}
+\definecolor{occ}{HTML}{C0392B}
+\definecolor{pp}{HTML}{8E44AD}
+\definecolor{cy}{HTML}{2E9BC0}
+\definecolor{mg}{HTML}{C0399B}
+
+\begin{document}
+\begin{tikzpicture}[
+  font=\footnotesize,
+  box/.style={draw, rounded corners=2pt, minimum height=8.5mm, minimum width=17mm,
+              align=center, fill=gray!8, inner sep=3pt},
+  stage/.style={align=center},
+  arr/.style={-{Latex[length=2.2mm]}, semithick},
+  lbl/.style={midway, above, font=\scriptsize\itshape, text=black!70},
+  lblb/.style={midway, below, font=\scriptsize\itshape, text=black!70},
+]
+
+% --- Input image ---
+\node[stage] (img) {%
+  \includegraphics[width=27mm]{arch_input.jpg}\\[1pt]
+  Lot frame $+$\\spot quadrilaterals};
+
+% --- Warped patches (fanned colored stack) ---
+\begin{scope}[shift={(3.35,0.15)}]
+  \foreach \c/\dx/\dy in {free/0.30/-0.30, cy/0.20/-0.10, pp/0.10/0.10, mg/0.0/0.30}{
+    \fill[\c, draw=black!55, rounded corners=1pt] (\dx,\dy) rectangle ++(0.62,0.46);
+  }
+  \node[font=\scriptsize, align=center] at (0.5,-0.82) {$128{\times}128$\\patches};
+  \coordinate (patchesout) at (1.0,0.38);
+\end{scope}
+
+% --- Classifier ---
+\node[box, right=42mm of img] (cls) {YOLOv8n-cls\\\scriptsize 2.83\,MB};
+
+% --- Per-spot prediction ---
+\node[box, fill=occ!18, draw=occ, above right=2.5mm and 12mm of cls] (occ) {occupied};
+\node[box, fill=free!20, draw=free, below right=2.5mm and 12mm of cls] (free) {free};
+
+% --- Downstream stages ---
+\node[box, right=46mm of cls] (smooth) {Temporal\\smoothing};
+\node[box, below=7mm of smooth] (json) {JSON\\\scriptsize payload};
+\node[box, below=7mm of json] (api) {FastAPI\\backend};
+
+% --- Apps ---
+\node[box, fill=blue!6, left=20mm of api] (apps)
+  {Web map $\cdot$ Mobile map\\Find My Car};
+
+% --- Arrows ---
+\draw[arr] (img.east) -- node[lbl]{perspective}node[lblb]{warp} (3.25,0.38);
+\draw[arr] (patchesout) -- (cls.west);
+\draw[arr] (cls.east) -- (occ.west);
+\draw[arr] (cls.east) -- (free.west);
+\draw[arr] (occ.east) -- ++(0.5,0) |- node[lbl,pos=0.25]{}(smooth.west);
+\draw[arr] (free.east) -- ++(0.5,0) |- (smooth.west);
+\draw[arr] (smooth.south) -- node[lbl,right,font=\scriptsize\itshape]{aggregate} (json.north);
+\draw[arr] (json.south) -- node[right,font=\scriptsize\itshape]{POST /update} (api.north);
+\draw[arr] (api.west) -- node[lblb, pos=0.5]{GET /status} (apps.east);
+
+\end{tikzpicture}
+\end{document}

@@ -40,6 +40,13 @@ from evaluate import (  # noqa: E402  (import after matplotlib backend is set)
     stage2_probabilities,
     stage2_root,
 )
+from report_style import (  # noqa: E402
+    CYAN,
+    INK,
+    OCC_RED,
+    PALETTE_BLUES,
+    apply_style,
+)
 
 DEFAULT_WEIGHTS = "acpds_cls/weights/best.pt"
 DEFAULT_OUTPUT_DIR = "artifacts/figures"
@@ -55,6 +62,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="mps")
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--normalized-out",
+        default=None,
+        help="If set, also save a single-panel normalized confusion matrix here.",
+    )
     return parser.parse_args()
 
 
@@ -65,7 +77,7 @@ def plot_confusion_matrix(matrix: np.ndarray, split: str, out_path: Path) -> Non
     data = (matrix, normalized)
     fmts = ("d", ".3f")
     for ax, title, grid, fmt in zip(axes, titles, data, fmts):
-        im = ax.imshow(grid, cmap="Blues", vmin=0, vmax=grid.max())
+        im = ax.imshow(grid, cmap=PALETTE_BLUES, vmin=0, vmax=grid.max())
         ax.set_title(title)
         ax.set_xticks(range(len(CLASS_NAMES)))
         ax.set_yticks(range(len(CLASS_NAMES)))
@@ -97,6 +109,39 @@ def plot_confusion_matrix(matrix: np.ndarray, split: str, out_path: Path) -> Non
     plt.close(fig)
 
 
+def plot_confusion_normalized(matrix: np.ndarray, split: str, out_path: Path) -> None:
+    """Single-panel row-normalized confusion matrix in the report palette."""
+    normalized = matrix / matrix.sum(axis=1, keepdims=True).clip(min=1)
+    fig, ax = plt.subplots(figsize=(5.2, 4.6))
+    im = ax.imshow(normalized, cmap=PALETTE_BLUES, vmin=0, vmax=1)
+    ax.set_xticks(range(len(CLASS_NAMES)))
+    ax.set_yticks(range(len(CLASS_NAMES)))
+    ax.set_xticklabels([c.capitalize() for c in CLASS_NAMES])
+    ax.set_yticklabels([c.capitalize() for c in CLASS_NAMES])
+    ax.set_xlabel("True label")
+    ax.set_ylabel("Predicted label")
+    ax.set_title(
+        f"YOLOv8n-cls — Normalized Confusion ({split} split)", fontweight="bold"
+    )
+    ax.grid(False)
+    for i in range(normalized.shape[0]):
+        for j in range(normalized.shape[1]):
+            ax.text(
+                j,
+                i,
+                format(normalized[i, j], ".3f"),
+                ha="center",
+                va="center",
+                fontsize=15,
+                fontweight="bold",
+                color="white" if normalized[i, j] > 0.5 else INK,
+            )
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
 def plot_pr_curve(
     y_true_occ: np.ndarray,
     scores: np.ndarray,
@@ -117,12 +162,12 @@ def plot_pr_curve(
 
     fig, ax = plt.subplots(figsize=(6.2, 5.0))
     ax.plot(
-        recall, precision, color="#1f4e79", lw=2, label=f"YOLOv8n-cls (AP={ap:.4f})"
+        recall, precision, color=CYAN, lw=2, label=f"YOLOv8n-cls (AP={ap:.4f})"
     )
     ax.scatter(
         [op_recall],
         [op_precision],
-        color="#e8743b",
+        color=OCC_RED,
         zorder=5,
         s=60,
         label=f"Operating point (t={operating_threshold:g})",
@@ -142,6 +187,7 @@ def plot_pr_curve(
 
 def main() -> None:
     args = parse_args()
+    apply_style()
     dataset_dir = eval_split_dir(stage2_root(args.data), args.split)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -167,6 +213,11 @@ def main() -> None:
     pr_path = output_dir / "pr_curve.png"
     plot_confusion_matrix(matrix, args.split, cm_path)
     plot_pr_curve(y_true_occ, scores, args.threshold, pr_path)
+    if args.normalized_out:
+        norm_path = Path(args.normalized_out)
+        norm_path.parent.mkdir(parents=True, exist_ok=True)
+        plot_confusion_normalized(matrix, args.split, norm_path)
+        print(f"Saved {norm_path}")
 
     print(
         f"Accuracy {metrics['top1_accuracy']:.4f} | "
