@@ -49,7 +49,7 @@ WEEK7_LOG_DIR ?= logs/week7
 STABILITY_DURATION ?= 1800
 STABILITY_ARGS ?=
 
-.PHONY: venv install install-dev check-python \
+.PHONY: venv install install-dev check-python fetch-weights \
 	prepare-stage1 prepare-stage2 validate-stage2 prepare-single-model layout-sample \
 	train-stage1 train-stage2 train-stage2-all \
 	evaluate-stage1 evaluate-stage2 compare-stage2 sweep-stage2 \
@@ -69,6 +69,9 @@ install: venv
 	$(VENV_PYTHON) -m pip install -r requirements.txt
 
 install-dev: install
+
+fetch-weights:
+	bash scripts/fetch_weights.sh
 
 prepare-stage1:
 	$(VENV_PYTHON) ml/prepare_dataset.py --stage1 --pklot-dir $(PKLOT_DIR) $(PREP_STAGE1_ARGS)

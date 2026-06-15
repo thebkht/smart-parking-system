@@ -30,20 +30,25 @@ log-*/
 downloads/
 *.db
 
+# Environment files
+.env
+.env.*
+!.env.example
+
 # macOS
 .DS_Store
 
-# Editors
+# Editors / agents
 .idea/
 .vscode/
+.claude/
 
 datasets/*
 patch_detect.py
 
-# Exact Week 5 handoff artifacts that must stay trackable
-!acpds_cls/
-!acpds_cls/weights/
-!acpds_cls/weights/best.pt
+# Model weights are published as GitHub Release assets, not committed.
+# Fetch them with `make fetch-weights` (see scripts/fetch_weights.sh).
+acpds_cls/weights/
 
 !artifacts/layout_sample/
 !artifacts/layout_sample/bev_map.png

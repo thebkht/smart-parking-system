@@ -1,0 +1,4 @@
+dist
+node_modules
+package-lock.json
+mobile/node_modules

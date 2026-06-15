@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a problem with the edge pipeline, backend, web, or mobile app
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill out the sections below.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the system is affected?
+      options:
+        - edge (detect.py / inference)
+        - backend (FastAPI / SQLite)
+        - frontend web
+        - frontend mobile (Expo)
+        - ml (training / evaluation / export)
+        - docs / other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands, requests, or UI steps. Include the exact `make` target or CLI used.
+      placeholder: |
+        1. Run `make backend`
+        2. POST to /update with ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Node version, device (CPU/MPS/CUDA), and how you installed deps.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Relevant traceback or console output.
+      render: shell

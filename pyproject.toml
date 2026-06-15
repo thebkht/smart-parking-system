@@ -1,0 +1,18 @@
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+# Pyflakes + pycodestyle errors. Line length (E501) is left to the formatter
+# (black) rather than enforced as a lint error. Kept conservative so the
+# existing codebase stays clean; expand deliberately.
+select = ["E", "F"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
