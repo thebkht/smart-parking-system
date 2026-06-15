@@ -1,4 +1,4 @@
-\documentclass[10pt,letterpaper]{article}
+\documentclass[10pt,twocolumn,letterpaper]{article}
 
 \usepackage{iccv}
 \usepackage[utf8]{inputenc}
@@ -43,6 +43,21 @@
   \end{minipage}}}
 
 \setlength{\emergencystretch}{2em}
+
+% Float placement: let figures fill more of each page and pack tighter so
+% they stay near their text instead of spilling onto end-of-document float
+% pages (two-column layout).
+\usepackage{placeins}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.72}
+\renewcommand{\dbltopfraction}{0.92}
+\renewcommand{\dblfloatpagefraction}{0.72}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\setcounter{dbltopnumber}{3}
 
 \begin{document}
 
@@ -168,6 +183,24 @@ parked car from a photo.
 \label{sec:solution}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+Figure~\ref{fig:architecture} gives the end-to-end architecture. Each
+parking space's annotated quadrilateral is perspective-warped to a
+$128\times128$ patch; a single compact YOLOv8n-cls model classifies every
+patch as occupied or free; the per-spot results are temporally smoothed,
+serialized to JSON, and posted to a FastAPI backend that serves the web
+and mobile clients. The rest of this section describes each stage in turn.
+
+\begin{figure*}[tp]
+\centering
+\includegraphics[width=\linewidth]{figures/architecture.pdf}
+\caption{End-to-end system architecture. A lot frame with quadrilateral
+spot annotations is pooled into perspective-corrected $128\times128$
+patches, classified by YOLOv8n-cls, temporally smoothed, and reported as
+compact JSON to the FastAPI backend, which drives the web/mobile occupancy
+maps and Find My Car. Only the JSON leaves the edge device.}
+\label{fig:architecture}
+\end{figure*}
+
 \subsection{Quadrilateral pooling}
 \label{sec:pivot}
 
@@ -179,16 +212,16 @@ crops --- they enable a geometrically correct patch extraction. The ACPDS
 paper compares the two extraction methods, reproduced in
 Figure~\ref{fig:pooling}.
 
-\begin{figure}[H]
+\begin{figure*}[tp]
 \centering
-\includegraphics[width=0.75\textwidth]{figures/pooling.pdf}
+\includegraphics[width=0.92\linewidth]{figures/pooling.pdf}
 \caption{Quadrilateral vs.\ square pooling of parking spaces (reproduced
 from Marek~\cite{marek2021imagebased}). The quadrilateral region (a) contains only
 the target spot's pixels; the bounding square (b) --- geometrically
 equivalent to an axis-aligned ROI --- bleeds into
 neighboring spots and remains perspective-distorted.}
 \label{fig:pooling}
-\end{figure}
+\end{figure*}
 
 The pipeline adopts method~(a). Each quadrilateral is passed through
 \texttt{order\_corners()}, which enforces a clockwise top-left
@@ -211,7 +244,7 @@ parameters it has roughly $9\times$ fewer weights than the dataset paper's
 ResNet50 (25.6\,M) while taking the identical pooled input, which makes the
 accuracy comparison fair.
 
-\begin{table}[H]
+\begin{table*}[tp]
 \centering\small
 \begin{tabular}{lrrl}
 \toprule
@@ -225,7 +258,7 @@ YOLOv8m-cls & 17\,M & 30.22\,MB & Comparison \\
 \caption{Stage 2 classifier variants. All use a $128\times128$
 quadrilateral-pooled input and a binary occupied/free head.}
 \label{tab:variants}
-\end{table}
+\end{table*}
 
 All variants were trained from scratch on quadrilateral-warped ACPDS
 patches with the configuration in Table~\ref{tab:trainconfig}; the
@@ -280,16 +313,16 @@ Because only this JSON crosses the network, the reporting path keeps a
 measured 99.9\,\% bandwidth reduction relative to a 1080p H.264 stream,
 with no camera footage leaving the device.
 
-\begin{figure}[tbp]
+\begin{figure*}[tp]
 \centering
-\includegraphics[width=0.78\textwidth]{figures/detection.jpg}
+\includegraphics[width=0.75\linewidth]{figures/detection.jpg}
 \caption{Annotated edge inference output
 (\texttt{runs/output/detection.jpg}). Quadrilateral spot polygons are
 colored by predicted state (green free, red occupied) with per-spot
 confidence; on this ACPDS lot the promoted classifier reads 70 free /
 50 occupied.}
 \label{fig:detection}
-\end{figure}
+\end{figure*}
 
 \subsection{Backend and software design}
 \label{sec:backend}
@@ -337,7 +370,7 @@ Table~\ref{tab:results} compares the earlier fixed-ROI baseline with the
 retrained quadrilateral-warp classifiers on the validation lots, including
 a controlled square-crop ablation of the nano variant.
 
-\begin{table}[H]
+\begin{table*}[tp]
 \centering
 \begin{tabular}{llrr}
 \toprule
@@ -361,7 +394,7 @@ ResNet50 (ACPDS paper~\cite{marek2021imagebased}) & quadrilateral warp & --- & $
 threshold 0.3; it is included for trajectory, not as a strictly
 like-for-like comparison.}
 \label{tab:results}
-\end{table}
+\end{table*}
 
 Three findings stand out. First, the accuracy jump from the earlier
 deployment (90.9\,\%) to the current pipeline (98.3\,\%) comes
@@ -377,16 +410,16 @@ reached within roughly 20 epochs, and Figure~\ref{fig:smcurves} shows the
 same for the larger variants --- and the confusion matrix in
 Figure~\ref{fig:qualitative} shows balanced class performance.
 
-\begin{figure}[tbp]
+\begin{figure*}[tp]
 \centering
-\includegraphics[width=0.78\textwidth]{figures/yolov8n_results.png}
+\includegraphics[width=0.82\linewidth]{figures/yolov8n_results.png}
 \caption{YOLOv8n-cls training curves on warped ACPDS patches
 (\texttt{runs/acpds\_cls/yolov8n\_stage2}): train/validation loss and
 top-1 accuracy over 50 epochs.}
 \label{fig:curves}
-\end{figure}
+\end{figure*}
 
-\begin{figure}[tbp]
+\begin{figure*}[tp]
 \centering
 \begin{subfigure}[t]{0.55\textwidth}
   \centering
@@ -402,9 +435,9 @@ top-1 accuracy over 50 epochs.}
 balanced performance across the \emph{occupied} and \emph{free} classes;
 (b) shows predicted labels on warped validation patches.}
 \label{fig:qualitative}
-\end{figure}
+\end{figure*}
 
-\begin{figure}[tbp]
+\begin{figure*}[tp]
 \centering
 \begin{subfigure}[t]{0.49\linewidth}
   \centering
@@ -419,7 +452,7 @@ balanced performance across the \emph{occupied} and \emph{free} classes;
 \caption{Training curves for the comparison variants: train/validation
 loss and validation top-1 accuracy.}
 \label{fig:smcurves}
-\end{figure}
+\end{figure*}
 
 \subsection{Test-split model comparison}
 
@@ -435,7 +468,7 @@ The 98\,\% paper target on the test split is narrowly missed by 0.28\,pp;
 the evidence in the following subsections points to patch quality and
 distribution shift, not model capacity, as the remaining bottleneck.
 
-\begin{table}[H]
+\begin{table*}[tp]
 \centering\footnotesize
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{llrrrr}
@@ -457,7 +490,7 @@ YOLOv8n-cls (abl.) & sq. & 96.38 & --- & 0.9559 & 2.7\,M \\
 Accuracies in \%. \textsuperscript{$\ast$}\,ResNet50 figures from
 Table~1 of Marek~\cite{marek2021imagebased}.}
 \label{tab:testcompare}
-\end{table}
+\end{table*}
 
 \subsection{Validation vs.\ test gap}
 
@@ -470,7 +503,7 @@ accuracy drop matches the deployed error mode --- occupied spots are
 occasionally missed on border-heavy or partial-vehicle patches in the
 harder test lots --- and the larger s/m classifiers do not close the gap.
 
-\begin{table}[H]
+\begin{table*}[tp]
 \centering\small
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrrrrr}
@@ -486,11 +519,11 @@ YOLOv8m-cls & 97.95 & 97.38 & $-0.57$ & 98.68 & 95.04 \\
 \caption{Validation vs.\ test accuracy and recall (\%). $\Delta$ is the
 accuracy delta; R denotes recall.}
 \label{tab:valtestgap}
-\end{table}
+\end{table*}
 
 \begin{figure}[tbp]
 \centering
-\includegraphics[width=0.75\linewidth]{figures/w11_val_test_gap.png}
+\includegraphics[width=\linewidth]{figures/w11_val_test_gap.png}
 \caption{Validation vs.\ test accuracy across the three YOLOv8 variants.
 Drops are modest and consistent, indicating distribution shift rather
 than overfitting.}
@@ -508,16 +541,16 @@ fragments inside the warped quadrilateral --- and it shows the model is
 conservative about declaring a space occupied. Table~\ref{tab:cmmetrics}
 gives the per-class metrics.
 
-\begin{figure}[tbp]
+\begin{figure*}[tp]
 \centering
-\includegraphics[width=0.95\linewidth]{figures/gen_confusion_test.png}
+\includegraphics[width=0.78\linewidth]{figures/gen_confusion_test.png}
 \caption{YOLOv8n-cls confusion matrix on the test split. Left: raw
 counts ($\text{TN}=877$, $\text{FP}=8$, $\text{FN}=26$,
 $\text{TP}=579$). Right: row-normalized. Regenerated directly from the
 promoted checkpoint by \texttt{ml/make\_report\_figures.py}
 (\texttt{make figures}).}
 \label{fig:cmtest}
-\end{figure}
+\end{figure*}
 
 \begin{table}[H]
 \centering\small
@@ -544,7 +577,7 @@ threshold 0.5 is the right trade-off.
 
 \begin{figure}[tbp]
 \centering
-\includegraphics[width=0.62\linewidth]{figures/gen_pr_curve.png}
+\includegraphics[width=\linewidth]{figures/gen_pr_curve.png}
 \caption{Precision--recall curve for YOLOv8n-cls on the test split
 (average precision 0.9945); the threshold-0.5 operating point is marked.
 Regenerated from the promoted checkpoint by
@@ -584,7 +617,7 @@ image luminance.}
 
 \begin{figure}[tbp]
 \centering
-\includegraphics[width=0.75\linewidth]{figures/w11_per_weather.png}
+\includegraphics[width=\linewidth]{figures/w11_per_weather.png}
 \caption{Per-weather accuracy, precision, and recall for YOLOv8n-cls on
 the test split.}
 \label{fig:weather}
@@ -624,7 +657,7 @@ architecture and data.}
 
 \begin{figure}[tbp]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/w11_pooling_compare.png}
+\includegraphics[width=\linewidth]{figures/w11_pooling_compare.png}
 \caption{Quadrilateral vs.\ square pooling on the test split. Quad wins
 on all metrics except recall.}
 \label{fig:poolcompare}
@@ -692,8 +725,9 @@ actual quantized Apple-Silicon deployment artifact --- is fastest at
 858\,FPS (1.2\,ms), with no accuracy loss relative to the PyTorch
 checkpoint.
 
-\begin{table}[H]
-\centering\small
+\begin{table}[tbp]
+\centering\footnotesize
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrr}
 \toprule
 \textbf{Backend} & \textbf{Latency (ms)} & \textbf{FPS} \\
@@ -726,45 +760,55 @@ ships on both.
 
 \subsection{Owner setup (web)}
 
-The owner uploads reference photos of the lot, the layout is generated as
-quadrilateral spot polygons, and the owner publishes it (with a
-bird's-eye-view background) via \texttt{POST /map}. This is the one-time
-configuration step that every other screen depends on.
+The owner uploads reference photos of the lot, an SfM pass computes a
+bird's-eye-view layout and extracts quadrilateral spot polygons, and the
+owner publishes the result via \texttt{POST /map}. This is the one-time
+configuration step that every other screen depends on. The screenshot in
+Figure~\ref{fig:ui-owner} shows the web flow driving a sample placeholder
+layout (\texttt{spot\_source: placeholder\_grid}); the quadrilateral
+extraction itself is demonstrated on real ACPDS imagery in
+Figures~\ref{fig:architecture} and~\ref{fig:detection}, and a clean
+end-to-end SfM bird's-eye reconstruction remains future work
+(Section~\ref{sec:conclusion}).
 
-\begin{figure}[H]
+\begin{figure}[tbp]
 \centering
-\uiplaceholder{ui_owner_setup.png}
-% \includegraphics[width=\linewidth]{figures/ui_owner_setup.png}
-\caption{Owner setup (web): photo upload and the generated quadrilateral
-layout published as the lot map.}
+\fbox{\includegraphics[width=\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax]{figures/ui_owner_setup_layout.png}}
+\caption{Owner setup (web): the photo-upload area and the resulting
+12-spot layout panel (\emph{``Layout ready --- 12 spots detected''}),
+ready to publish as the lot map. The spots shown are a sample placeholder
+grid (\texttt{spot\_source: placeholder\_grid}) used to exercise the UI;
+real quadrilateral extraction on ACPDS imagery is shown in
+Figures~\ref{fig:architecture} and~\ref{fig:detection}.}
 \label{fig:ui-owner}
 \end{figure}
 
 \subsection{Live occupancy map (web and mobile)}
 
 Both clients poll \texttt{GET /status} and color each published spot by
-its current state, with a free / occupied / total summary. The web map uses
-Leaflet polygon overlays; the mobile map renders the same layout as
-coordinate-accurate SVG polygons with pinch-to-zoom and pan. Counts are
-scoped to the active layout's spot IDs (see Section~\ref{sec:casestudy}).
+its current state, with a free / occupied / total summary. The mobile map
+renders the same layout as coordinate-accurate SVG polygons with
+pinch-to-zoom and pan. Counts are scoped to the active layout's spot IDs
+(see Section~\ref{sec:casestudy}); in Figure~\ref{fig:ui-web-map} the
+4 / 8 / 12 summary agrees with the colored spots.
 
-\begin{figure}[H]
+\begin{figure}[tbp]
 \centering
-\begin{subfigure}[t]{0.49\linewidth}
-  \centering
-  \uiplaceholder{ui_web_map.png}
-  % \includegraphics[width=\linewidth]{figures/ui_web_map.png}
-  \caption{Web live occupancy map.}
-\end{subfigure}\hfill
-\begin{subfigure}[t]{0.49\linewidth}
-  \centering
-  \uiplaceholder{ui_mobile_map.png}
-  % \includegraphics[width=\linewidth]{figures/ui_mobile_map.png}
-  \caption{Mobile live occupancy map.}
-\end{subfigure}
-\caption{Live occupancy map on web (Leaflet) and mobile (SVG + gestures);
-spots are colored green for free and red for occupied.}
-\label{fig:ui-map}
+\fbox{\includegraphics[width=\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax]{figures/ui_web_map.png}}
+\caption{Web live occupancy map: each published spot colored green (free)
+or red (occupied), with free / occupied / total counters, a polling
+control, and a live connection indicator.}
+\label{fig:ui-web-map}
+\end{figure}
+
+\begin{figure}[tbp]
+\centering
+\fbox{\includegraphics[width=0.50\linewidth]{figures/ui_mobile_map.png}}
+\caption{Mobile live occupancy map (SVG polygons with pinch-to-zoom and
+pan). The 4 / 8 / 12 free / occupied / total summary and per-spot colors
+mirror the web client of Figure~\ref{fig:ui-web-map} against the same
+12-spot layout.}
+\label{fig:ui-mobile-map}
 \end{figure}
 
 \subsection{Find My Car (mobile)}
@@ -775,12 +819,13 @@ Later the driver taps \emph{Find My Car}; the app calls
 \texttt{GET /find/\{session\_id\}} and highlights the matched spot in amber
 on the map.
 
-\begin{figure}[H]
+\begin{figure}[tbp]
 \centering
-\uiplaceholder{ui_find_my_car.png}
-% \includegraphics[width=0.6\linewidth]{figures/ui_find_my_car.png}
-\caption{Find My Car (mobile): the localized spot highlighted in amber
-after a driver photo is matched to the published layout.}
+\fbox{\includegraphics[width=0.50\linewidth]{figures/ui_find_my_car.png}}
+\caption{Find My Car (mobile): the driver's overhead photo is matched by
+SIFT feature matching to the published layout (here \texttt{spot\_2},
+similarity score 7.056), and the localized spot is highlighted in amber on
+the map.}
 \label{fig:ui-fmc}
 \end{figure}
 
@@ -800,7 +845,9 @@ episode motivated a hardening recommendation: the backend should filter
 clients receive consistent data by construction.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\FloatBarrier
 \section{Conclusion}
+\label{sec:conclusion}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 This project delivers an edge-based smart parking system that classifies
