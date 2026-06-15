@@ -301,6 +301,24 @@ The source code in this repository is released under the MIT License — see [`L
 
 ---
 
+## Citation
+
+If you use this project, please cite it. Metadata lives in [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository" generates APA/BibTeX from it), or use:
+
+```bibtex
+@software{Ganijon_Smart_Parking_System_2026,
+author = {Ganijon, Bakhtiyor and Sadriddinov, Otabek and Mamatov, Sattor and Mirzayev, Komronkhon},
+license = {MIT},
+month = jun,
+title = {{Smart Parking System}},
+url = {https://github.com/thebkht/smart-parking-system},
+version = {1.0.0},
+year = {2026}
+}
+```
+
+---
+
 ## Acknowledgments
 
 Built by a four-person team: [@thebkht](https://github.com/thebkht), [@OtabekSadriddinov](https://github.com/OtabekSadriddinov), [@abdusattormv](https://github.com/abdusattormv), and [@mirzayv](https://github.com/mirzayv). Dataset by Martin Marek et al. ([ACPDS](https://github.com/martin-marek/parking-space-occupancy)).
