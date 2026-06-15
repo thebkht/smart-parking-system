@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import secrets
 import sqlite3
 import shutil
 import tempfile
@@ -10,10 +12,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, UploadFile, File
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+
+# Auth is opt-in so the class demo keeps working without tokens. Set
+# AUTH_ENABLED=1 to require bearer tokens on owner-mutating routes and to scope
+# Find My Car sessions to their owner.
+AUTH_ENABLED = os.getenv("AUTH_ENABLED", "").strip().lower() in {"1", "true", "yes"}
 
 app = FastAPI()
 
@@ -46,7 +53,45 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 DB = Path("parking.db")
 LATEST_FRAME_PATH = Path("logs/latest_frame.jpg")
 BEV_BACKGROUND_PATH = Path("artifacts/layout_sample/bev_map.png")
+# Layout output dir shares the parent of the served BEV background so that a
+# freshly generated map is reachable via GET /map/background.
+LAYOUT_OUTPUT_DIR = BEV_BACKGROUND_PATH.parent
+OWNER_UPLOAD_ROOT = Path("artifacts/owner_uploads")
+SPOT_REFERENCE_ROOT = Path("artifacts/spot_references")
 _conn: sqlite3.Connection | None = None
+
+
+FALLBACK_REFERENCE_PATH = Path("samples/localization_refs")
+
+
+def _run_sfm(paths: List[Path], output_dir: Path) -> dict:
+    """Run the SfM/BEV pipeline in-process. Isolated for easy test monkeypatching."""
+    import sys
+
+    sys.path.insert(0, str(Path("ml")))
+    from sfm_layout import generate_layout
+
+    return generate_layout(paths, output_dir)
+
+
+def _has_reference_images(root: Path) -> bool:
+    if not root.exists():
+        return False
+    for sub in root.iterdir():
+        if sub.is_dir() and any(
+            child.suffix.lower() in {".jpg", ".jpeg", ".png"} for child in sub.iterdir()
+        ):
+            return True
+    return False
+
+
+def resolve_references_path() -> Path | None:
+    """Prefer owner-managed per-spot references; fall back to the bundled samples."""
+    if _has_reference_images(SPOT_REFERENCE_ROOT):
+        return SPOT_REFERENCE_ROOT
+    if FALLBACK_REFERENCE_PATH.exists():
+        return FALLBACK_REFERENCE_PATH
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +145,14 @@ class ParkSession(BaseModel):
     status: Literal["occupied", "free"]
     timestamp: str
     confidence: Optional[float] = None
+
+
+class SpotLabelUpdate(BaseModel):
+    label: str
+
+
+class RegisterPayload(BaseModel):
+    username: str
 
 
 def validate_quad_points(raw_points: List[List[float]], spot_id: str) -> List[List[float]]:
@@ -171,6 +224,35 @@ def init_db(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
         """
     )
 
+    # NEW: per-spot reference photos for Find My Car localization
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS spot_reference_images (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            spot_id      TEXT    NOT NULL,
+            path         TEXT    NOT NULL,
+            created_at   TEXT    NOT NULL
+        )
+        """
+    )
+
+    # NEW: users (lightweight bearer-token auth + session ownership)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            username     TEXT    NOT NULL UNIQUE,
+            token        TEXT    NOT NULL UNIQUE,
+            created_at   TEXT    NOT NULL
+        )
+        """
+    )
+
+    # Migration: attach session ownership to park_sessions if not present yet.
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(park_sessions)").fetchall()}
+    if "user_id" not in cols:
+        conn.execute("ALTER TABLE park_sessions ADD COLUMN user_id INTEGER")
+
     conn.commit()
     _conn = conn
     return conn
@@ -185,6 +267,49 @@ def get_conn() -> sqlite3.Connection:
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# ---------------------------------------------------------------------------
+# Auth helpers (active only when AUTH_ENABLED)
+# ---------------------------------------------------------------------------
+
+def _token_from_header(authorization: Optional[str]) -> Optional[str]:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    return authorization.split(" ", 1)[1].strip() or None
+
+
+def _user_by_token(token: str) -> Optional[dict]:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id, username FROM users WHERE token=?", (token,)
+    ).fetchone()
+    return {"id": row[0], "username": row[1]} if row else None
+
+
+async def require_user(authorization: Optional[str] = Header(None)) -> Optional[dict]:
+    """Require a valid bearer token on owner-mutating routes when auth is on.
+
+    When AUTH_ENABLED is false this is a no-op (returns None) so the demo and
+    existing clients keep working without tokens.
+    """
+    if not AUTH_ENABLED:
+        return None
+    token = _token_from_header(authorization)
+    if token is None:
+        raise HTTPException(status_code=401, detail="Missing bearer token.")
+    user = _user_by_token(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+    return user
+
+
+async def optional_user(authorization: Optional[str] = Header(None)) -> Optional[dict]:
+    """Resolve the caller if a valid token is present, but never reject."""
+    token = _token_from_header(authorization)
+    if token is None:
+        return None
+    return _user_by_token(token)
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +404,24 @@ async def history(limit: int = 100) -> HistoryResponse:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "auth_enabled": AUTH_ENABLED}
+
+
+@app.post("/auth/register")
+async def auth_register(payload: RegisterPayload) -> dict:
+    """Issue a bearer token for an owner. Lightweight (no password) by design."""
+    conn = get_conn()
+    token = secrets.token_urlsafe(32)
+    now = utc_now_iso()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO users (username, token, created_at) VALUES (?, ?, ?)",
+            (payload.username, token, now),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Username already registered.") from exc
+    return {"user_id": cursor.lastrowid, "username": payload.username, "token": token}
 
 
 @app.get("/stream")
@@ -301,7 +443,9 @@ async def stream() -> StreamingResponse:
 # ---------------------------------------------------------------------------
 
 @app.post("/map")
-async def save_map(layout: LayoutPayload) -> dict:
+async def save_map(
+    layout: LayoutPayload, user: Optional[dict] = Depends(require_user)
+) -> dict:
     """Save the parking lot layout (quad polygons for each spot)."""
     # Validate ALL spots first before touching the database
     for spot in layout.spots:
@@ -385,7 +529,9 @@ async def get_sessions(spot_id: Optional[str] = None, limit: int = 100) -> dict:
 from fastapi import UploadFile, File
 
 @app.post("/park")
-async def park_car(photo: UploadFile = File(...)) -> dict:
+async def park_car(
+    photo: UploadFile = File(...), user: Optional[dict] = Depends(optional_user)
+) -> dict:
     """Accept a driver photo, run SIFT localization, insert park_session row."""
     import sys
     sys.path.insert(0, str(Path("ml")))
@@ -399,8 +545,8 @@ async def park_car(photo: UploadFile = File(...)) -> dict:
         tmp_path.write_bytes(contents)
 
     try:
-        refs_path = Path("samples/localization_refs")
-        if not refs_path.exists():
+        refs_path = resolve_references_path()
+        if refs_path is None:
             raise HTTPException(status_code=503, detail="No reference images found.")
 
         result = localize_query(
@@ -422,10 +568,10 @@ async def park_car(photo: UploadFile = File(...)) -> dict:
     now = utc_now_iso()
     cursor = conn.execute(
         """
-        INSERT INTO park_sessions (spot_id, status, confidence, recorded_at)
-        VALUES (?, 'occupied', ?, ?)
+        INSERT INTO park_sessions (spot_id, status, confidence, recorded_at, user_id)
+        VALUES (?, 'occupied', ?, ?, ?)
         """,
-        (spot_id, score, now),
+        (spot_id, score, now, user["id"] if user else None),
     )
     conn.commit()
     session_id = cursor.lastrowid
@@ -440,20 +586,27 @@ async def park_car(photo: UploadFile = File(...)) -> dict:
 
 
 @app.get("/find/{session_id}")
-async def find_car(session_id: int) -> dict:
+async def find_car(
+    session_id: int, user: Optional[dict] = Depends(optional_user)
+) -> dict:
     """Look up a park session and return spot_id + corner coordinates."""
     conn = get_conn()
 
     # Get session
     row = conn.execute(
-        "SELECT spot_id, confidence, recorded_at FROM park_sessions WHERE id = ?",
+        "SELECT spot_id, confidence, recorded_at, user_id FROM park_sessions WHERE id = ?",
         (session_id,),
     ).fetchone()
 
     if not row:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found.")
 
-    spot_id, confidence, recorded_at = row
+    spot_id, confidence, recorded_at, session_user_id = row
+
+    # When auth is on, an owned session is only visible to its owner.
+    if AUTH_ENABLED and session_user_id is not None:
+        if user is None or user["id"] != session_user_id:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found.")
 
     # Get corners from spot_references
     spot_row = conn.execute(
@@ -473,30 +626,149 @@ async def find_car(session_id: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Find My Car — per-spot reference photo management
+# ---------------------------------------------------------------------------
+
+@app.patch("/spots/{spot_id}")
+async def update_spot_label(
+    spot_id: str,
+    payload: SpotLabelUpdate,
+    user: Optional[dict] = Depends(require_user),
+) -> dict:
+    """Owner correction: rename a spot's label after layout generation.
+
+    Updates ``spot_references`` and rewrites the latest ``layout`` row so the
+    new label is reflected by ``GET /map``. Geometry is left unchanged.
+    """
+    conn = get_conn()
+    now = utc_now_iso()
+
+    row = conn.execute(
+        "SELECT spot_id FROM spot_references WHERE spot_id=?", (spot_id,)
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Spot {spot_id} not found.")
+
+    conn.execute(
+        "UPDATE spot_references SET label=? WHERE spot_id=?", (payload.label, spot_id)
+    )
+
+    layout_row = conn.execute(
+        "SELECT id, data FROM layout ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    if layout_row:
+        layout_id, data_json = layout_row
+        data = json.loads(data_json)
+        for spot in data.get("spots", []):
+            if spot.get("spot_id") == spot_id:
+                spot["label"] = payload.label
+        conn.execute(
+            "UPDATE layout SET data=?, updated_at=? WHERE id=?",
+            (json.dumps(data), now, layout_id),
+        )
+
+    conn.commit()
+    return {"spot_id": spot_id, "label": payload.label}
+
+
+@app.post("/spots/{spot_id}/references")
+async def add_spot_references(
+    spot_id: str,
+    photos: List[UploadFile] = File(...),
+    user: Optional[dict] = Depends(require_user),
+) -> dict:
+    """Store one or more reference photos for a spot (used by Find My Car SIFT matching)."""
+    spot_dir = SPOT_REFERENCE_ROOT / spot_id
+    spot_dir.mkdir(parents=True, exist_ok=True)
+
+    conn = get_conn()
+    now = utc_now_iso()
+    saved: List[str] = []
+    for photo in photos:
+        suffix = Path(photo.filename).suffix if photo.filename else ".jpg"
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        dest = spot_dir / f"{stamp}{suffix}"
+        dest.write_bytes(await photo.read())
+        conn.execute(
+            "INSERT INTO spot_reference_images (spot_id, path, created_at) VALUES (?, ?, ?)",
+            (spot_id, str(dest), now),
+        )
+        saved.append(str(dest))
+    conn.commit()
+    return {"spot_id": spot_id, "saved": len(saved), "paths": saved}
+
+
+@app.get("/spots/{spot_id}/references")
+async def list_spot_references(spot_id: str) -> dict:
+    """List stored reference photos for a spot."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT path, created_at FROM spot_reference_images WHERE spot_id=? ORDER BY id DESC",
+        (spot_id,),
+    ).fetchall()
+    return {
+        "spot_id": spot_id,
+        "references": [{"path": r[0], "created_at": r[1]} for r in rows],
+        "count": len(rows),
+    }
+
+
+# ---------------------------------------------------------------------------
 # /layout alias — frontend compatibility
 # ---------------------------------------------------------------------------
 @app.post("/layout")
-async def save_layout_alias(request: Request) -> dict:
-    """
-    Frontend sends raw image files here during owner setup.
-    SfM is not wired server-side yet — return the stored map if one exists,
-    otherwise 404 so the frontend fallback to MOCK_LAYOUT triggers.
+async def save_layout_alias(
+    request: Request, user: Optional[dict] = Depends(require_user)
+) -> dict:
+    """Owner setup entry point.
+
+    Multipart (image uploads): run SfM server-side to build the BEV map + spot
+    polygons, persist the layout, and return it. If SfM cannot produce a usable
+    layout, respond 422 so the app can fall back to manual polygon submission via
+    ``POST /map``.
+
+    JSON body: treated as a precomputed ``LayoutPayload`` (the manual fallback),
+    forwarded to ``POST /map``.
     """
     content_type = request.headers.get("content-type", "")
 
     if "multipart/" in content_type:
-        conn = get_conn()
-        row = conn.execute(
-            "SELECT data, updated_at FROM layout ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-        if row:
-            data = json.loads(row[0])
-            data["updated_at"] = row[1]
-            return data
-        raise HTTPException(
-            status_code=404,
-            detail="No layout stored yet. Load sample handoff or POST /map with a LayoutPayload.",
-        )
+        form = await request.form()
+        uploads = [
+            item
+            for item in form.getlist("images")
+            if hasattr(item, "filename") and item.filename
+        ]
+        if not uploads:
+            raise HTTPException(status_code=422, detail="No images uploaded for SfM.")
+
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        upload_dir = OWNER_UPLOAD_ROOT / stamp
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        saved_paths: List[Path] = []
+        for upload in uploads:
+            dest = upload_dir / Path(upload.filename).name
+            dest.write_bytes(await upload.read())
+            saved_paths.append(dest)
+
+        try:
+            layout_dict = _run_sfm(saved_paths, LAYOUT_OUTPUT_DIR)
+        except Exception as exc:  # SfMError or any CV failure → manual fallback
+            raise HTTPException(
+                status_code=422,
+                detail=f"SfM failed — submit polygons manually via POST /map. ({exc})",
+            ) from exc
+
+        try:
+            payload = LayoutPayload.model_validate(layout_dict)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"SfM produced an invalid layout — submit polygons manually via POST /map. ({exc})",
+            ) from exc
+
+        await save_map(payload, user=user)
+        return await get_map()
 
     try:
         body = await request.json()
@@ -504,7 +776,7 @@ async def save_layout_alias(request: Request) -> dict:
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Invalid layout payload: {exc}") from exc
 
-    return await save_map(layout)
+    return await save_map(layout, user=user)
 
 
 @app.get("/layout")

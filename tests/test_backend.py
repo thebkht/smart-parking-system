@@ -70,7 +70,9 @@ def test_health():
     client = TestClient(app)
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert "auth_enabled" in body
 
 
 def test_update_accepts_v3_payload():
@@ -256,10 +258,24 @@ def test_layout_aliases_return_latest_layout():
     assert body["updated_at"].endswith("Z")
 
 
-def test_multipart_layout_alias_returns_stored_layout():
-    client = TestClient(app)
-    client.post("/map", json=sample_layout())
+def test_multipart_layout_runs_sfm_and_persists(monkeypatch):
+    captured = {}
 
+    def fake_run_sfm(paths, output_dir):
+        captured["paths"] = [p.name for p in paths]
+        return {
+            "canvas": {"width": 200, "height": 160},
+            "background_image": "bev_map.png",
+            "spot_source": "placeholder_grid",
+            "source_images": [p.name for p in paths],
+            "spots": [
+                {"spot_id": "spot_1", "corners": [[0, 0], [10, 0], [10, 10], [0, 10]]},
+            ],
+        }
+
+    monkeypatch.setattr(backend_module, "_run_sfm", fake_run_sfm)
+
+    client = TestClient(app)
     response = client.post(
         "/layout",
         files=[
@@ -270,8 +286,132 @@ def test_multipart_layout_alias_returns_stored_layout():
 
     assert response.status_code == 200
     body = response.json()
-    assert body["spots"] == stored_layout_spots()
-    assert body["updated_at"].endswith("Z")
+    assert body["spot_source"] == "placeholder_grid"
+    assert [s["spot_id"] for s in body["spots"]] == ["spot_1"]
+    assert captured["paths"] == ["lot-1.jpg", "lot-2.jpg"]
+
+    # Layout persisted and queryable.
+    assert client.get("/map").json()["spots"][0]["spot_id"] == "spot_1"
+
+
+def test_multipart_layout_sfm_failure_returns_422(monkeypatch):
+    def boom(paths, output_dir):
+        raise RuntimeError("not enough features")
+
+    monkeypatch.setattr(backend_module, "_run_sfm", boom)
+
+    client = TestClient(app)
+    response = client.post(
+        "/layout",
+        files=[("images", ("lot-1.jpg", b"x", "image/jpeg"))],
+    )
+    assert response.status_code == 422
+    assert "manually" in response.json()["detail"]
+
+
+def test_multipart_layout_no_images_returns_422():
+    client = TestClient(app)
+    response = client.post("/layout", files=[("other", ("x.txt", b"x", "text/plain"))])
+    assert response.status_code == 422
+
+
+def test_patch_spot_label_updates_references_and_map():
+    client = TestClient(app)
+    client.post("/map", json=sample_layout())
+
+    response = client.patch("/spots/spot_1", json={"label": "VIP-1"})
+    assert response.status_code == 200
+    assert response.json() == {"spot_id": "spot_1", "label": "VIP-1"}
+
+    # spot_references updated
+    row = backend_module.get_conn().execute(
+        "SELECT label FROM spot_references WHERE spot_id='spot_1'"
+    ).fetchone()
+    assert row[0] == "VIP-1"
+
+    # GET /map reflects the new label
+    spots = client.get("/map").json()["spots"]
+    assert next(s for s in spots if s["spot_id"] == "spot_1")["label"] == "VIP-1"
+
+
+def test_patch_spot_label_unknown_spot_returns_404():
+    client = TestClient(app)
+    response = client.patch("/spots/nope", json={"label": "X"})
+    assert response.status_code == 404
+
+
+def test_spot_references_upload_and_park_uses_managed_dir(monkeypatch, tmp_path):
+    seen = {}
+
+    fake_localize = types.ModuleType("localize")
+
+    def localize_query(query_path, refs_path, **kwargs):
+        seen["refs_path"] = Path(refs_path)
+        return {"spot_id": "spot_1", "score": 9.0, "elapsed_ms": 12.0}
+
+    fake_localize.localize_query = localize_query
+    monkeypatch.setitem(sys.modules, "localize", fake_localize)
+    monkeypatch.setattr(backend_module, "SPOT_REFERENCE_ROOT", tmp_path / "refs")
+
+    client = TestClient(app)
+    upload = client.post(
+        "/spots/spot_1/references",
+        files=[("photos", ("ref-a.jpg", b"\x89PNG-bytes", "image/jpeg"))],
+    )
+    assert upload.status_code == 200
+    assert upload.json()["saved"] == 1
+
+    listing = client.get("/spots/spot_1/references")
+    assert listing.json()["count"] == 1
+
+    client.post(
+        "/park",
+        files={"photo": ("driver.jpg", b"fake", "image/jpeg")},
+    )
+    # /park localized against the managed reference dir, not the bundled samples.
+    assert seen["refs_path"] == tmp_path / "refs"
+
+
+def test_auth_protects_mutations_when_enabled(monkeypatch):
+    monkeypatch.setattr(backend_module, "AUTH_ENABLED", True)
+    client = TestClient(app)
+
+    # No token → rejected.
+    assert client.post("/map", json=sample_layout()).status_code == 401
+
+    # Register and use the token.
+    reg = client.post("/auth/register", json={"username": "owner"})
+    assert reg.status_code == 200
+    token = reg.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    assert client.post("/map", json=sample_layout(), headers=headers).status_code == 200
+
+
+def test_find_scoped_to_owner_when_auth_enabled(monkeypatch):
+    fake_localize = types.ModuleType("localize")
+    fake_localize.localize_query = lambda *a, **k: {
+        "spot_id": "spot_1",
+        "score": 1.0,
+        "elapsed_ms": 1.0,
+    }
+    monkeypatch.setitem(sys.modules, "localize", fake_localize)
+    monkeypatch.setattr(backend_module, "AUTH_ENABLED", True)
+
+    client = TestClient(app)
+    owner = client.post("/auth/register", json={"username": "o1"}).json()["token"]
+    other = client.post("/auth/register", json={"username": "o2"}).json()["token"]
+    h_owner = {"Authorization": f"Bearer {owner}"}
+    h_other = {"Authorization": f"Bearer {other}"}
+
+    client.post("/map", json=sample_layout(), headers=h_owner)
+    sid = client.post(
+        "/park",
+        files={"photo": ("d.jpg", b"x", "image/jpeg")},
+        headers=h_owner,
+    ).json()["session_id"]
+
+    assert client.get(f"/find/{sid}", headers=h_owner).status_code == 200
+    assert client.get(f"/find/{sid}", headers=h_other).status_code == 404
 
 
 def test_sessions_returns_recent_updates_and_filter():
