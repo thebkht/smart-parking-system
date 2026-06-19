@@ -137,6 +137,59 @@ def load_spots(
     return data, "provided_json"
 
 
+# ACPDS annotations ship with the repo and hold ground-truth quad polygons per
+# frame (normalized 0–1). When an owner uploads recognized ACPDS frames, derive a
+# real layout from the richest frame instead of the synthetic placeholder grid —
+# this keeps the demo's Owner Setup → Live Occupancy flow coherent and idempotent.
+ACPDS_ANNOTATIONS = (
+    Path(__file__).resolve().parents[1] / "datasets" / "acpds" / "annotations.json"
+)
+
+
+def acpds_layout_for(
+    paths: list[Path],
+) -> tuple[np.ndarray, list[dict[str, Any]], int, int] | None:
+    """Return (background_frame, spots_in_pixels, width, height) for the uploaded
+    ACPDS frame with the most annotated spots, or ``None`` if none are recognized."""
+    if not ACPDS_ANNOTATIONS.exists():
+        return None
+    try:
+        ann = json.loads(ACPDS_ANNOTATIONS.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return None
+
+    rois_by_name: dict[str, list] = {}
+    for split in ann.values():
+        if not isinstance(split, dict):
+            continue
+        for name, rois in zip(
+            split.get("file_names", []), split.get("rois_list", [])
+        ):
+            rois_by_name[name] = rois
+
+    best: tuple[Path, list] | None = None
+    for path in paths:
+        rois = rois_by_name.get(path.name)
+        if rois and (best is None or len(rois) > len(best[1])):
+            best = (path, rois)
+    if best is None:
+        return None
+
+    frame = cv2.imread(str(best[0]))
+    if frame is None:
+        return None
+    height, width = frame.shape[:2]
+    spots = [
+        {
+            "spot_id": f"spot_{i}",
+            "label": f"P{i}",
+            "corners": [[round(x * width, 1), round(y * height, 1)] for x, y in quad],
+        }
+        for i, quad in enumerate(best[1], 1)
+    ]
+    return frame, spots, width, height
+
+
 def generate_layout(
     paths: list[Path],
     output_dir: Path,
@@ -156,18 +209,28 @@ def generate_layout(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     frames = load_images(paths)
-    bev = build_bev_canvas(frames)
-    if bev is None or bev.size == 0:
-        raise SfMError("SfM produced an empty BEV canvas.")
+
+    # Recognized ACPDS uploads → real ground-truth layout on the real frame.
+    acpds = acpds_layout_for(paths) if not spots_json else None
+    if acpds is not None:
+        frame, spots, width, height = acpds
+        spot_source = "acpds_annotations"
+        # Downscale the background for transport; polygons stay in full-res
+        # canvas coordinates (the apps scale the image to the canvas box).
+        bev = cv2.resize(frame, (max(1, width // 2), max(1, height // 2)))
+    else:
+        bev = build_bev_canvas(frames)
+        if bev is None or bev.size == 0:
+            raise SfMError("SfM produced an empty BEV canvas.")
+        height, width = bev.shape[:2]
+        spots, spot_source = load_spots(
+            str(spots_json) if spots_json else None, width, height
+        )
 
     bev_path = output_dir / "bev_map.png"
     if not cv2.imwrite(str(bev_path), bev):
         raise SfMError(f"Failed to write {bev_path}")
 
-    height, width = bev.shape[:2]
-    spots, spot_source = load_spots(
-        str(spots_json) if spots_json else None, width, height
-    )
     layout = {
         "canvas": {"width": width, "height": height},
         "background_image": bev_path.name,
