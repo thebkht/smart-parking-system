@@ -44,7 +44,8 @@ function spotStyle(occ, isHighlit, isDimmed) {
     fillColor,
     color,
     weight: isHighlit ? 3 : 1.5,
-    fillOpacity: isDimmed ? 0.05 : 0.13,
+    // 2D schematic (no photo underneath) → fill solidly so spots read as boxes.
+    fillOpacity: isDimmed ? 0.08 : 0.55,
     opacity: isDimmed ? 0.25 : 1,
   };
 }
@@ -88,6 +89,9 @@ export default function LeafletMap({
     // Leaflet uses [lat, lng] = [y, x] in image space.
     const map = L.map(containerRef.current, {
       crs: L.CRS.Simple,
+      // Allow zooming out past 0 — with CRS.Simple, zoom 0 is 1px:1unit, so a
+      // multi-thousand-pixel lot would otherwise clamp and show only a corner.
+      minZoom: -5,
       zoomSnap: 0.1,
       zoomControl: false,
       attributionControl: false,
@@ -104,15 +108,9 @@ export default function LeafletMap({
       [height, width],
     ];
 
-    map.fitBounds(bounds, { padding: [0, 0] });
-
-    // Optional background image overlay
-    if (layout.background_image) {
-      L.imageOverlay(layout.background_image, bounds).addTo(map);
-    } else {
-      // Subtle parking-lot tarmac fill as fallback
-      map.getContainer().style.background = "#f5f5f4";
-    }
+    // Render a clean 2D schematic on a neutral tarmac fill — no photo overlay.
+    // The source frames are distorted wide-angle shots; a flat map reads better.
+    map.getContainer().style.background = "#eceae8";
 
     // Draw all spot polygons
     layout.spots.forEach((spot) => {
@@ -168,8 +166,22 @@ export default function LeafletMap({
       tooltipsRef.current[spot.spot_id] = tooltip;
     });
 
+    // Fit to the whole lot once the container has its real size. Calling
+    // fitBounds at init zooms wrong if the aspect-ratio box hasn't laid out
+    // yet, so refit on the next frame and whenever the container resizes.
+    const fitToLot = () => {
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [12, 12] });
+    };
+    fitToLot();
+    const raf = requestAnimationFrame(fitToLot);
+    const resizeObserver = new ResizeObserver(fitToLot);
+    resizeObserver.observe(containerRef.current);
+
     // Cleanup on unmount
     return () => {
+      cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       polygonsRef.current = {};
