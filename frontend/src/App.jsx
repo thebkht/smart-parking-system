@@ -1,10 +1,10 @@
-import LeafletMap from "./LeafletMap";
-import { normalizeLayout } from "./layout";
-import { parseStatus, countOccupancy } from "./occupancy";
-import { spotLabel, applyLabelEdit } from "./labels";
-import { useState, useEffect, useRef, useCallback } from "react";
-import PropTypes from "prop-types";
-import axios from "axios";
+import LeafletMap from './LeafletMap'
+import { normalizeLayout } from './layout'
+import { parseStatus, countOccupancy } from './occupancy'
+import { spotLabel, applyLabelEdit } from './labels'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import PropTypes from 'prop-types'
+import axios from 'axios'
 import {
   CameraIcon,
   GearIcon,
@@ -13,7 +13,7 @@ import {
   Cross2Icon,
   ArrowRightIcon,
   UpdateIcon,
-} from "@radix-ui/react-icons";
+} from '@radix-ui/react-icons'
 
 // ---------------------------------------------------------------------------
 // PropTypes shapes
@@ -21,7 +21,7 @@ import {
 const spotShape = PropTypes.shape({
   spot_id: PropTypes.string.isRequired,
   corners: PropTypes.arrayOf(PropTypes.arrayOf(PropTypes.number)).isRequired,
-});
+})
 
 const layoutShape = PropTypes.shape({
   canvas: PropTypes.shape({
@@ -32,19 +32,19 @@ const layoutShape = PropTypes.shape({
   source_images: PropTypes.arrayOf(PropTypes.string),
   spot_source: PropTypes.string,
   spots: PropTypes.arrayOf(spotShape),
-});
+})
 
 // ---------------------------------------------------------------------------
 // Mock data
 // ---------------------------------------------------------------------------
 const MOCK_LAYOUT = {
   canvas: { width: 600, height: 400 },
-  background_image: "bev_map.png",
-  source_images: ["img_001.jpg", "img_002.jpg", "img_003.jpg"],
-  spot_source: "placeholder_grid",
+  background_image: 'bev_map.png',
+  source_images: ['img_001.jpg', 'img_002.jpg', 'img_003.jpg'],
+  spot_source: 'placeholder_grid',
   spots: [
     {
-      spot_id: "spot_1",
+      spot_id: 'spot_1',
       corners: [
         [40, 60],
         [110, 60],
@@ -53,7 +53,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_2",
+      spot_id: 'spot_2',
       corners: [
         [120, 60],
         [190, 60],
@@ -62,7 +62,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_3",
+      spot_id: 'spot_3',
       corners: [
         [200, 60],
         [270, 60],
@@ -71,7 +71,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_4",
+      spot_id: 'spot_4',
       corners: [
         [280, 60],
         [350, 60],
@@ -80,7 +80,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_5",
+      spot_id: 'spot_5',
       corners: [
         [360, 60],
         [430, 60],
@@ -89,7 +89,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_6",
+      spot_id: 'spot_6',
       corners: [
         [440, 60],
         [510, 60],
@@ -98,7 +98,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_7",
+      spot_id: 'spot_7',
       corners: [
         [40, 220],
         [110, 220],
@@ -107,7 +107,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_8",
+      spot_id: 'spot_8',
       corners: [
         [120, 220],
         [190, 220],
@@ -116,7 +116,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_9",
+      spot_id: 'spot_9',
       corners: [
         [200, 220],
         [270, 220],
@@ -125,7 +125,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_10",
+      spot_id: 'spot_10',
       corners: [
         [280, 220],
         [350, 220],
@@ -134,7 +134,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_11",
+      spot_id: 'spot_11',
       corners: [
         [360, 220],
         [430, 220],
@@ -143,7 +143,7 @@ const MOCK_LAYOUT = {
       ],
     },
     {
-      spot_id: "spot_12",
+      spot_id: 'spot_12',
       corners: [
         [440, 220],
         [510, 220],
@@ -152,100 +152,102 @@ const MOCK_LAYOUT = {
       ],
     },
   ],
-};
+}
 
 const MOCK_STATUS = {
-  spot_1: "occupied",
-  spot_2: "free",
-  spot_3: "occupied",
-  spot_4: "free",
-  spot_5: "free",
-  spot_6: "occupied",
-  spot_7: "free",
-  spot_8: "occupied",
-  spot_9: "free",
-  spot_10: "occupied",
-  spot_11: "free",
-  spot_12: "occupied",
-};
+  spot_1: 'occupied',
+  spot_2: 'free',
+  spot_3: 'occupied',
+  spot_4: 'free',
+  spot_5: 'free',
+  spot_6: 'occupied',
+  spot_7: 'free',
+  spot_8: 'occupied',
+  spot_9: 'free',
+  spot_10: 'occupied',
+  spot_11: 'free',
+  spot_12: 'occupied',
+}
 
 // ---------------------------------------------------------------------------
 // Axios instance — all requests go through here
 // ---------------------------------------------------------------------------
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
 
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
-});
+})
 
 // Attach the owner bearer token (when present) so mutating routes work if the
 // backend has AUTH_ENABLED. No-op for the default token-less demo.
 api.interceptors.request.use((config) => {
   const token =
-    typeof localStorage !== "undefined" ? localStorage.getItem("spp_token") : null;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('spp_token')
+      : null
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
 
 // ---------------------------------------------------------------------------
 // StatusDot
 // ---------------------------------------------------------------------------
 function StatusDot({ status }) {
   const dotColor =
-    status === "connected"
-      ? "bg-green-500"
-      : status === "polling"
-        ? "bg-amber-500"
-        : "bg-stone-400";
+    status === 'connected'
+      ? 'bg-green-500'
+      : status === 'polling'
+        ? 'bg-amber-500'
+        : 'bg-stone-400'
   return (
     <span className="inline-flex items-center gap-2 text-sm text-stone-500">
       <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`} />
       {status}
     </span>
-  );
+  )
 }
-StatusDot.propTypes = { status: PropTypes.string.isRequired };
+StatusDot.propTypes = { status: PropTypes.string.isRequired }
 
 // ---------------------------------------------------------------------------
 // Spinner
 // ---------------------------------------------------------------------------
 function Spinner() {
-  return (
-    <UpdateIcon className="w-5 h-5 text-stone-500 animate-spin shrink-0" />
-  );
+  return <UpdateIcon className="w-5 h-5 text-stone-500 animate-spin shrink-0" />
 }
 
 // ---------------------------------------------------------------------------
 // AuthControls — optional owner sign-in (used when backend AUTH_ENABLED)
 // ---------------------------------------------------------------------------
 function AuthControls() {
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState('')
   const [token, setToken] = useState(() =>
-    typeof localStorage !== "undefined" ? localStorage.getItem("spp_token") : null,
-  );
-  const [err, setErr] = useState(null);
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('spp_token')
+      : null
+  )
+  const [err, setErr] = useState(null)
 
   const register = async () => {
-    setErr(null);
-    if (!username) return;
+    setErr(null)
+    if (!username) return
     try {
-      const { data } = await api.post("/auth/register", { username });
-      localStorage.setItem("spp_token", data.token);
-      setToken(data.token);
+      const { data } = await api.post('/auth/register', { username })
+      localStorage.setItem('spp_token', data.token)
+      setToken(data.token)
     } catch (e) {
       setErr(
         e?.response?.status === 409
-          ? "Username taken — reuse your existing token."
-          : "Could not register (is auth enabled on the backend?).",
-      );
+          ? 'Username taken — reuse your existing token.'
+          : 'Could not register (is auth enabled on the backend?).'
+      )
     }
-  };
+  }
 
   const signOut = () => {
-    localStorage.removeItem("spp_token");
-    setToken(null);
-  };
+    localStorage.removeItem('spp_token')
+    setToken(null)
+  }
 
   if (token) {
     return (
@@ -259,7 +261,7 @@ function AuthControls() {
           Sign out
         </button>
       </div>
-    );
+    )
   }
 
   return (
@@ -280,7 +282,7 @@ function AuthControls() {
       </div>
       {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
     </div>
-  );
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -288,26 +290,26 @@ function AuthControls() {
 // ---------------------------------------------------------------------------
 function SpotLabelsEditor({ layout, setLayout }) {
   const [drafts, setDrafts] = useState(() =>
-    Object.fromEntries(layout.spots.map((s) => [s.spot_id, spotLabel(s)])),
-  );
-  const [savingId, setSavingId] = useState(null);
-  const [savedId, setSavedId] = useState(null);
-  const [err, setErr] = useState(null);
+    Object.fromEntries(layout.spots.map((s) => [s.spot_id, spotLabel(s)]))
+  )
+  const [savingId, setSavingId] = useState(null)
+  const [savedId, setSavedId] = useState(null)
+  const [err, setErr] = useState(null)
 
   const save = async (spotId) => {
-    setSavingId(spotId);
-    setSavedId(null);
-    setErr(null);
+    setSavingId(spotId)
+    setSavedId(null)
+    setErr(null)
     try {
-      await api.patch(`/spots/${spotId}`, { label: drafts[spotId] });
-      setLayout(applyLabelEdit(layout, spotId, drafts[spotId]));
-      setSavedId(spotId);
+      await api.patch(`/spots/${spotId}`, { label: drafts[spotId] })
+      setLayout(applyLabelEdit(layout, spotId, drafts[spotId]))
+      setSavedId(spotId)
     } catch {
-      setErr(`Could not save ${spotId}. Is the backend running?`);
+      setErr(`Could not save ${spotId}. Is the backend running?`)
     } finally {
-      setSavingId(null);
+      setSavingId(null)
     }
-  };
+  }
 
   return (
     <div className="mt-5 border border-stone-200 rounded-xl p-4">
@@ -321,7 +323,7 @@ function SpotLabelsEditor({ layout, setLayout }) {
               {spot.spot_id}
             </span>
             <input
-              value={drafts[spot.spot_id] ?? ""}
+              value={drafts[spot.spot_id] ?? ''}
               onChange={(e) =>
                 setDrafts((d) => ({ ...d, [spot.spot_id]: e.target.value }))
               }
@@ -333,83 +335,83 @@ function SpotLabelsEditor({ layout, setLayout }) {
               className="text-xs px-2.5 py-1 rounded-md border border-stone-300 bg-white
                          hover:bg-stone-50 transition-colors cursor-pointer disabled:opacity-40"
             >
-              {savedId === spot.spot_id ? "Saved" : "Save"}
+              {savedId === spot.spot_id ? 'Saved' : 'Save'}
             </button>
           </div>
         ))}
       </div>
       {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
     </div>
-  );
+  )
 }
 
 SpotLabelsEditor.propTypes = {
   layout: layoutShape,
   setLayout: PropTypes.func.isRequired,
-};
+}
 
 // ---------------------------------------------------------------------------
 // OwnerSetup
 // ---------------------------------------------------------------------------
 function OwnerSetup({ layout, setLayout }) {
-  const [files, setFiles] = useState([]);
-  const [step, setStep] = useState("idle");
-  const [error, setError] = useState(null);
-  const fileRef = useRef();
+  const [files, setFiles] = useState([])
+  const [step, setStep] = useState('idle')
+  const [error, setError] = useState(null)
+  const fileRef = useRef()
 
   const handleFiles = (e) => {
     const picked = Array.from(e.target.files).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    setFiles(picked);
-    setStep("ready");
-    setError(null);
-  };
+      f.type.startsWith('image/')
+    )
+    setFiles(picked)
+    setStep('ready')
+    setError(null)
+  }
 
   const submit = async () => {
-    if (files.length < 4) {
-      setError("Upload at least 4 photos for reliable SfM.");
-      return;
+    if (files.length < 3) {
+      setError('Upload at least 3 photos for reliable SfM.')
+      return
     }
-    setStep("processing");
-    setError(null);
+    setStep('processing')
+    setError(null)
 
-    const form = new FormData();
-    files.forEach((f) => form.append("images", f));
+    const form = new FormData()
+    files.forEach((f) => form.append('images', f))
 
     try {
       // POST /layout runs SfM server-side and returns the stored layout.
-      const { data } = await api.post("/layout", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setLayout(normalizeLayout(data, { apiBase: API_BASE }));
-      setStep("done");
+      const { data } = await api.post('/layout', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setLayout(normalizeLayout(data, { apiBase: API_BASE }))
+      setStep('done')
     } catch (err) {
       if (err?.response?.status === 422) {
         // SfM could not build a usable layout — fall back to manual entry.
         setError(
-          "SfM could not build a layout from these photos. Submit spot polygons manually (POST /map) or load the sample handoff below.",
-        );
-        setStep("ready");
-        return;
+          'SfM could not build a layout from these photos. Submit spot polygons manually (POST /map) or load the sample handoff below.'
+        )
+        setStep('ready')
+        return
       }
       // Backend unreachable / other error — show the last stored layout if any.
       try {
-        const { data } = await api.get("/map");
-        setLayout(normalizeLayout(data, { apiBase: API_BASE }));
+        const { data } = await api.get('/map')
+        setLayout(normalizeLayout(data, { apiBase: API_BASE }))
       } catch {
-        setLayout(normalizeLayout(MOCK_LAYOUT));
+        setLayout(normalizeLayout(MOCK_LAYOUT))
       }
-      setStep("done");
+      setStep('done')
     }
-  };
+  }
 
   const reset = () => {
-    setFiles([]);
-    setStep("idle");
-    setError(null);
-    setLayout(null);
-  };
+    setFiles([])
+    setStep('idle')
+    setError(null)
+    setLayout(null)
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -431,8 +433,8 @@ function OwnerSetup({ layout, setLayout }) {
         </div>
         <p className="text-base font-medium text-stone-800">
           {files.length
-            ? `${files.length} photo${files.length > 1 ? "s" : ""} selected`
-            : "Click to select photos"}
+            ? `${files.length} photo${files.length > 1 ? 's' : ''} selected`
+            : 'Click to select photos'}
         </p>
         <p className="text-sm text-stone-400 mt-1.5">
           JPG or PNG · minimum 4 images · 60%+ overlap recommended
@@ -464,7 +466,7 @@ function OwnerSetup({ layout, setLayout }) {
       {error && <p className="text-sm text-red-600 mt-2.5">{error}</p>}
 
       {/* Actions */}
-      {(step === "idle" || step === "ready") && (
+      {(step === 'idle' || step === 'ready') && (
         <div className="flex gap-3 mt-6">
           <button
             onClick={submit}
@@ -478,8 +480,8 @@ function OwnerSetup({ layout, setLayout }) {
           </button>
           <button
             onClick={() => {
-              setLayout(normalizeLayout(MOCK_LAYOUT));
-              setStep("done");
+              setLayout(normalizeLayout(MOCK_LAYOUT))
+              setStep('done')
             }}
             className="px-5 py-3 rounded-lg border border-stone-200 bg-transparent text-sm
                        text-stone-500 hover:bg-stone-50 transition-colors cursor-pointer"
@@ -489,7 +491,7 @@ function OwnerSetup({ layout, setLayout }) {
         </div>
       )}
 
-      {step === "processing" && (
+      {step === 'processing' && (
         <div className="flex items-center gap-3 py-4">
           <Spinner />
           <span className="text-sm text-stone-500">Running SfM pipeline…</span>
@@ -519,71 +521,73 @@ function OwnerSetup({ layout, setLayout }) {
             </button>
             <span className="text-sm text-stone-500">
               {layout.canvas && (
-  <>Canvas {layout.canvas.width}×{layout.canvas.height} · </>
-)}
-{layout.source_images?.length ?? 0} source images
+                <>
+                  Canvas {layout.canvas.width}×{layout.canvas.height} ·{' '}
+                </>
+              )}
+              {layout.source_images?.length ?? 0} source images
             </span>
           </div>
         </div>
       )}
     </div>
-  );
+  )
 }
 
 OwnerSetup.propTypes = {
   layout: layoutShape,
   setLayout: PropTypes.func.isRequired,
-};
+}
 
 // ---------------------------------------------------------------------------
 // OccupancyMap
 // ---------------------------------------------------------------------------
 function OccupancyMap({ layout }) {
-  const [status, setStatus] = useState(null);
-  const [pollState, setPollState] = useState("idle");
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [selectedSpot, setSelectedSpot] = useState(null);
-  const intervalRef = useRef(null);
+  const [status, setStatus] = useState(null)
+  const [pollState, setPollState] = useState('idle')
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [selectedSpot, setSelectedSpot] = useState(null)
+  const intervalRef = useRef(null)
 
   const poll = useCallback(async () => {
-    setPollState("polling");
+    setPollState('polling')
     try {
-      const { data } = await api.get("/status");
+      const { data } = await api.get('/status')
       // Backend returns { spots, confidence, timestamp } — extract spots map
-      setStatus(parseStatus(data));
-      setLastUpdated(new Date());
-      setPollState("connected");
+      setStatus(parseStatus(data))
+      setLastUpdated(new Date())
+      setPollState('connected')
     } catch {
       // No backend — use / keep mock data so the map still renders
       setStatus((prev) => {
-        if (prev) return prev;
-        const toggled = {};
+        if (prev) return prev
+        const toggled = {}
         Object.keys(MOCK_STATUS).forEach((k) => {
-          toggled[k] = Math.random() > 0.45 ? "occupied" : "free";
-        });
-        return toggled;
-      });
-      setLastUpdated(new Date());
-      setPollState("idle");
+          toggled[k] = Math.random() > 0.45 ? 'occupied' : 'free'
+        })
+        return toggled
+      })
+      setLastUpdated(new Date())
+      setPollState('idle')
     }
-  }, []);
+  }, [])
 
   const startPolling = () => {
-    poll();
-    intervalRef.current = setInterval(poll, 3000);
-  };
+    poll()
+    intervalRef.current = setInterval(poll, 3000)
+  }
   const stopPolling = () => {
-    clearInterval(intervalRef.current);
-    setPollState("idle");
-  };
-  useEffect(() => () => clearInterval(intervalRef.current), []);
+    clearInterval(intervalRef.current)
+    setPollState('idle')
+  }
+  useEffect(() => () => clearInterval(intervalRef.current), [])
 
   // Count only spots that exist in the published layout — the /status payload
   // can include stale spot IDs from earlier edge runs.
   const { free: freeCount, occupied: occCount } = countOccupancy(
     layout?.spots ?? [],
-    status,
-  );
+    status
+  )
 
   if (!layout)
     return (
@@ -591,17 +595,17 @@ function OccupancyMap({ layout }) {
         No layout loaded. Go to <strong>Owner Setup</strong> first to generate
         the parking map.
       </div>
-    );
+    )
 
   const stats = [
-    { label: "Free spots", value: freeCount, color: "text-green-700" },
-    { label: "Occupied", value: occCount, color: "text-red-700" },
+    { label: 'Free spots', value: freeCount, color: 'text-green-700' },
+    { label: 'Occupied', value: occCount, color: 'text-red-700' },
     {
-      label: "Total spots",
+      label: 'Total spots',
       value: layout.spots.length,
-      color: "text-stone-500",
+      color: 'text-stone-500',
     },
-  ];
+  ]
 
   return (
     <div>
@@ -613,7 +617,7 @@ function OccupancyMap({ layout }) {
               {label}
             </p>
             <p className={`mt-1.5 text-4xl font-medium font-mono ${color}`}>
-              {status ? value : "–"}
+              {status ? value : '–'}
             </p>
           </div>
         ))}
@@ -624,7 +628,7 @@ function OccupancyMap({ layout }) {
         <div className="flex gap-3">
           <button
             onClick={startPolling}
-            disabled={pollState !== "idle"}
+            disabled={pollState !== 'idle'}
             className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg
                        border border-stone-300 bg-transparent hover:bg-stone-50 transition-colors
                        cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -634,7 +638,7 @@ function OccupancyMap({ layout }) {
           </button>
           <button
             onClick={stopPolling}
-            disabled={pollState === "idle"}
+            disabled={pollState === 'idle'}
             className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg
                        border border-stone-200 bg-transparent text-stone-500 hover:bg-stone-50
                        transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -662,9 +666,9 @@ function OccupancyMap({ layout }) {
       {/* Legend */}
       <div className="flex gap-5 mt-3 text-sm text-stone-500 items-center">
         {[
-          ["#1a7a4a", "Free"],
-          ["#c0392b", "Occupied"],
-          ["#e7e5e4", "Unknown"],
+          ['#1a7a4a', 'Free'],
+          ['#c0392b', 'Occupied'],
+          ['#e7e5e4', 'Unknown'],
         ].map(([c, l]) => (
           <span key={l} className="flex items-center gap-2">
             <span
@@ -686,12 +690,12 @@ function OccupancyMap({ layout }) {
           <span className="font-mono text-base">{selectedSpot}</span>
           <span
             className={`text-sm font-medium ${
-              status[selectedSpot] === "free"
-                ? "text-green-700"
-                : "text-red-700"
+              status[selectedSpot] === 'free'
+                ? 'text-green-700'
+                : 'text-red-700'
             }`}
           >
-            {status[selectedSpot] ?? "unknown"}
+            {status[selectedSpot] ?? 'unknown'}
           </span>
           <button
             onClick={() => setSelectedSpot(null)}
@@ -704,22 +708,38 @@ function OccupancyMap({ layout }) {
         </div>
       )}
     </div>
-  );
+  )
 }
 
-OccupancyMap.propTypes = { layout: layoutShape };
+OccupancyMap.propTypes = { layout: layoutShape }
 
 // ---------------------------------------------------------------------------
 // Root App
 // ---------------------------------------------------------------------------
 const TABS = [
-  { id: "setup", label: "Owner setup", Icon: GearIcon },
-  { id: "map", label: "Live occupancy", Icon: UpdateIcon },
-];
+  { id: 'setup', label: 'Owner setup', Icon: GearIcon },
+  { id: 'map', label: 'Live occupancy', Icon: UpdateIcon },
+]
 
 export default function App() {
-  const [tab, setTab] = useState("setup");
-  const [layout, setLayout] = useState(null);
+  const [tab, setTab] = useState('setup')
+  const [layout, setLayout] = useState(null)
+
+  // Hydrate the persisted layout from the backend on mount so Live Occupancy
+  // works after a page reload (or when opened directly) without having to
+  // re-run Owner Setup. A 404 just means no layout exists yet.
+  useEffect(() => {
+    let cancelled = false
+    api
+      .get('/map')
+      .then(({ data }) => {
+        if (!cancelled) setLayout(normalizeLayout(data, { apiBase: API_BASE }))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div className="font-sans max-w-5xl mx-auto px-6 pb-14">
@@ -746,12 +766,12 @@ export default function App() {
               key={id}
               onClick={() => setTab(id)}
               className={[
-                "inline-flex items-center gap-2 px-5 py-3 text-sm border-b-2 transition-colors",
-                "cursor-pointer bg-transparent border-x-0 border-t-0",
+                'inline-flex items-center gap-2 px-5 py-3 text-sm border-b-2 transition-colors',
+                'cursor-pointer bg-transparent border-x-0 border-t-0',
                 tab === id
-                  ? "border-stone-900 text-stone-900 font-semibold"
-                  : "border-transparent text-stone-400 hover:text-stone-600",
-              ].join(" ")}
+                  ? 'border-stone-900 text-stone-900 font-semibold'
+                  : 'border-transparent text-stone-400 hover:text-stone-600',
+              ].join(' ')}
             >
               <Icon className="w-4 h-4" />
               {label}
@@ -760,8 +780,8 @@ export default function App() {
         </div>
       </div>
 
-      {tab === "setup" && <OwnerSetup layout={layout} setLayout={setLayout} />}
-      {tab === "map" && <OccupancyMap layout={layout} />}
+      {tab === 'setup' && <OwnerSetup layout={layout} setLayout={setLayout} />}
+      {tab === 'map' && <OccupancyMap layout={layout} />}
     </div>
-  );
+  )
 }
